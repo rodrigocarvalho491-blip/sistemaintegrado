@@ -27,11 +27,12 @@ CUSTOM_CSS = """
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ ---
+# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ ALTERNATIVA E ESTÁVEL ---
 def consultar_cnpj_api(cnpj_input):
     cnpj_limpo = "".join(filter(str.isdigit, str(cnpj_input)))
     if len(cnpj_limpo) == 14:
-        url = f"https://publica.cnpj.ws/cnpj/{cnpj_limpo}"
+        # Utilizando a API pública BrasilAPI, altamente estável
+        url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
         try:
             response = requests.get(url, timeout=5)
             if response.status_code == 200:
@@ -567,21 +568,25 @@ elif menu == "📝 Elaboração de Contrato":
         # Campo de seleção de Estado (UF)
         uf_selecionada = st.selectbox("Estado (UF)", estados_brasil, index=estados_brasil.index("SP") if "SP" in estados_brasil else 0)
 
-        # Lógica dinâmica para CNPJ / IE e Consulta Automática via API
+        # Lógica dinâmica para CNPJ / IE
         if mesmo_cnpj == "Sim":
             cnpj_campo_val = st.text_input("CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("I.E.", placeholder="Ex: 234.208.886.111")
+            ie_campo_val = st.text_input("I.E.", placeholder="Ex: Digite a Inscrição Estadual")
         elif mesmo_cnpj == "Não":
             cnpj_campo_val = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: 234.208.886.111")
+            ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: Digite a Inscrição Estadual")
 
-        # Se houver 14 dígitos digitados, executa a consulta automática na API
+        # Consulta automática via API estável
         if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
             dados_api = consultar_cnpj_api(cnpj_campo_val)
             if dados_api:
                 razao_social_txt = dados_api.get("razao_social", "Não encontrada")
-                situacao_cad = dados_api.get("estabelecimento", {}).get("situacao_cadastral", "")
-                status_cnpj_txt = "Ativo" if situacao_cad == "Ativa" or situacao_cad == 2 else f"Inativa ({situacao_cad})"
+                situacao_cad = dados_api.get("situacao_cadastral", "")
+                # Ajuste para o padrão numérico ou textual da BrasilAPI
+                if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA":
+                    status_cnpj_txt = "Ativo"
+                else:
+                    status_cnpj_txt = f"Inativa ({situacao_cad})"
                 
                 st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
                 st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
