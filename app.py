@@ -179,10 +179,3 @@ if menu == "📊 Dashboard de Ocorrências":
             with col_f1:
                 cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas)
             with col_f2:
-                sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas)
-            
-            df_filtrado = df_pendentes.copy()
-            if mostrar_so_hoje:
-                hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                hoje_fim = hoje_inicio + timedelta(days=1) - timedelta(seconds=1)
-                df_filtrado = df_filtrado[(df_filtrado['Prazo_DT'] >= hoje_inicio) & (df_
