@@ -166,4 +166,23 @@ if menu == "📊 Dashboard de Ocorrências":
             
             st.subheader("2. Agenda Geral de Visitas Pendentes")
             
-            col_t1, col_t2 = st.columns
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                mostrar_so_hoje = st.toggle("📅 Mostrar apenas ocorrências com prazo PARA HOJE", value=False)
+            with col_t2:
+                mostrar_so_semana = st.toggle("🗓️ Mostrar apenas os próximos 5 dias úteis", value=False)
+            
+            cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
+            sub_class_unicas = sorted(list(df_pendentes[COL_SUB_CLASSIF].unique()))
+            
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas)
+            with col_f2:
+                sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas)
+            
+            df_filtrado = df_pendentes.copy()
+            if mostrar_so_hoje:
+                hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                hoje_fim = hoje_inicio + timedelta(days=1) - timedelta(seconds=1)
+                df_filtrado = df_filtrado[(df_filtrado['Prazo_DT'] >= hoje_inicio) & (df_
