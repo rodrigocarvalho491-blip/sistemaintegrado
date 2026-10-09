@@ -339,3 +339,366 @@ if menu == "📷 Visita de Transferência":
         def __init__(self, cod="", nome=""):
             super().__init__()
             self.cod = cod.replace(".", "").strip().upper()
+            self.nome = nome.strip().upper()
+
+        def header(self):
+            if os.path.exists(LOGO2_PATH):
+                self.image(LOGO2_PATH, x=10, y=8, w=45)
+            if self.page_no() == 1:
+                self.set_y(10)
+                self.set_font("Arial", "B", 15)
+                self.cell(0, 8, "RELATÓRIO TÉCNICO", align="C", ln=1)
+                if self.cod or self.nome:
+                    self.set_font("Arial", "B", 11)
+                    self.cell(0, 6, f"{self.cod} | {self.nome}", align="C", ln=1)
+                self.set_y(35)
+            else:
+                self.set_y(35)
+
+        def footer(self):
+            self.set_y(-15)
+            self.set_font("Arial", "I", 8)
+            self.cell(0, 10, f"Página {self.page_no()}", align="C")
+
+    def gerar_pdf(equipamentos, dic_fotos, cod, nome, qty_c):
+        pdf = RelatorioPDF(cod, nome)
+        pdf.set_margins(10, 35, 10)
+        pdf.set_auto_page_break(auto=True, margin=20)
+
+        for cat, arquivos in dic_fotos.items():
+            if arquivos:
+                pdf.add_page()
+                pdf.set_font("Arial", "B", 11)
+                pdf.cell(0, 6, cat.upper(), ln=1, align="L")
+                pdf.ln(2)
+                for idx, arq in enumerate(arquivos):
+                    try:
+                        img = Image.open(arq)
+                        if img.mode != "RGB": img = img.convert("RGB")
+                        t_path = f"temp_{cat}_{idx}.jpg"
+                        img.save(t_path)
+                        w_p, h_p = img.size
+                        prop = h_p / w_p
+                        w_alv = 130
+                        h_alv = w_alv * prop
+                        if h_alv > 110:
+                            h_alv = 110
+                            w_alv = h_alv / prop
+                        pos_x = (210 - w_alv) / 2
+                        if pdf.get_y() + h_alv > 270: pdf.add_page()
+                        pdf.image(t_path, x=pos_x, y=pdf.get_y(), w=w_alv, h=h_alv)
+                        pdf.set_y(pdf.get_y() + h_alv + 5)
+                        if os.path.exists(t_path): os.remove(t_path)
+                    except Exception:
+                        pass
+
+        if equipamentos:
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 11)
+            pdf.cell(0, 6, "LISTA DE ITENS E VAZÕES", ln=1, align="L")
+            pdf.ln(2)
+            
+            def get_c_pdf(it): return "Central" if qty_c == 1 else it.get("central", "Central")
+            centrais_p = sorted(list(set([get_c_pdf(it) for it in equipamentos])))
+            
+            for c_nome in centrais_p:
+                pdf.set_font("Arial", "B", 10)
+                pdf.cell(0, 6, c_nome.upper(), ln=1, align="L")
+                pdf.set_fill_color(230, 230, 230)
+                pdf.cell(20, 7, "QTD", border=1, align="C", fill=True)
+                pdf.cell(120, 7, "ITEM / EQUIPAMENTO", border=1, align="C", fill=True)
+                pdf.cell(50, 7, "VAZÃO TOTAL", border=1, align="C", fill=True, ln=1)
+                
+                pdf.set_font("Arial", "", 10)
+                tot_v = 0.0
+                for it in equipamentos:
+                    if get_c_pdf(it) == c_nome:
+                        tot_v += it["vazao_total_item"]
+                        v_disp = "-" if it.get("tipo") == "cilindro" else f"{it['vazao_total_item']:.2f}".replace(".", ",").rstrip("0").rstrip(",") + " kg/h"
+                        pdf.cell(20, 6, f"{it['qtd']:02d}", border=1, align="C")
+                        pdf.cell(120, 6, f"{it['nome']}", border=1, align="L")
+                        pdf.cell(50, 6, v_disp, border=1, align="C", ln=1)
+                
+                v_tot_str = f"{tot_v:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                pdf.set_font("Arial", "B", 10)
+                pdf.cell(140, 7, f"VAZÃO TOTAL {c_nome.upper()}:", border=1, align="R", fill=True)
+                pdf.cell(50, 7, f"{v_tot_str} kg/h", border=1, align="C", fill=True, ln=1)
+                pdf.ln(4)
+
+        return pdf.output(dest="S").encode("latin-1")
+
+    st.subheader("6. Ações Finais")
+    col_a1, col_a2 = st.columns(2)
+
+    with col_a1:
+        if st.button("📄 Gerar Relatório PDF"):
+            if not cod_cliente.strip() or not nome_cliente.strip():
+                st.error("⚠️ Preencha pelo menos o Código e o Nome do Cliente.")
+            else:
+                pdf_bytes = gerar_pdf(st.session_state.equipamentos, dic_fotos_final, cod_cliente, nome_cliente, qtd_centrais)
+                st.success("✅ PDF gerado com sucesso!")
+                st.download_button(
+                    label="📥 Baixar Relatório (PDF)",
+                    data=pdf_bytes,
+                    file_name=f"relatorio_{cod_cliente}.pdf",
+                    mime="application/pdf"
+                )
+
+    with col_a2:
+        if st.button("📝 Gerar Texto para Sistema"):
+            lista_eq_txt = ""
+            if st.session_state.equipamentos:
+                def get_c_txt(eq): return "Central" if qtd_centrais == 1 else eq.get("central", "Central")
+                cps = sorted(list(set([get_c_txt(eq) for eq in st.session_state.equipamentos])))
+                for c_n in cps:
+                    lista_eq_txt += f"Equipamentos {c_n}\n"
+                    v_c = 0.0
+                    for eq in st.session_state.equipamentos:
+                        if get_c_txt(eq) == c_n:
+                            lista_eq_txt += f"{eq['texto']}\n"
+                            v_c += eq["vazao_total_item"]
+                    lista_eq_txt += f"\nTotal Vazão {c_n}: {f'{v_c:.2f}'.replace('.', ',')} kg/h\n\n"
+            else:
+                lista_eq_txt = "Nenhum item cadastrado.\n\n"
+
+            texto_final = f"""Contato: {contato}
+Sobrenome ou departamento: {departamento}
+Telefone: {telefone}
+
+Equipamentos de acordo com o contrato vigente? {eq_contrato} - {desc_eq_contrato}
+Representante 2 está correto? {rep2_correto}
+Possui programação cadastrada? {tem_freq} - {desc_freq}
+Consumo mensal atual de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg
+Laudo ART emitido? {possui_art} - {desc_art}
+Central atende as normas? {central_norma} - {desc_central_norma}
+
+Quais equipamentos disponíveis no cliente?
+
+{lista_eq_txt}Indicação de novos negócios do cliente: {indica_negocios}
+Cliente possui débitos? {possui_debitos} - {desc_debitos}
+Cliente está satisfeito com o atendimento da Consigaz? {cliente_satisfeito}
+
+Obs.: {observacoes}
+"""
+            st.success("✅ Texto gerado com sucesso! Copie abaixo:")
+            st.code(texto_final, language="text")
+
+
+# =====================================================================
+# TELA 2: ELABORAÇÃO DE CONTRATO
+# =====================================================================
+elif menu == "📝 Elaboração de Contrato":
+    col_logo, col_titulo = st.columns([1, 4])
+    with col_logo:
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, width=150)
+    with col_titulo:
+        st.title("Elaboração de Contrato")
+        st.markdown("Formulário de preenchimento e geração do padrão de solicitação.")
+
+    st.divider()
+
+    tipo_fluxo = st.radio(
+        "Selecione o objetivo da solicitação:", 
+        ["Gerar Minuta", "Enviar para Assinatura"],
+        horizontal=True
+    )
+
+    st.divider()
+
+    # --- TEMA 1: MOTIVO ---
+    st.subheader("1. Motivo")
+    motivo_solicitacao = st.text_input("Motivo da solicitação", placeholder="Ex: Alteração de CNPJ + Reneg de Preço")
+
+    st.divider()
+
+    # --- TEMA 2: DADOS DO CLIENTE ---
+    st.subheader("2. Dados do Cliente")
+    col_cli1, col_cli2, col_cli3 = st.columns(3)
+    with col_cli1:
+        contato_contrato = st.text_input("Contato", placeholder="Ex: Sidnei")
+    with col_cli2:
+        telefone_contrato = st.text_input("Telefone", placeholder="Ex: 11 99157-0730")
+    with col_cli3:
+        email_contrato = st.text_input("E-mail", placeholder="Ex: adm@grscondominios.com.br")
+
+    st.divider()
+
+    # --- TEMA 3: SOLICITAÇÃO ---
+    st.subheader("3. Solicitação")
+    tipo_contrato = st.selectbox("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], index=None, placeholder="Selecione...")
+
+    st.divider()
+
+    # --- TEMA 4: DADOS DO CONTRATO ---
+    st.subheader("4. Dados do Contrato")
+    col_con1, col_con2 = st.columns(2)
+    with col_con1:
+        endereco_padrao = st.text_input("Endereço padrão ou entrega?", placeholder="Ex: Padrão + ENTREGA1")
+        mesmo_cnpj = st.selectbox("Mesmo CNPJ?", ["Sim", "Não"], index=None, placeholder="Selecione...")
+        mesmo_prop = st.selectbox("Mesmo proprietário?", ["Sim", "Não"], index=None, placeholder="Selecione...")
+        novo_cnpj = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56")
+    with col_con2:
+        nova_ie = st.text_input("Nova I.E.", placeholder="Ex: 234.208.886.111")
+        cond_pagamento = st.text_input("Condição de pagamento", placeholder="Ex: 14 dias")
+        vigencia = st.text_input("Vigência", placeholder="Ex: 60 meses")
+
+    st.divider()
+
+    # --- TEMA 5: DADOS DO COMODATO ---
+    st.subheader("5. Dados do Comodato")
+    equipamentos_contrato = st.text_input("Equipamentos", placeholder="Ex: 01 b190 + 01 CC")
+    
+    tipo_fornecimento = st.multiselect("Tipo de Fornecimento", ["Granel", "Cilindro"])
+    
+    preco_granel = ""
+    consumo_granel = ""
+    if "Granel" in tipo_fornecimento:
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            preco_granel = st.text_input("Preço Granel", placeholder="Ex: 7,50")
+        with col_g2:
+            consumo_granel = st.text_input("Consumo previsto (Granel) mensal", placeholder="Ex: 100 kgs")
+        
+    preco_cilindro_str = ""
+    consumo_cilindro_total = 0
+    p13_qtd, p20_qtd, p45_qtd = 0, 0, 0
+    p13_val, p20_val, p45_val = "", "", ""
+    
+    if "Cilindro" in tipo_fornecimento:
+        st.markdown("**Preços e Quantidades por Modelo de Cilindro:**")
+        col_c_mod1, col_c_mod2 = st.columns(2)
+        with col_c_mod1:
+            p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1)
+        with col_c_mod2:
+            p13_val = st.text_input("Preço P13 (/und)", placeholder="xx,xx")
+            
+        col_c_mod3, col_c_mod4 = st.columns(2)
+        with col_c_mod3:
+            p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1)
+        with col_c_mod4:
+            p20_val = st.text_input("Preço P20 (/und)", placeholder="xx,xx")
+            
+        col_c_mod5, col_c_mod6 = st.columns(2)
+        with col_c_mod5:
+            p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1)
+        with col_c_mod6:
+            p45_val = st.text_input("Preço P45 (/und)", placeholder="xx,xx")
+        
+        preco_cilindro_str = f"[P13 = {p13_val} / und] [P20 = {p20_val} / und] [P45 = {p45_val} / und]"
+        consumo_cilindro_total = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
+
+    st.divider()
+
+    # --- TEMA 6: FINANCEIRO ---
+    st.subheader("6. Financeiro")
+    col_fin1, col_fin2 = st.columns(2)
+    with col_fin1:
+        possui_debito_fin = st.selectbox("Cliente possui débitos?", ["Não", "Sim"], index=0)
+        resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", placeholder="Ex: n/a")
+    with col_fin2:
+        email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", placeholder="Ex: N/A")
+
+    if tipo_fluxo == "Enviar para Assinatura":
+        st.markdown("---")
+        st.markdown("### Dados de Assinatura e Testemunhas")
+        col_a1, col_a2 = st.columns(2)
+        with col_a1:
+            nome_testemunha = st.text_input("Nome da Testemunha", placeholder="")
+            email_testemunha = st.text_input("E-mail da Testemunha", placeholder="")
+        with col_a2:
+            nome_responsavel = st.text_input("Nome do Responsável pela assinatura", placeholder="")
+            email_responsavel = st.text_input("E-mail do Responsável pela assinatura", placeholder="")
+    else:
+        nome_testemunha = ""
+        email_testemunha = ""
+        nome_responsavel = ""
+        email_responsavel = ""
+
+    st.divider()
+
+    # --- TEMA 7: CONTA SIM ---
+    st.subheader("7. Condomínio CONTA SIM")
+    conta_sim = st.selectbox("Condomínio CONTA SIM?", ["Não", "Sim"], index=0)
+
+    num_unidades = ""
+    qtd_torres = ""
+    qtd_blocos = ""
+    preco_religue = ""
+    preco_servico = ""
+
+    if conta_sim == "Sim":
+        col_cs1, col_cs2, col_cs3 = st.columns(3)
+        with col_cs1:
+            num_unidades = st.text_input("N° Unid autônomas (Aptos + áreas comuns/zeladoria)", placeholder="")
+            qtd_torres = st.text_input("Qtd Torres", placeholder="")
+        with col_cs2:
+            qtd_blocos = st.text_input("Qtd Blocos", placeholder="")
+            preco_religue = st.text_input("Valor preço de religue", placeholder="")
+        with col_cs3:
+            preco_servico = st.text_input("Valor preço de serviço", placeholder="")
+
+    st.write("")
+    observacoes_contrato = st.text_area("Obs.", placeholder="Ex: Cliente trocou de CNPJ...")
+
+    st.divider()
+    if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
+        
+        texto_padrao_contrato = f"""ELABORAÇÃO DE CONTRATO
+
+Motivo da solicitação: {motivo_solicitacao}
+
+Contato: {contato_contrato}
+Telefone: {telefone_contrato}
+E-mail: {email_contrato}
+Contrato / Aditamento / Distrato: {tipo_contrato if tipo_contrato else ''}
+Mesmo CNPJ?: {mesmo_cnpj if mesmo_cnpj else ''}
+Mesmo proprietário?: {mesmo_prop if mesmo_prop else ''}
+Novo CNPJ: {novo_cnpj}
+Nova I.E.: {nova_ie}
+Endereço padrão ou entrega?: {endereco_padrao}"""
+
+        if "Granel" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg"
+            
+        if "Cilindro" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nPreço Cilindro: {preco_cilindro_str}"
+
+        texto_padrao_contrato += f"""
+Condição de pagamento: {cond_pagamento}"""
+
+        if "Granel" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nConsumo previsto (Granel) mensal: {consumo_granel}"
+            
+        if "Cilindro" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nQual consumo previsto (Cilindro) mensal: {consumo_cilindro_total} kgs"
+
+        texto_padrao_contrato += f"""
+Vigência: {vigencia}
+Equipamentos: {equipamentos_contrato}
+
+Cliente possui débitos?: {possui_debito_fin}
+Quem será o responsável pelas NF's pendentes? {resp_pendentes}
+E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop}
+
+Nome da Testemunha: {nome_testemunha}
+E-mail da Testemunha: {email_testemunha}
+Nome do Responsável pela assinatura: {nome_responsavel}
+E-mail do Responsável pela assinatura: {email_responsavel}
+
+Condomínio CONTA SIM?: {conta_sim}"""
+
+        if conta_sim == "Sim":
+            texto_padrao_contrato += f"""
+N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades}
+Qtd Torres: {qtd_torres}
+Qtd Blocos: {qtd_blocos}
+Valor preço de religue: {preco_religue}
+Valor preço de serviço: {preco_servico}"""
+
+        texto_padrao_contrato += f"""
+
+Obs.: {observacoes_contrato}"""
+
+        st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
+        st.code(texto_padrao_contrato, language="text")
