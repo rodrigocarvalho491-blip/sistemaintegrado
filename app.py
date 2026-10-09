@@ -247,4 +247,64 @@ if menu == "📊 Dashboard de Ocorrências":
         except Exception as e:
             st.error(f"⚠️ Erro ao processar o ficheiro Excel: {e}")
     else:
-        st.info("👆 Por favor, faça o upload da folha de cálculo atualizada de ocorrências acima para
+        st.info("👆 Por favor, faça o upload da folha de cálculo atualizada de ocorrências acima para carregar o dashboard.")
+
+
+# =====================================================================
+# TELA 2: TRATATIVA & RELATÓRIO TÉCNICO (Subpágina unificada)
+# =====================================================================
+elif menu == "📷 Tratativa & Relatório Técnico":
+    rc = st.session_state.reset_counter
+    ekc = st.session_state.eq_key_counter
+
+    col_logo, col_titulo = st.columns([1, 4])
+    with col_logo:
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, width=150)
+    with col_titulo:
+        st.title("Subpágina de Tratativa & Relatório Técnico")
+        oc_ativa = st.session_state.ocorrencia_ativa
+        if oc_ativa["codigo"]:
+            st.info(f"🔗 Ocorrência em Tratativa: **#{oc_ativa['codigo']}** — **{oc_ativa['cliente']}**")
+        else:
+            st.warning("⚠️ Nenhuma ocorrência selecionada no Dashboard. Preencha os campos abaixo de forma manual ou selecione uma no menu anterior.")
+
+    st.divider()
+
+    # Botão flutuante para reiniciar dados do cliente
+    st.button("🔄 Novo Cliente / Limpar", on_click=resetar_dados_cliente)
+
+    # --- SEÇÃO 1: DADOS DO CLIENTE ---
+    st.subheader("1. Identificação do Cliente")
+    
+    val_cod = oc_ativa["codigo"] if oc_ativa["codigo"] else ""
+    val_nome = oc_ativa["cliente"] if oc_ativa["cliente"] else ""
+
+    s1_l1_c1, s1_l1_c2, s1_l1_c3 = st.columns(3)
+    with s1_l1_c1:
+        cod_cliente = st.text_input("Código do Cliente *", value=val_cod, placeholder="Ex: 87.653", key=f"input_cod_{rc}")
+    with s1_l1_c2:
+        nome_cliente = st.text_input("Nome / Razão Social *", value=val_nome, placeholder="Ex: SABOR DA TERRA", key=f"input_nome_{rc}")
+    with s1_l1_c3:
+        telefone = st.text_input("Telefone *", placeholder="Ex: 12-992586760", key=f"input_tel_{rc}")
+
+    s1_l2_c1, s1_l2_c2, s1_l2_c3 = st.columns(3)
+    with s1_l2_c1:
+        contato = st.text_input("Contato *", placeholder="Ex: Nilton", key=f"input_contato_{rc}")
+    with s1_l2_c2:
+        departamento = st.text_input("Sobrenome ou Departamento *", placeholder="Ex: Gerente", key=f"input_depto_{rc}")
+    with s1_l2_c3:
+        st.write("")
+
+    st.divider()
+
+    # --- SEÇÃO 2: INFORMAÇÕES CONTRATUAIS ---
+    st.subheader("2. Informações Contratuais")
+
+    s2_l1_c1, s2_l1_c2, s2_l1_c3, s2_l1_c4 = st.columns(4)
+    with s2_l1_c1:
+        eq_contrato = st.selectbox("Equipamentos de acordo com contrato? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"eq_contrato_{rc}")
+    with s2_l1_c2:
+        desc_eq_contrato = st.text_input("Quais equipamentos disponíveis? *", placeholder="Ex: 01 B190...", key=f"desc_eq_contrato_{rc}")
+    with s2_l1_c3:
+        tem_freq = st.selectbox("Possui programação cadastrada? *",
