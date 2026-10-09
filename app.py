@@ -750,4 +750,49 @@ Nova I.E.: {ie_campo_val}"""
             texto_padrao_contrato += f"\nStatus I.E.: {situacao_ie_txt}"
 
         texto_padrao_contrato += f"""
-Endereço padrão ou entrega?:
+Endereço padrão ou entrega?: {endereco_padrao}"""
+
+        if "Granel" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg"
+            
+        if "Cilindro" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nPreço Cilindro: {preco_cilindro_str}"
+
+        texto_padrao_contrato += f"""
+Condição de pagamento: {cond_pagamento}"""
+
+        if "Granel" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nConsumo previsto (Granel) mensal: {consumo_granel}"
+            
+        if "Cilindro" in tipo_fornecimento:
+            texto_padrao_contrato += f"\nQual consumo previsto (Cilindro) mensal: {consumo_cilindro_total} kgs"
+
+        texto_padrao_contrato += f"""
+Vigência: {vigencia}
+Equipamentos: {equipamentos_contrato}
+
+Cliente possui débitos?: {possui_debito_fin}
+Quem será o responsável pelas NF's pendentes? {resp_pendentes}
+E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop}
+
+Nome da Testemunha: {nome_testemunha}
+E-mail da Testemunha: {email_testemunha}
+Nome do Responsável pela assinatura: {nome_responsavel}
+E-mail do Responsável pela assinatura: {email_responsavel}
+
+Condomínio CONTA SIM?: {conta_sim}"""
+
+        if conta_sim == "Sim":
+            texto_padrao_contrato += f"""
+N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades}
+Qtd Torres: {qtd_torres}
+Qtd Blocos: {qtd_blocos}
+Valor preço de religue: {preco_religue}
+Valor preço de serviço: {preco_servico}"""
+
+        texto_padrao_contrato += f"""
+
+Obs.: {observacoes_contrato}"""
+
+        st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
+        st.code(texto_padrao_contrato, language="text")
