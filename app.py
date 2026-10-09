@@ -27,11 +27,10 @@ CUSTOM_CSS = """
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ ALTERNATIVA E ESTÁVEL ---
+# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ E INSCRIÇÃO ESTADUAL ---
 def consultar_cnpj_api(cnpj_input):
     cnpj_limpo = "".join(filter(str.isdigit, str(cnpj_input)))
     if len(cnpj_limpo) == 14:
-        # Utilizando a API pública BrasilAPI, altamente estável
         url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
         try:
             response = requests.get(url, timeout=5)
@@ -551,7 +550,7 @@ elif menu == "📝 Elaboração de Contrato":
     
     # Variáveis globais de controle para preenchimento/consulta
     cnpj_campo_val, ie_campo_val = "", ""
-    status_cnpj_txt, razao_social_txt = "", ""
+    status_cnpj_txt, razao_social_txt, ie_consultada = "", "", ""
     uf_selecionada = ""
 
     estados_brasil = [
@@ -568,30 +567,45 @@ elif menu == "📝 Elaboração de Contrato":
         # Campo de seleção de Estado (UF)
         uf_selecionada = st.selectbox("Estado (UF)", estados_brasil, index=estados_brasil.index("SP") if "SP" in estados_brasil else 0)
 
-        # Lógica dinâmica para CNPJ / IE
-        if mesmo_cnpj == "Sim":
-            cnpj_campo_val = st.text_input("CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("I.E.", placeholder="Ex: Digite a Inscrição Estadual")
-        elif mesmo_cnpj == "Não":
-            cnpj_campo_val = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: Digite a Inscrição Estadual")
-
-        # Consulta automática via API estável
-        if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
-            dados_api = consultar_cnpj_api(cnpj_campo_val)
+        # Consulta automática via API do CNPJ (puxa dados da empresa e tenta capturar a Inscrição Estadual federal se disponível)
+        cnpj_input_temp = st.text_input("CNPJ (Digite para consultar)", placeholder="Ex: 58.582.414/0001-56")
+        
+        if len("".join(filter(str.isdigit, str(cnpj_input_temp)))) == 14:
+            dados_api = consultar_cnpj_api(cnpj_input_temp)
             if dados_api:
                 razao_social_txt = dados_api.get("razao_social", "Não encontrada")
                 situacao_cad = dados_api.get("situacao_cadastral", "")
-                # Ajuste para o padrão numérico ou textual da BrasilAPI
                 if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA":
                     status_cnpj_txt = "Ativo"
                 else:
                     status_cnpj_txt = f"Inativa ({situacao_cad})"
                 
+                # Tenta extrair a Inscrição Estadual caso a API retorne nos dados estaduais do estabelecimento
+                estab = dados_api.get("estabelecimento", {})
+                regs_estaduais = estab.get("inscricoes_estaduais", [])
+                if regs_estaduais:
+                    for reg in regs_estaduais:
+                        if reg.get("estado", {}).get("sigla") == uf_selecionada and reg.get("ativo"):
+                            ie_consultada = reg.get("inscricao_estadual", "")
+                            break
+
                 st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
                 st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
+                if ie_consultada:
+                    st.markdown(f"🔵 **I.E. Encontrada ({uf_selecionada}):** {ie_consultada}")
             else:
                 st.warning("⚠️ CNPJ não encontrado ou erro na consulta automática.")
+
+        # Lógica dinâmica para exibição dos campos de CNPJ / IE conforme a escolha
+        if mesmo_cnpj == "Sim":
+            cnpj_campo_val = st.text_input("CNPJ (Confirmação)", value=cnpj_input_temp, placeholder="Ex: 58.582.414/0001-56")
+            ie_campo_val = st.text_input("I.E.", value=ie_consultada, placeholder="Ex: Digite ou cole a Inscrição Estadual")
+        elif mesmo_cnpj == "Não":
+            cnpj_campo_val = st.text_input("Novo CNPJ", value=cnpj_input_temp, placeholder="Ex: 58.582.414/0001-56")
+            ie_campo_val = st.text_input("Nova I.E.", value=ie_consultada, placeholder="Ex: Digite ou cole a Inscrição Estadual")
+        else:
+            cnpj_campo_val = cnpj_input_temp
+            ie_campo_val = ie_consultada
 
     with col_con2:
         cond_pagamento = st.text_input("Condição de pagamento", placeholder="Ex: 14 dias")
