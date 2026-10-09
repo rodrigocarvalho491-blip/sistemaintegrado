@@ -27,64 +27,15 @@ CUSTOM_CSS = """
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÕES NA BARRA LATERAL (API E NAVEGAÇÃO) ---
-st.sidebar.title("📌 Menu de Navegação")
-menu = st.sidebar.radio(
-    "Selecione a página:", 
-    [
-        "📷 Visita de Transferência",
-        "📝 Elaboração de Contrato"
-    ]
-)
-
-st.sidebar.divider()
-st.sidebar.subheader("⚙️ Configurações de API")
-api_key_input = st.sidebar.text_input("Chave API Sintegra / IE (Opcional)", type="password", placeholder="Insira seu token gratuito se houver")
-st.sidebar.caption("Utilizado para consultar I.E. e situação cadastral automaticamente dentro da franquia gratuita.")
-
-if st.sidebar.button("🔄 Resetar Sessão Completa"):
-    st.session_state.clear()
-    st.rerun()
-
-# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ E I.E. ---
-def consultar_dados_cadastrais(cnpj_input, api_key=""):
+# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ ---
+def consultar_cnpj_api(cnpj_input):
     cnpj_limpo = "".join(filter(str.isdigit, str(cnpj_input)))
     if len(cnpj_limpo) == 14:
-        # Se houver chave de API configurada, tenta consultar via provedor integrado de Sintegra/IE
-        if api_key.strip():
-            url = f"https://www.sintegrabrasil.com.br/api/v1/cnpj/{cnpj_limpo}"
-            headers = {"X-Api-Key": api_key.strip()}
-            try:
-                response = requests.get(url, headers=headers, timeout=5)
-                if response.status_code == 200:
-                    dados = response.json()
-                    # Retorna estruturado no formato unificado
-                    ies = dados.get("inscricoes_estaduais", [])
-                    ie_val = ies[0].get("inscricao_estadual", "") if ies else ""
-                    situacao_ie_val = "Habilitada" if (ies and ies[0].get("ativo")) else "Inativa/Baixada"
-                    return {
-                        "razao_social": dados.get("razao_social", ""),
-                        "situacao_cnpj": dados.get("situacao_cadastral", "Ativo"),
-                        "inscricao_estadual": ie_val,
-                        "situacao_ie": situacao_ie_val
-                    }
-            except Exception:
-                pass
-
-        # Fallback padrão e gratuito apenas para CNPJ via BrasilAPI caso não use chave externa
-        url_fallback = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
+        url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
         try:
-            response = requests.get(url_fallback, timeout=5)
+            response = requests.get(url, timeout=5)
             if response.status_code == 200:
-                dados = response.json()
-                situacao_cad = dados.get("situacao_cadastral", "")
-                status_txt = "Ativo" if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA" else f"Inativa ({situacao_cad})"
-                return {
-                    "razao_social": dados.get("razao_social", ""),
-                    "situacao_cnpj": status_txt,
-                    "inscricao_estadual": "",
-                    "situacao_ie": "Não consultada (Requer Token)"
-                }
+                return response.json()
         except Exception:
             return None
     return None
@@ -111,6 +62,21 @@ def resetar_dados_cliente():
     st.session_state.equipamentos = []
     st.session_state.last_central = "Central"
     st.session_state.last_tipo_cad = "Equipamentos"
+
+# --- MENU LATERAL DE NAVEGAÇÃO ---
+st.sidebar.title("📌 Menu de Navegação")
+menu = st.sidebar.radio(
+    "Selecione a página:", 
+    [
+        "📷 Visita de Transferência",
+        "📝 Elaboração de Contrato"
+    ]
+)
+
+st.sidebar.divider()
+if st.sidebar.button("🔄 Resetar Sessão Completa"):
+    st.session_state.clear()
+    st.rerun()
 
 
 # =====================================================================
@@ -505,7 +471,7 @@ if menu == "📷 Visita de Transferência":
                         if get_c_txt(eq) == c_n:
                             lista_eq_txt += f"{eq['texto']}\n"
                             v_c += eq["vazao_total_item"]
-                    lista_eq_txt += f"\nTotal Vazão {c_n}: {f'{v_c:.2f}'.replace('.', ',')} kg/h\n\n"
+                    lista_eq_txt += f"\nTotal Vazão {c_n}: {f'{v_c:.2f}'.replace(".", ",")} kg/h\n\n"
             else:
                 lista_eq_txt = "Nenhum item cadastrado.\n\n"
 
@@ -556,243 +522,4 @@ elif menu == "📝 Elaboração de Contrato":
 
     # --- TEMA 1: MOTIVO ---
     st.subheader("1. Motivo")
-    motivo_solicitacao = st.text_input("Motivo da solicitação", placeholder="Ex: Alteração de CNPJ + Reneg de Preço")
-
-    st.divider()
-
-    # --- TEMA 2: DADOS DO CLIENTE ---
-    st.subheader("2. Dados do Cliente")
-    col_cli1, col_cli2, col_cli3 = st.columns(3)
-    with col_cli1:
-        contato_contrato = st.text_input("Contato", placeholder="Ex: Sidnei")
-    with col_cli2:
-        telefone_contrato = st.text_input("Telefone", placeholder="Ex: 11 99157-0730")
-    with col_cli3:
-        email_contrato = st.text_input("E-mail", placeholder="Ex: adm@grscondominios.com.br")
-
-    st.divider()
-
-    # --- TEMA 3: SOLICITAÇÃO ---
-    st.subheader("3. Solicitação")
-    tipo_contrato = st.radio("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None)
-
-    st.divider()
-
-    # --- TEMA 4: DADOS DO CONTRATO ---
-    st.subheader("4. Dados do Contrato")
-    col_con1, col_con2 = st.columns(2)
-    
-    # Variáveis globais de controle para preenchimento/consulta
-    cnpj_campo_val, ie_campo_val = "", ""
-    status_cnpj_txt, razao_social_txt, situacao_ie_txt = "", "", ""
-
-    with col_con1:
-        endereco_padrao = st.text_input("Endereço padrão ou entrega?", placeholder="Ex: Padrão + ENTREGA1")
-        mesmo_prop = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None)
-        mesmo_cnpj = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None)
-        
-        # Lógica dinâmica baseada na seleção de "Mesmo CNPJ?"
-        if mesmo_cnpj == "Sim":
-            cnpj_campo_val = st.text_input("CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("I.E.", placeholder="Ex: 234.208.886.111")
-        elif mesmo_cnpj == "Não":
-            cnpj_campo_val = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: 234.208.886.111")
-
-        # Executa a consulta automática se o CNPJ tiver 14 dígitos
-        if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
-            resultado_consulta = consultar_dados_cadastrais(cnpj_campo_val, api_key_input)
-            if resultado_consulta:
-                razao_social_txt = resultado_consulta.get("razao_social", "")
-                status_cnpj_txt = resultado_consulta.get("situacao_cnpj", "")
-                situacao_ie_txt = resultado_consulta.get("situacao_ie", "")
-                
-                # Se a API retornou a IE e o campo estiver vazio, preenche automaticamente
-                if resultado_consulta.get("inscricao_estadual") and not ie_campo_val:
-                    ie_campo_val = resultado_consulta.get("inscricao_estadual")
-
-                st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
-                st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
-                if situacao_ie_txt:
-                    st.markdown(f"🔵 **Status I.E.:** {situacao_ie_txt}")
-            else:
-                st.warning("⚠️ CNPJ não encontrado ou erro na consulta automática.")
-
-    with col_con2:
-        cond_pagamento = st.text_input("Condição de pagamento", placeholder="Ex: 14 dias")
-        vigencia = st.text_input("Vigência", placeholder="Ex: 60 meses")
-        equipamentos_contrato = st.text_input("Equipamentos", placeholder="Ex: 01 b190 + 01 CC")
-
-    st.divider()
-
-    # --- TEMA 5: COMODATO / FORNECIMENTO ---
-    st.subheader("5. Comodato / Fornecimento")
-    tipo_fornecimento = st.multiselect("Tipo de Fornecimento", ["Granel", "Cilindro"])
-    
-    preco_granel = ""
-    consumo_granel = ""
-    if "Granel" in tipo_fornecimento:
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            preco_granel = st.text_input("Preço Granel", placeholder="Ex: 7,50")
-        with col_g2:
-            consumo_granel = st.text_input("Consumo previsto (Granel) mensal", placeholder="Ex: 100 kgs")
-        
-    preco_cilindro_str = ""
-    consumo_cilindro_total = 0
-    p13_qtd, p20_qtd, p45_qtd = 0, 0, 0
-    p13_val, p20_val, p45_val = "", "", ""
-    
-    if "Cilindro" in tipo_fornecimento:
-        st.markdown("**Preços e Quantidades por Modelo de Cilindro:**")
-        col_c_mod1, col_c_mod2 = st.columns(2)
-        with col_c_mod1:
-            p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1)
-        with col_c_mod2:
-            p13_val = st.text_input("Preço P13 (/und)", placeholder="xx,xx")
-            
-        col_c_mod3, col_c_mod4 = st.columns(2)
-        with col_c_mod3:
-            p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1)
-        with col_c_mod4:
-            p20_val = st.text_input("Preço P20 (/und)", placeholder="xx,xx")
-            
-        col_c_mod5, col_c_mod6 = st.columns(2)
-        with col_c_mod5:
-            p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1)
-        with col_c_mod6:
-            p45_val = st.text_input("Preço P45 (/und)", placeholder="xx,xx")
-        
-        preco_cilindro_str = f"[P13 = {p13_val} / und] [P20 = {p20_val} / und] [P45 = {p45_val} / und]"
-        consumo_cilindro_total = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
-
-    st.divider()
-
-    # --- TEMA 6: FINANCEIRO ---
-    st.subheader("6. Financeiro")
-    col_fin1, col_fin2 = st.columns(2)
-    with col_fin1:
-        possui_debito_fin = st.radio("Cliente possui débitos?", ["Não", "Sim"], horizontal=True, index=0)
-        resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", placeholder="Ex: n/a")
-    with col_fin2:
-        email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", placeholder="Ex: N/A")
-
-    if tipo_fluxo == "Enviar para Assinatura":
-        st.markdown("---")
-        st.markdown("### Dados de Assinatura e Testemunhas")
-        col_a1, col_a2 = st.columns(2)
-        with col_a1:
-            nome_testemunha = st.text_input("Nome da Testemunha", placeholder="")
-            email_testemunha = st.text_input("E-mail da Testemunha", placeholder="")
-        with col_a2:
-            nome_responsavel = st.text_input("Nome do Responsável pela assinatura", placeholder="")
-            email_responsavel = st.text_input("E-mail do Responsável pela assinatura", placeholder="")
-    else:
-        nome_testemunha = ""
-        email_testemunha = ""
-        nome_responsavel = ""
-        email_responsavel = ""
-
-    st.divider()
-
-    # --- TEMA 7: CONTA SIM ---
-    st.subheader("7. Condomínio CONTA SIM")
-    conta_sim = st.radio("Condomínio CONTA SIM?", ["Não", "Sim"], horizontal=True, index=0)
-
-    num_unidades = ""
-    qtd_torres = ""
-    qtd_blocos = ""
-    preco_religue = ""
-    preco_servico = ""
-
-    if conta_sim == "Sim":
-        col_cs1, col_cs2, col_cs3 = st.columns(3)
-        with col_cs1:
-            num_unidades = st.text_input("N° Unid autônomas (Aptos + áreas comuns/zeladoria)", placeholder="")
-            qtd_torres = st.text_input("Qtd Torres", placeholder="")
-        with col_cs2:
-            qtd_blocos = st.text_input("Qtd Blocos", placeholder="")
-            preco_religue = st.text_input("Valor preço de religue", placeholder="")
-        with col_cs3:
-            preco_servico = st.text_input("Valor preço de serviço", placeholder="")
-
-    st.write("")
-    observacoes_contrato = st.text_area("Obs.", placeholder="Ex: Cliente trocou de CNPJ...")
-
-    st.divider()
-    if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
-        
-        texto_padrao_contrato = f"""ELABORAÇÃO DE CONTRATO
-
-Motivo da solicitação: {motivo_solicitacao}
-
-Contato: {contato_contrato}
-Telefone: {telefone_contrato}
-E-mail: {email_contrato}
-Contrato / Aditamento / Distrato: {tipo_contrato if tipo_contrato else ''}
-Mesmo proprietário?: {mesmo_prop if mesmo_prop else ''}
-Mesmo CNPJ?: {mesmo_cnpj if mesmo_cnpj else ''}"""
-
-        if mesmo_cnpj == "Sim":
-            texto_padrao_contrato += f"""
-CNPJ: {cnpj_campo_val}
-I.E.: {ie_campo_val}"""
-        elif mesmo_cnpj == "Não":
-            texto_padrao_contrato += f"""
-Novo CNPJ: {cnpj_campo_val}
-Nova I.E.: {ie_campo_val}"""
-
-        if razao_social_txt:
-            texto_padrao_contrato += f"\nRazão Social (Consultada): {razao_social_txt}"
-        if status_cnpj_txt:
-            texto_padrao_contrato += f"\nStatus CNPJ: {status_cnpj_txt}"
-        if situacao_ie_txt:
-            texto_padrao_contrato += f"\nStatus I.E.: {situacao_ie_txt}"
-
-        texto_padrao_contrato += f"""
-Endereço padrão ou entrega?: {endereco_padrao}"""
-
-        if "Granel" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg"
-            
-        if "Cilindro" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nPreço Cilindro: {preco_cilindro_str}"
-
-        texto_padrao_contrato += f"""
-Condição de pagamento: {cond_pagamento}"""
-
-        if "Granel" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nConsumo previsto (Granel) mensal: {consumo_granel}"
-            
-        if "Cilindro" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nQual consumo previsto (Cilindro) mensal: {consumo_cilindro_total} kgs"
-
-        texto_padrao_contrato += f"""
-Vigência: {vigencia}
-Equipamentos: {equipamentos_contrato}
-
-Cliente possui débitos?: {possui_debito_fin}
-Quem será o responsável pelas NF's pendentes? {resp_pendentes}
-E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop}
-
-Nome da Testemunha: {nome_testemunha}
-E-mail da Testemunha: {email_testemunha}
-Nome do Responsável pela assinatura: {nome_responsavel}
-E-mail do Responsável pela assinatura: {email_responsavel}
-
-Condomínio CONTA SIM?: {conta_sim}"""
-
-        if conta_sim == "Sim":
-            texto_padrao_contrato += f"""
-N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades}
-Qtd Torres: {qtd_torres}
-Qtd Blocos: {qtd_blocos}
-Valor preço de religue: {preco_religue}
-Valor preço de serviço: {preco_servico}"""
-
-        texto_padrao_contrato += f"""
-
-Obs.: {observacoes_contrato}"""
-
-        st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
-        st.code(texto_padrao_contrato, language="text")
+    motivo_solicitacao = st.text_input
