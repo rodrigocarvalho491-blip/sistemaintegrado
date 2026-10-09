@@ -471,7 +471,7 @@ if menu == "📷 Visita de Transferência":
                         if get_c_txt(eq) == c_n:
                             lista_eq_txt += f"{eq['texto']}\n"
                             v_c += eq["vazao_total_item"]
-                    lista_eq_txt += f"\nTotal Vazão {c_n}: {f'{v_c:.2f}'.replace(".", ",")} kg/h\n\n"
+                    lista_eq_txt += f"\nTotal Vazão {c_n}: {f'{v_c:.2f}'.replace('.', ',')} kg/h\n\n"
             else:
                 lista_eq_txt = "Nenhum item cadastrado.\n\n"
 
@@ -548,24 +548,29 @@ elif menu == "📝 Elaboração de Contrato":
     st.subheader("4. Dados do Contrato")
     col_con1, col_con2 = st.columns(2)
     
-    # Variáveis globais de controle para preenchimento/consulta
     cnpj_campo_val, ie_campo_val = "", ""
     status_cnpj_txt, razao_social_txt = "", ""
+    email_novo_prop = "n/a"
 
     with col_con1:
         endereco_padrao = st.text_input("Endereço padrão ou entrega?", placeholder="Ex: Padrão + ENTREGA1")
-        mesmo_prop = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None)
-        mesmo_cnpj = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None)
         
-        # Lógica dinâmica baseada na seleção de "Mesmo CNPJ?" (Sim -> CNPJ/IE | Não -> Novo CNPJ/Nova IE)
-        if mesmo_cnpj == "Sim":
+        st.markdown("Mesmo proprietário?")
+        mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed")
+        
+        if mesmo_prop_opt == "Não":
+            email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", placeholder="Ex: novo@email.com")
+
+        st.markdown("Mesmo CNPJ?")
+        mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed")
+        
+        if mesmo_cnpj_opt == "Sim":
             cnpj_campo_val = st.text_input("CNPJ", placeholder="Ex: 58.582.414/0001-56")
             ie_campo_val = st.text_input("I.E.", placeholder="Ex: 234.208.886.111")
-        elif mesmo_cnpj == "Não":
+        elif mesmo_cnpj_opt == "Não":
             cnpj_campo_val = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56")
             ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: 234.208.886.111")
 
-        # Se houver 14 dígitos digitados, executa a consulta automática na API do CNPJ
         if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
             dados_api = consultar_cnpj_api(cnpj_campo_val)
             if dados_api:
@@ -635,10 +640,12 @@ elif menu == "📝 Elaboração de Contrato":
     st.subheader("6. Financeiro")
     col_fin1, col_fin2 = st.columns(2)
     with col_fin1:
-        possui_debito_fin = st.radio("Cliente possui débitos?", ["Não", "Sim"], horizontal=True, index=0)
-        resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", placeholder="Ex: n/a")
-    with col_fin2:
-        email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", placeholder="Ex: N/A")
+        st.markdown("Cliente possui débitos?")
+        possui_debito_fin = st.radio("Cliente possui débitos?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed")
+        
+        resp_pendentes = "n/a"
+        if possui_debito_fin == "Sim":
+            resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", placeholder="Ex: Cliente")
 
     if tipo_fluxo == "Enviar para Assinatura":
         st.markdown("---")
@@ -660,7 +667,8 @@ elif menu == "📝 Elaboração de Contrato":
 
     # --- TEMA 7: CONTA SIM ---
     st.subheader("7. Condomínio CONTA SIM")
-    conta_sim = st.radio("Condomínio CONTA SIM?", ["Não", "Sim"], horizontal=True, index=0)
+    st.markdown("Condomínio CONTA SIM?")
+    conta_sim = st.radio("Condomínio CONTA SIM?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed")
 
     num_unidades = ""
     qtd_torres = ""
@@ -685,22 +693,30 @@ elif menu == "📝 Elaboração de Contrato":
     st.divider()
     if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
         
-        texto_padrao_contrato = f"""ELABORAÇÃO DE CONTRATO
+        # Formatação das seleções em estilo de marcação (bolinha / x)
+        sel_granel = "[x]" if "Granel" in tipo_fornecimento else "[ ]"
+        sel_cilindro = "[x]" if "Cilindro" in tipo_fornecimento else "[ ]"
+        
+        texto_padrao_contrato = f"Motivo da solicitação: {motivo_solicitacao}"
 
-Motivo da solicitação: {motivo_solicitacao}
+        if tipo_fluxo == "Gerar Minuta":
+            texto_padrao_contrato += "\n\n** FAVOR GERAR MINUTA EM PDF PARA ENVIO AO CLIENTE **"
+
+        texto_padrao_contrato += f"""
 
 Contato: {contato_contrato}
 Telefone: {telefone_contrato}
 E-mail: {email_contrato}
 Contrato / Aditamento / Distrato: {tipo_contrato if tipo_contrato else ''}
-Mesmo proprietário?: {mesmo_prop if mesmo_prop else ''}
-Mesmo CNPJ?: {mesmo_cnpj if mesmo_cnpj else ''}"""
+Mesmo proprietário?: {mesmo_prop_opt if mesmo_prop_opt else ''}
+E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop}
+Mesmo CNPJ?: {mesmo_cnpj_opt if mesmo_cnpj_opt else ''}"""
 
-        if mesmo_cnpj == "Sim":
+        if mesmo_cnpj_opt == "Sim":
             texto_padrao_contrato += f"""
 CNPJ: {cnpj_campo_val}
 I.E.: {ie_campo_val}"""
-        elif mesmo_cnpj == "Não":
+        elif mesmo_cnpj_opt == "Não":
             texto_padrao_contrato += f"""
 Novo CNPJ: {cnpj_campo_val}
 Nova I.E.: {ie_campo_val}"""
@@ -711,7 +727,8 @@ Nova I.E.: {ie_campo_val}"""
             texto_padrao_contrato += f"\nStatus CNPJ: {status_cnpj_txt}"
 
         texto_padrao_contrato += f"""
-Endereço padrão ou entrega?: {endereco_padrao}"""
+Endereço padrão ou entrega?: {endereco_padrao}
+Tipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"""
 
         if "Granel" in tipo_fornecimento:
             texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg"
@@ -733,13 +750,16 @@ Vigência: {vigencia}
 Equipamentos: {equipamentos_contrato}
 
 Cliente possui débitos?: {possui_debito_fin}
-Quem será o responsável pelas NF's pendentes? {resp_pendentes}
-E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop}
+Quem será o responsável pelas NF's pendentes? {resp_pendentes}"""
 
+        if tipo_fluxo == "Enviar para Assinatura":
+            texto_padrao_contrato += f"""
 Nome da Testemunha: {nome_testemunha}
 E-mail da Testemunha: {email_testemunha}
 Nome do Responsável pela assinatura: {nome_responsavel}
-E-mail do Responsável pela assinatura: {email_responsavel}
+E-mail do Responsável pela assinatura: {email_responsavel}"""
+
+        texto_padrao_contrato += f"""
 
 Condomínio CONTA SIM?: {conta_sim}"""
 
