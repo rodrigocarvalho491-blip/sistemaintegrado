@@ -27,15 +27,64 @@ CUSTOM_CSS = """
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ E INSCRIÇÃO ESTADUAL ---
-def consultar_cnpj_api(cnpj_input):
+# --- CONFIGURAÇÕES NA BARRA LATERAL (API E NAVEGAÇÃO) ---
+st.sidebar.title("📌 Menu de Navegação")
+menu = st.sidebar.radio(
+    "Selecione a página:", 
+    [
+        "📷 Visita de Transferência",
+        "📝 Elaboração de Contrato"
+    ]
+)
+
+st.sidebar.divider()
+st.sidebar.subheader("⚙️ Configurações de API")
+api_key_input = st.sidebar.text_input("Chave API Sintegra / IE (Opcional)", type="password", placeholder="Insira seu token gratuito se houver")
+st.sidebar.caption("Utilizado para consultar I.E. e situação cadastral automaticamente dentro da franquia gratuita.")
+
+if st.sidebar.button("🔄 Resetar Sessão Completa"):
+    st.session_state.clear()
+    st.rerun()
+
+# --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ E I.E. ---
+def consultar_dados_cadastrais(cnpj_input, api_key=""):
     cnpj_limpo = "".join(filter(str.isdigit, str(cnpj_input)))
     if len(cnpj_limpo) == 14:
-        url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
+        # Se houver chave de API configurada, tenta consultar via provedor integrado de Sintegra/IE
+        if api_key.strip():
+            url = f"https://www.sintegrabrasil.com.br/api/v1/cnpj/{cnpj_limpo}"
+            headers = {"X-Api-Key": api_key.strip()}
+            try:
+                response = requests.get(url, headers=headers, timeout=5)
+                if response.status_code == 200:
+                    dados = response.json()
+                    # Retorna estruturado no formato unificado
+                    ies = dados.get("inscricoes_estaduais", [])
+                    ie_val = ies[0].get("inscricao_estadual", "") if ies else ""
+                    situacao_ie_val = "Habilitada" if (ies and ies[0].get("ativo")) else "Inativa/Baixada"
+                    return {
+                        "razao_social": dados.get("razao_social", ""),
+                        "situacao_cnpj": dados.get("situacao_cadastral", "Ativo"),
+                        "inscricao_estadual": ie_val,
+                        "situacao_ie": situacao_ie_val
+                    }
+            except Exception:
+                pass
+
+        # Fallback padrão e gratuito apenas para CNPJ via BrasilAPI caso não use chave externa
+        url_fallback = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
         try:
-            response = requests.get(url, timeout=5)
+            response = requests.get(url_fallback, timeout=5)
             if response.status_code == 200:
-                return response.json()
+                dados = response.json()
+                situacao_cad = dados.get("situacao_cadastral", "")
+                status_txt = "Ativo" if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA" else f"Inativa ({situacao_cad})"
+                return {
+                    "razao_social": dados.get("razao_social", ""),
+                    "situacao_cnpj": status_txt,
+                    "inscricao_estadual": "",
+                    "situacao_ie": "Não consultada (Requer Token)"
+                }
         except Exception:
             return None
     return None
@@ -62,21 +111,6 @@ def resetar_dados_cliente():
     st.session_state.equipamentos = []
     st.session_state.last_central = "Central"
     st.session_state.last_tipo_cad = "Equipamentos"
-
-# --- MENU LATERAL DE NAVEGAÇÃO ---
-st.sidebar.title("📌 Menu de Navegação")
-menu = st.sidebar.radio(
-    "Selecione a página:", 
-    [
-        "📷 Visita de Transferência",
-        "📝 Elaboração de Contrato"
-    ]
-)
-
-st.sidebar.divider()
-if st.sidebar.button("🔄 Resetar Sessão Completa"):
-    st.session_state.clear()
-    st.rerun()
 
 
 # =====================================================================
@@ -550,62 +584,39 @@ elif menu == "📝 Elaboração de Contrato":
     
     # Variáveis globais de controle para preenchimento/consulta
     cnpj_campo_val, ie_campo_val = "", ""
-    status_cnpj_txt, razao_social_txt, ie_consultada = "", "", ""
-    uf_selecionada = ""
-
-    estados_brasil = [
-        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", 
-        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", 
-        "RS", "RO", "RR", "SC", "SP", "SE", "TO"
-    ]
+    status_cnpj_txt, razao_social_txt, situacao_ie_txt = "", "", ""
 
     with col_con1:
         endereco_padrao = st.text_input("Endereço padrão ou entrega?", placeholder="Ex: Padrão + ENTREGA1")
         mesmo_prop = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None)
         mesmo_cnpj = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None)
         
-        # Campo de seleção de Estado (UF)
-        uf_selecionada = st.selectbox("Estado (UF)", estados_brasil, index=estados_brasil.index("SP") if "SP" in estados_brasil else 0)
+        # Lógica dinâmica baseada na seleção de "Mesmo CNPJ?"
+        if mesmo_cnpj == "Sim":
+            cnpj_campo_val = st.text_input("CNPJ", placeholder="Ex: 58.582.414/0001-56")
+            ie_campo_val = st.text_input("I.E.", placeholder="Ex: 234.208.886.111")
+        elif mesmo_cnpj == "Não":
+            cnpj_campo_val = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56")
+            ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: 234.208.886.111")
 
-        # Consulta automática via API do CNPJ (puxa dados da empresa e tenta capturar a Inscrição Estadual federal se disponível)
-        cnpj_input_temp = st.text_input("CNPJ (Digite para consultar)", placeholder="Ex: 58.582.414/0001-56")
-        
-        if len("".join(filter(str.isdigit, str(cnpj_input_temp)))) == 14:
-            dados_api = consultar_cnpj_api(cnpj_input_temp)
-            if dados_api:
-                razao_social_txt = dados_api.get("razao_social", "Não encontrada")
-                situacao_cad = dados_api.get("situacao_cadastral", "")
-                if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA":
-                    status_cnpj_txt = "Ativo"
-                else:
-                    status_cnpj_txt = f"Inativa ({situacao_cad})"
+        # Executa a consulta automática se o CNPJ tiver 14 dígitos
+        if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
+            resultado_consulta = consultar_dados_cadastrais(cnpj_campo_val, api_key_input)
+            if resultado_consulta:
+                razao_social_txt = resultado_consulta.get("razao_social", "")
+                status_cnpj_txt = resultado_consulta.get("situacao_cnpj", "")
+                situacao_ie_txt = resultado_consulta.get("situacao_ie", "")
                 
-                # Tenta extrair a Inscrição Estadual caso a API retorne nos dados estaduais do estabelecimento
-                estab = dados_api.get("estabelecimento", {})
-                regs_estaduais = estab.get("inscricoes_estaduais", [])
-                if regs_estaduais:
-                    for reg in regs_estaduais:
-                        if reg.get("estado", {}).get("sigla") == uf_selecionada and reg.get("ativo"):
-                            ie_consultada = reg.get("inscricao_estadual", "")
-                            break
+                # Se a API retornou a IE e o campo estiver vazio, preenche automaticamente
+                if resultado_consulta.get("inscricao_estadual") and not ie_campo_val:
+                    ie_campo_val = resultado_consulta.get("inscricao_estadual")
 
                 st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
                 st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
-                if ie_consultada:
-                    st.markdown(f"🔵 **I.E. Encontrada ({uf_selecionada}):** {ie_consultada}")
+                if situacao_ie_txt:
+                    st.markdown(f"🔵 **Status I.E.:** {situacao_ie_txt}")
             else:
                 st.warning("⚠️ CNPJ não encontrado ou erro na consulta automática.")
-
-        # Lógica dinâmica para exibição dos campos de CNPJ / IE conforme a escolha
-        if mesmo_cnpj == "Sim":
-            cnpj_campo_val = st.text_input("CNPJ (Confirmação)", value=cnpj_input_temp, placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("I.E.", value=ie_consultada, placeholder="Ex: Digite ou cole a Inscrição Estadual")
-        elif mesmo_cnpj == "Não":
-            cnpj_campo_val = st.text_input("Novo CNPJ", value=cnpj_input_temp, placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("Nova I.E.", value=ie_consultada, placeholder="Ex: Digite ou cole a Inscrição Estadual")
-        else:
-            cnpj_campo_val = cnpj_input_temp
-            ie_campo_val = ie_consultada
 
     with col_con2:
         cond_pagamento = st.text_input("Condição de pagamento", placeholder="Ex: 14 dias")
@@ -720,8 +731,7 @@ Telefone: {telefone_contrato}
 E-mail: {email_contrato}
 Contrato / Aditamento / Distrato: {tipo_contrato if tipo_contrato else ''}
 Mesmo proprietário?: {mesmo_prop if mesmo_prop else ''}
-Mesmo CNPJ?: {mesmo_cnpj if mesmo_cnpj else ''}
-Estado (UF): {uf_selecionada}"""
+Mesmo CNPJ?: {mesmo_cnpj if mesmo_cnpj else ''}"""
 
         if mesmo_cnpj == "Sim":
             texto_padrao_contrato += f"""
@@ -736,51 +746,8 @@ Nova I.E.: {ie_campo_val}"""
             texto_padrao_contrato += f"\nRazão Social (Consultada): {razao_social_txt}"
         if status_cnpj_txt:
             texto_padrao_contrato += f"\nStatus CNPJ: {status_cnpj_txt}"
+        if situacao_ie_txt:
+            texto_padrao_contrato += f"\nStatus I.E.: {situacao_ie_txt}"
 
         texto_padrao_contrato += f"""
-Endereço padrão ou entrega?: {endereco_padrao}"""
-
-        if "Granel" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg"
-            
-        if "Cilindro" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nPreço Cilindro: {preco_cilindro_str}"
-
-        texto_padrao_contrato += f"""
-Condição de pagamento: {cond_pagamento}"""
-
-        if "Granel" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nConsumo previsto (Granel) mensal: {consumo_granel}"
-            
-        if "Cilindro" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nQual consumo previsto (Cilindro) mensal: {consumo_cilindro_total} kgs"
-
-        texto_padrao_contrato += f"""
-Vigência: {vigencia}
-Equipamentos: {equipamentos_contrato}
-
-Cliente possui débitos?: {possui_debito_fin}
-Quem será o responsável pelas NF's pendentes? {resp_pendentes}
-E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop}
-
-Nome da Testemunha: {nome_testemunha}
-E-mail da Testemunha: {email_testemunha}
-Nome do Responsável pela assinatura: {nome_responsavel}
-E-mail do Responsável pela assinatura: {email_responsavel}
-
-Condomínio CONTA SIM?: {conta_sim}"""
-
-        if conta_sim == "Sim":
-            texto_padrao_contrato += f"""
-N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades}
-Qtd Torres: {qtd_torres}
-Qtd Blocos: {qtd_blocos}
-Valor preço de religue: {preco_religue}
-Valor preço de serviço: {preco_servico}"""
-
-        texto_padrao_contrato += f"""
-
-Obs.: {observacoes_contrato}"""
-
-        st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
-        st.code(texto_padrao_contrato, language="text")
+Endereço padrão ou entrega?:
