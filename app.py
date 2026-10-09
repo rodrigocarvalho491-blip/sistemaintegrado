@@ -513,14 +513,19 @@ elif menu == "📝 Elaboração de Contrato":
         contato_contrato = st.text_input("Contato", value="Sidnei")
         telefone_contrato = st.text_input("Telefone", value="11 99157-0730")
         email_contrato = st.text_input("E-mail", value="adm@grscondominios.com.br")
+        
+        # Seleção única de Contrato / Aditamento / Distrato
         tipo_contrato = st.selectbox("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], index=0)
+        
+        # Caixa de seleção para Mesmo proprietário (Sim / Não)
         mesmo_prop = st.selectbox("Mesmo proprietário?", ["Não", "Sim"], index=0)
+        
         novo_cnpj = st.text_input("Novo CNPJ", value="58.582.414/0001-56")
         nova_ie = st.text_input("Nova I.E.", value="234.208.886.111")
         endereco_padrao = st.text_input("Endereço padrão ou entrega?", value="Padrão + ENTREGA1")
 
     with col_c2:
-        # Caixa de seleção múltipla para escolher Granel, Cilindro ou ambos
+        # Seleção de tipo de fornecimento (Granel / Cilindro)
         tipo_fornecimento = st.multiselect("Tipo de Fornecimento", ["Granel", "Cilindro"], default=["Granel"])
         
         preco_granel = ""
@@ -530,36 +535,20 @@ elif menu == "📝 Elaboração de Contrato":
             consumo_granel = st.text_input("Consumo previsto (Granel) mensal", value="100 kgs")
             
         preco_cilindro_str = ""
-        consumo_cilindro_total = 0
-        p13_qtd, p20_qtd, p45_qtd = 0, 0, 0
+        consumo_cilindro = ""
         p13_val, p20_val, p45_val = "", "", ""
-        
-        if "Cilindro" in tipo_fornecimento:
-            st.markdown("**Preços e Quantidades por Modelo de Cilindro:**")
+        if "Cilindro" in tipo_cilindro_opc := "Cilindro" in tipo_fornecimento:
+            st.markdown("**Preços por Modelo de Cilindro:**")
+            col_cil1, col_cil2, col_cil3 = st.columns(3)
+            with col_cil1:
+                p13_val = st.text_input("P13", placeholder="xx,xx")
+            with col_cil2:
+                p20_val = st.text_input("P20", placeholder="xx,xx")
+            with col_cil3:
+                p45_val = st.text_input("P45", placeholder="xx,xx")
             
-            col_c_mod1, col_c_mod2 = st.columns(2)
-            with col_c_mod1:
-                p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1)
-            with col_c_mod2:
-                p13_val = st.text_input("Preço P13 (/und)", placeholder="xx,xx")
-                
-            col_c_mod3, col_c_mod4 = st.columns(2)
-            with col_c_mod3:
-                p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1)
-            with col_c_mod4:
-                p20_val = st.text_input("Preço P20 (/und)", placeholder="xx,xx")
-                
-            col_c_mod5, col_c_mod6 = st.columns(2)
-            with col_c_mod5:
-                p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1)
-            with col_c_mod6:
-                p45_val = st.text_input("Preço P45 (/und)", placeholder="xx,xx")
-            
-            # Formatação do preço por cilindro
-            preco_cilindro_str = f"[P13 = {p13_val} / und] [P20 = {p20_val} / und] [P45 = {p45_val} / und]"
-            
-            # Cálculo automático do consumo em KGs baseado nas quantidades informadas
-            consumo_cilindro_total = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
+            preco_cilindro_str = f"[P13 = {p13_val} /und] [P20 = {p20_val} /und] [P45 = {p45_val} /und]"
+            consumo_cilindro = st.text_input("Qual consumo previsto (Cilindro) mensal", placeholder="Ex: ")
 
         cond_pagamento = st.text_input("Condição de pagamento", value="14 dias")
         vigencia = st.text_input("Vigência", value="60 meses")
@@ -615,6 +604,10 @@ elif menu == "📝 Elaboração de Contrato":
     st.divider()
     if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
         
+        # Montar a linha de preço conforme preenchido
+        linha_preco_granel = f"Preço Granel: {preco_granel} /kg" if "Granel" in tipo_fornecimento else ""
+        linha_preco_cilindro = f"Preço Cilindro: {preco_cilindro_str}" if "Cilindro" in tipo_fornecimento else ""
+
         texto_padrao_contrato = f"""ELABORAÇÃO DE CONTRATO
 
 Motivo da solicitação: {motivo_solicitacao}
@@ -628,20 +621,18 @@ Novo CNPJ: {novo_cnpj}
 Nova I.E.: {nova_ie}
 Endereço padrão ou entrega?: {endereco_padrao}"""
 
-        if "Granel" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg"
-            
-        if "Cilindro" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nPreço Cilindro: {preco_cilindro_str}"
+        if linha_preco_granel:
+            texto_padrao_contrato += f"\n{linha_preco_granel}"
+        if linha_preco_cilindro:
+            texto_padrao_contrato += f"\n{linha_preco_cilindro}"
 
         texto_padrao_contrato += f"""
 Condição de pagamento: {cond_pagamento}"""
 
         if "Granel" in tipo_fornecimento:
             texto_padrao_contrato += f"\nConsumo previsto (Granel) mensal: {consumo_granel}"
-            
         if "Cilindro" in tipo_fornecimento:
-            texto_padrao_contrato += f"\nQual consumo previsto (Cilindro) mensal: {consumo_cilindro_total} kgs"
+            texto_padrao_contrato += f"\nQual consumo previsto (Cilindro) mensal: {consumo_cilindro}"
 
         texto_padrao_contrato += f"""
 Vigência: {vigencia}
