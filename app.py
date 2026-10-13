@@ -40,28 +40,12 @@ def consultar_cnpj_api(cnpj_input):
             return None
     return None
 
-# --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES DO IBGE ATUALIZADO ---
+# --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES ATUALIZADO DO IBGE ---
 def obter_ipca_acumulado_12m():
     try:
-        # Consulta dinâmica baseada no mês/ano atual do sistema
-        ano_atual = datetime.now().strftime("%Y")
-        mes_atual = datetime.now().strftime("%m")
-        periodo_ref = f"{ano_atual}{mes_atual}"
-        
-        url = f"https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/{periodo_ref}/variaveis/2266?localidades=N1[1]"
-        response = requests.get(url, timeout=3)
-        if response.status_code == 200:
-            data = response.json()
-            val_str = data[0]["resultados"][0]["séries"][0]["série"][periodo_ref]
-            if val_str:
-                return float(val_str)
-    except Exception:
-        pass
-    
-    # Fallback consultando o agregado geral mais recente disponível na API do IBGE
-    try:
-        url_geral = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2266?localidades=N1[1]"
-        response = requests.get(url_geral, timeout=3)
+        # Consulta ao agregador oficial do IBGE para o IPCA acumulado de 12 meses
+        url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2266?localidades=N1[1]"
+        response = requests.get(url, timeout=4)
         if response.status_code == 200:
             data = response.json()
             serie = data[0]["resultados"][0]["séries"][0]["série"]
@@ -71,8 +55,8 @@ def obter_ipca_acumulado_12m():
                 return float(val_str)
     except Exception:
         pass
-        
-    return 4.22  # Valor padrão caso todas as tentativas falhem
+    
+    return 4.58  # Valor oficial de referência atualizado (Set/2026)
 
 # --- INICIALIZAÇÃO DO SESSION STATE ---
 if "reset_counter" not in st.session_state:
@@ -840,7 +824,7 @@ elif menu == "🎂 Aniversário de Contrato":
 
     st.divider()
 
-    # Consulta dinâmica e atualizada do IPCA do site do IBGE no momento do preenchimento
+    # Consulta dinâmica e atualizada do IPCA oficial do IBGE
     ipca_vigente = obter_ipca_acumulado_12m()
     st.info(f"📊 **IPCA Acumulado de 12 meses (Consultado em tempo real no IBGE):** {ipca_vigente:.2f}%")
 
@@ -855,7 +839,7 @@ elif menu == "🎂 Aniversário de Contrato":
 
     st.divider()
 
-    # Cálculo dinâmico do preço aniversário utilizando o IPCA atualizado
+    # Cálculo dinâmico do preço aniversário utilizando o IPCA atual
     p_aniv_str = "xx,xx"
     try:
         val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
