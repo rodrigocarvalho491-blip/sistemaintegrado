@@ -379,7 +379,6 @@ if menu == "📷 Visita de Transferência":
             if self.page_no() == 1:
                 self.set_y(10)
                 self.set_font("Arial", "B", 15)
-                # Título atualizado para RELATÓRIO FOTOGRÁFICO
                 self.cell(0, 8, "RELATÓRIO FOTOGRÁFICO", align="C", ln=1)
                 if self.cod or self.nome:
                     self.set_font("Arial", "B", 11)
@@ -471,10 +470,16 @@ if menu == "📷 Visita de Transferência":
             st.warning("⚠️ Preencha pelo menos o Código e o Nome do Cliente para habilitar o PDF.")
         else:
             pdf_bytes = gerar_pdf(st.session_state.equipamentos, dic_fotos_final, cod_cliente, nome_cliente, qtd_centrais)
+            
+            # Formatação do nome do arquivo: relatorio_<codigo_sem_pontuacao>_<dd-mm-aa>
+            cod_limpo = "".join(filter(str.isalnum, cod_cliente))
+            data_atual_str = datetime.now().strftime("%d-%m-%y")
+            nome_arquivo_pdf = f"relatorio_{cod_limpo}_{data_atual_str}.pdf"
+
             st.download_button(
                 label="📥 Baixar Relatório (PDF)",
                 data=pdf_bytes,
-                file_name=f"relatorio_{cod_cliente}.pdf",
+                file_name=nome_arquivo_pdf,
                 mime="application/pdf"
             )
 
