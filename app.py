@@ -379,7 +379,8 @@ if menu == "📷 Visita de Transferência":
             if self.page_no() == 1:
                 self.set_y(10)
                 self.set_font("Arial", "B", 15)
-                self.cell(0, 8, "RELATÓRIO TÉCNICO", align="C", ln=1)
+                # Título atualizado para RELATÓRIO FOTOGRÁFICO
+                self.cell(0, 8, "RELATÓRIO FOTOGRÁFICO", align="C", ln=1)
                 if self.cod or self.nome:
                     self.set_font("Arial", "B", 11)
                     self.cell(0, 6, f"{self.cod} | {self.nome}", align="C", ln=1)
