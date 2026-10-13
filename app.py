@@ -43,7 +43,6 @@ def consultar_cnpj_api(cnpj_input):
 # --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES ATUALIZADO DO IBGE ---
 def obter_ipca_acumulado_12m():
     try:
-        # Consulta ao agregador oficial do IBGE para o IPCA acumulado de 12 meses
         url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2266?localidades=N1[1]"
         response = requests.get(url, timeout=4)
         if response.status_code == 200:
@@ -514,7 +513,7 @@ Cliente está satisfeito com o atendimento da Consigaz? {cliente_satisfeito}
 Obs.: {observacoes}
 """
             st.success("✅ Texto gerado com sucesso! Copie abaixo:")
-            st.code(texto_final, language="text")
+            st.text_area("Copie o texto abaixo:", value=texto_final, height=250)
 
 
 # =====================================================================
@@ -807,7 +806,7 @@ Valor preço de serviço: {preco_servico}"""
 Obs.: {observacoes_contrato}"""
 
         st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
-        st.code(texto_padrao_contrato, language="text")
+        st.text_area("Copie o texto abaixo:", value=texto_padrao_contrato, height=250)
 
 
 # =====================================================================
@@ -864,7 +863,7 @@ Preço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}
 Preço Aniversário: R$ {p_aniv_str}"""
 
         st.success("✅ Texto gerado com sucesso! Copie abaixo:")
-        st.code(texto_aniversario, language="text")
+        st.text_area("Copie o texto de Aniversário abaixo:", value=texto_aniversario, height=180)
 
     st.divider()
 
@@ -886,4 +885,4 @@ Preço Aniversário: R$ {p_aniv_str}
 CI.: {ci_input if ci_input else '000.000.000'} - Preço Aniversário"""
 
         st.success("✅ Texto com C.I. gerado com sucesso! Copie abaixo:")
-        st.code(texto_ci, language="text")
+        st.text_area("Copie o texto com C.I. abaixo:", value=texto_ci, height=200)
