@@ -457,7 +457,11 @@ if menu == "📷 Visita de Transferência":
                 pdf.cell(50, 7, f"{v_tot_str} kg/h", border=1, align="C", fill=True, ln=1)
                 pdf.ln(4)
 
-        return pdf.output(dest="S").encode("latin-1")
+        # Tratamento compatível para a versão atual do fpdf2
+        pdf_output = pdf.output(dest="S")
+        if isinstance(pdf_output, str):
+            return pdf_output.encode("latin-1")
+        return pdf_output
 
     st.subheader("6. Ações Finais")
     col_a1, col_a2 = st.columns(2)
