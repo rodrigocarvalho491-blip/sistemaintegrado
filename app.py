@@ -40,6 +40,22 @@ def consultar_cnpj_api(cnpj_input):
             return None
     return None
 
+# --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES DO IBGE ---
+def obter_ipca_acumulado_12m():
+    # Valor padrão de segurança caso a API pública demore ou esteja indisponível
+    ipca_padrao = 4.58
+    try:
+        # Endpoint de indicadores do IBGE explicando inflação / agregados recentes
+        url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/202609/variaveis/2266?localidades=N1[1]"
+        response = requests.get(url, timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            val_str = data[0]["resultados"][0]["séries"][0]["série"]["202609"]
+            return float(val_str)
+    except Exception:
+        pass
+    return ipca_padrao
+
 # --- INICIALIZAÇÃO DO SESSION STATE ---
 if "reset_counter" not in st.session_state:
     st.session_state.reset_counter = 0
@@ -69,7 +85,8 @@ menu = st.sidebar.radio(
     "Selecione a página:", 
     [
         "📷 Visita de Transferência",
-        "📝 Elaboração de Contrato"
+        "📝 Elaboração de Contrato",
+        "🎂 Aniversário de Contrato"
     ]
 )
 
@@ -789,3 +806,62 @@ Obs.: {observacoes_contrato}"""
 
         st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
         st.code(texto_padrao_contrato, language="text")
+
+
+# =====================================================================
+# TELA 3: ANIVERSÁRIO DE CONTRATO
+# =====================================================================
+elif menu == "🎂 Aniversário de Contrato":
+    col_logo, col_titulo = st.columns([1, 4])
+    with col_logo:
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, width=150)
+    with col_titulo:
+        st.title("Aniversário de Contrato")
+        st.markdown("Tratativa de reajuste por IPCA acumulado de 12 meses.")
+
+    st.divider()
+
+    # Busca automatizada do IPCA atual do site do IBGE
+    ipca_vigente = obter_ipca_acumulado_12m()
+    st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE):** {ipca_vigente:.2f}%")
+
+    col_an1, col_an2 = st.columns(2)
+    with col_an1:
+        preco_anterior_input = st.text_input("Preço Anterior (R$)", placeholder="Ex: 7,50")
+    with col_an2:
+        st.write("")
+
+    st.markdown("Cliente possui cláusula em contrato?")
+    clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=0, label_visibility="collapsed")
+
+    st.divider()
+
+    if st.button("📝 Gerar Texto de Aniversário de Contrato", type="primary"):
+        # Tratamento do valor anterior para cálculo
+        try:
+            val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+            p_ant = float(val_limpo)
+            # Cálculo: Preço Aniversário = Preço Anterior + IPCA
+            p_aniv = p_ant * (1 + (ipca_vigente / 100.0))
+            p_aniv_str = f"{p_aniv:.2f}".replace(".", ",")
+        except ValueError:
+            p_aniv_str = "xx,xx"
+
+        # Aviso de atenção caso não possua cláusula (não impede a geração)
+        if clausula_contrato == "Não":
+            st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
+
+        # Montagem do texto final
+        texto_aniversario = f"""Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."""
+
+        if clausula_contrato == "Sim":
+            texto_aniversario += "\n\nCliente possui cláusula em contrato."
+
+        texto_aniversario += f"""
+
+Preço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}
+Preço Aniversário: R$ {p_aniv_str}"""
+
+        st.success("✅ Texto gerado com sucesso! Copie abaixo:")
+        st.code(texto_aniversario, language="text")
