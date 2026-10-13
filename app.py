@@ -144,8 +144,10 @@ menu = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-if st.sidebar.button("🔄 Resetar Sessão Completa"):
-    st.session_state.clear()
+if st.sidebar.button("🔄 Novo Cliente"):
+    resetar_dados_cliente()
+    resetar_dados_contrato()
+    resetar_dados_aniv()
     st.rerun()
 
 
@@ -156,18 +158,6 @@ if menu == "📷 Visita de Transferência":
     rc = st.session_state.reset_counter
     ekc = st.session_state.eq_key_counter
 
-    # Botão Flutuante Fixo para Novo Cliente
-    st.markdown("""
-        <style>
-            .floating-btn-container {
-                position: fixed;
-                top: 60px;
-                right: 30px;
-                z-index: 99999;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-    
     col_logo, col_titulo = st.columns([1, 4])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -177,12 +167,6 @@ if menu == "📷 Visita de Transferência":
         st.markdown("Gerador automatizado de relatórios técnicos e inspeções.")
 
     st.divider()
-
-    st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
-    if st.button("🔄 Novo Cliente / Limpar", key="btn_novo_transf"):
-        resetar_dados_cliente()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # --- SEÇÃO 1: DADOS DO CLIENTE ---
     st.subheader("1. Identificação do Cliente")
@@ -596,17 +580,6 @@ Obs.: {observacoes}
 elif menu == "📝 Elaboração de Contrato":
     rcc = st.session_state.reset_counter_contrato
 
-    st.markdown("""
-        <style>
-            .floating-btn-container {
-                position: fixed;
-                top: 60px;
-                right: 30px;
-                z-index: 99999;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
     col_logo, col_titulo = st.columns([1, 4])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -616,12 +589,6 @@ elif menu == "📝 Elaboração de Contrato":
         st.markdown("Formulário de preenchimento e geração do padrão de solicitação.")
 
     st.divider()
-
-    st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
-    if st.button("🔄 Novo Cliente / Limpar", key="btn_novo_contrato"):
-        resetar_dados_contrato()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     tipo_fluxo = st.radio(
         "Selecione o objetivo da solicitação:", 
@@ -909,17 +876,6 @@ Obs.: {observacoes_contrato}"""
 elif menu == "🎂 Aniversário de Contrato":
     rca = st.session_state.reset_counter_aniv
 
-    st.markdown("""
-        <style>
-            .floating-btn-container {
-                position: fixed;
-                top: 60px;
-                right: 30px;
-                z-index: 99999;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
     col_logo, col_titulo = st.columns([1, 4])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -929,12 +885,6 @@ elif menu == "🎂 Aniversário de Contrato":
         st.markdown("Tratativa de reajuste por IPCA acumulado de 12 meses.")
 
     st.divider()
-
-    st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
-    if st.button("🔄 Novo Cliente / Limpar", key="btn_novo_aniv"):
-        resetar_dados_aniv()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # Consulta dinâmica e atualizada do IPCA oficial do IBGE
     ipca_vigente = obter_ipca_acumulado_12m()
