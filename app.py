@@ -61,6 +61,12 @@ def obter_ipca_acumulado_12m():
 if "reset_counter" not in st.session_state:
     st.session_state.reset_counter = 0
 
+if "reset_counter_contrato" not in st.session_state:
+    st.session_state.reset_counter_contrato = 0
+
+if "reset_counter_aniv" not in st.session_state:
+    st.session_state.reset_counter_aniv = 0
+
 if "eq_key_counter" not in st.session_state:
     st.session_state.eq_key_counter = 0
 
@@ -79,6 +85,52 @@ def resetar_dados_cliente():
     st.session_state.equipamentos = []
     st.session_state.last_central = "Central"
     st.session_state.last_tipo_cad = "Equipamentos"
+
+def resetar_dados_contrato():
+    st.session_state.reset_counter_contrato += 1
+
+def resetar_dados_aniv():
+    st.session_state.reset_counter_aniv += 1
+
+# --- COMPONENTE DE BOTÃO DE CÓPIAS COM ÍCONE ESPECIAL ---
+def botao_copiar_customizado(texto_para_copiar, chave_unica):
+    texto_seguro = texto_para_copiar.replace('`', '\\`').replace('$', '\\$').replace('\n', '\\n')
+    component_html = f"""
+    <div style="margin-top: 5px; margin-bottom: 10px;">
+        <button id="btn_{chave_unica}" onclick="copiarTexto_{chave_unica}()" style="
+            background-color: #004080;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+            📋 Copiar Texto Completo
+        </button>
+        <span id="msg_{chave_unica}" style="margin-left: 10px; color: green; font-weight: bold; font-size: 13px; display: none;">Copiado com sucesso!</span>
+    </div>
+    <script>
+    function copiarTexto_{chave_unica}() {{
+        const texto = `{texto_seguro}`;
+        navigator.clipboard.writeText(texto).then(function() {{
+            const msg = document.getElementById("msg_{chave_unica}");
+            msg.style.display = "inline";
+            setTimeout(function() {{
+                msg.style.display = "none";
+            }}, 2500);
+        }}, function(err) {{
+            alert("Erro ao copiar texto: ", err);
+        }});
+    }}
+    </script>
+    """
+    components.html(component_html, height=50)
 
 # --- MENU LATERAL DE NAVEGAÇÃO ---
 st.sidebar.title("📌 Menu de Navegação")
@@ -471,7 +523,6 @@ if menu == "📷 Visita de Transferência":
         else:
             pdf_bytes = gerar_pdf(st.session_state.equipamentos, dic_fotos_final, cod_cliente, nome_cliente, qtd_centrais)
             
-            # Formatação do nome do arquivo: relatorio_<codigo_sem_pontuacao>_<dd-mm-aa>
             cod_limpo = "".join(filter(str.isalnum, cod_cliente))
             data_atual_str = datetime.now().strftime("%d-%m-%y")
             nome_arquivo_pdf = f"relatorio_{cod_limpo}_{data_atual_str}.pdf"
@@ -520,13 +571,15 @@ Cliente está satisfeito com o atendimento da Consigaz? {cliente_satisfeito}
 Obs.: {observacoes}
 """
             st.success("✅ Texto gerado com sucesso! Copie abaixo:")
-            st.text_area("Copie o texto abaixo:", value=texto_final, height=250)
+            botao_copiar_customizado(texto_final, "transferencia_txt")
 
 
 # =====================================================================
 # TELA 2: ELABORAÇÃO DE CONTRATO
 # =====================================================================
 elif menu == "📝 Elaboração de Contrato":
+    rcc = st.session_state.reset_counter_contrato
+
     col_logo, col_titulo = st.columns([1, 4])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -537,17 +590,20 @@ elif menu == "📝 Elaboração de Contrato":
 
     st.divider()
 
+    st.button("🔄 Novo Cliente / Limpar", on_click=resetar_dados_contrato)
+
     tipo_fluxo = st.radio(
         "Selecione o objetivo da solicitação:", 
         ["Gerar Minuta", "Enviar para Assinatura"],
-        horizontal=True
+        horizontal=True,
+        key=f"fluxo_c_{rcc}"
     )
 
     st.divider()
 
     # --- TEMA 1: MOTIVO ---
     st.subheader("1. Motivo")
-    motivo_solicitacao = st.text_input("Motivo da solicitação", placeholder="Ex: Alteração de CNPJ + Reneg de Preço")
+    motivo_solicitacao = st.text_input("Motivo da solicitação", placeholder="Ex: Alteração de CNPJ + Reneg de Preço", key=f"motivo_{rcc}")
 
     st.divider()
 
@@ -555,17 +611,17 @@ elif menu == "📝 Elaboração de Contrato":
     st.subheader("2. Dados do Cliente")
     col_cli1, col_cli2, col_cli3 = st.columns(3)
     with col_cli1:
-        contato_contrato = st.text_input("Contato", placeholder="Ex: Sidnei")
+        contato_contrato = st.text_input("Contato", placeholder="Ex: Sidnei", key=f"contato_c_{rcc}")
     with col_cli2:
-        telefone_contrato = st.text_input("Telefone", placeholder="Ex: 11 99157-0730")
+        telefone_contrato = st.text_input("Telefone", placeholder="Ex: 11 99157-0730", key=f"tel_c_{rcc}")
     with col_cli3:
-        email_contrato = st.text_input("E-mail", placeholder="Ex: adm@grscondominios.com.br")
+        email_contrato = st.text_input("E-mail", placeholder="Ex: adm@grscondominios.com.br", key=f"email_c_{rcc}")
 
     st.divider()
 
     # --- TEMA 3: SOLICITAÇÃO ---
     st.subheader("3. Solicitação")
-    tipo_contrato = st.radio("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None)
+    tipo_contrato = st.radio("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
 
     st.divider()
 
@@ -578,23 +634,23 @@ elif menu == "📝 Elaboração de Contrato":
     email_novo_prop = "n/a"
 
     with col_con1:
-        endereco_padrao = st.text_input("Endereço padrão ou entrega?", placeholder="Ex: Padrão + ENTREGA1")
+        endereco_padrao = st.text_input("Endereço padrão ou entrega?", placeholder="Ex: Padrão + ENTREGA1", key=f"end_padrao_{rcc}")
         
         st.markdown("Mesmo proprietário?")
-        mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed")
+        mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed", key=f"mesmo_prop_{rcc}")
         
         if mesmo_prop_opt == "Não":
-            email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", placeholder="Ex: novo@email.com")
+            email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", placeholder="Ex: novo@email.com", key=f"email_novo_{rcc}")
 
         st.markdown("Mesmo CNPJ?")
-        mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed")
+        mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed", key=f"mesmo_cnpj_{rcc}")
         
         if mesmo_cnpj_opt == "Sim":
-            cnpj_campo_val = st.text_input("CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("I.E.", placeholder="Ex: 234.208.886.111")
+            cnpj_campo_val = st.text_input("CNPJ", placeholder="Ex: 58.582.414/0001-56", key=f"cnpj_val_{rcc}")
+            ie_campo_val = st.text_input("I.E.", placeholder="Ex: 234.208.886.111", key=f"ie_val_{rcc}")
         elif mesmo_cnpj_opt == "Não":
-            cnpj_campo_val = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56")
-            ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: 234.208.886.111")
+            cnpj_campo_val = st.text_input("Novo CNPJ", placeholder="Ex: 58.582.414/0001-56", key=f"novo_cnpj_val_{rcc}")
+            ie_campo_val = st.text_input("Nova I.E.", placeholder="Ex: 234.208.886.111", key=f"nova_ie_val_{rcc}")
 
         if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
             dados_api = consultar_cnpj_api(cnpj_campo_val)
@@ -612,9 +668,9 @@ elif menu == "📝 Elaboração de Contrato":
                 st.warning("⚠️ CNPJ não encontrado ou erro na consulta automática.")
 
     with col_con2:
-        cond_pagamento = st.text_input("Condição de pagamento", placeholder="Ex: 14 dias")
-        vigencia = st.text_input("Vigência", placeholder="Ex: 60 meses")
-        equipamentos_contrato = st.text_input("Equipamentos", placeholder="Ex: 01 b190 + 01 CC")
+        cond_pagamento = st.text_input("Condição de pagamento", placeholder="Ex: 14 dias", key=f"cond_pag_{rcc}")
+        vigencia = st.text_input("Vigência", placeholder="Ex: 60 meses", key=f"vigencia_{rcc}")
+        equipamentos_contrato = st.text_input("Equipamentos", placeholder="Ex: 01 b190 + 01 CC", key=f"eq_contrato_c_{rcc}")
 
     st.divider()
 
@@ -622,7 +678,7 @@ elif menu == "📝 Elaboração de Contrato":
     st.subheader("5. Comodato / Fornecimento")
     
     st.markdown("Tipo de Fornecimento")
-    tipo_fornecimento = st.radio("Tipo de Fornecimento", ["Granel", "Cilindro"], horizontal=True, index=None, label_visibility="collapsed")
+    tipo_fornecimento = st.radio("Tipo de Fornecimento", ["Granel", "Cilindro"], horizontal=True, index=None, label_visibility="collapsed", key=f"tp_forn_{rcc}")
     
     preco_granel = ""
     consumo_granel = ""
@@ -634,28 +690,28 @@ elif menu == "📝 Elaboração de Contrato":
     if tipo_fornecimento == "Granel":
         col_g1, col_g2 = st.columns(2)
         with col_g1:
-            preco_granel = st.text_input("Preço Granel", placeholder="Ex: 7,50")
+            preco_granel = st.text_input("Preço Granel", placeholder="Ex: 7,50", key=f"preco_granel_{rcc}")
         with col_g2:
-            consumo_granel = st.text_input("Consumo mensal previsto (kgs)", placeholder="Ex: 100 kgs")
+            consumo_granel = st.text_input("Consumo mensal previsto (kgs)", placeholder="Ex: 100 kgs", key=f"cons_granel_{rcc}")
         
     elif tipo_fornecimento == "Cilindro":
         st.markdown("**Preços por Modelo de Cilindro:**")
         col_cp1, col_cp2, col_cp3 = st.columns(3)
         with col_cp1:
-            p13_val = st.text_input("Preço P13 (/und)", placeholder="xx,xx")
+            p13_val = st.text_input("Preço P13 (/und)", placeholder="xx,xx", key=f"p13_v_{rcc}")
         with col_cp2:
-            p20_val = st.text_input("Preço P20 (/und)", placeholder="xx,xx")
+            p20_val = st.text_input("Preço P20 (/und)", placeholder="xx,xx", key=f"p20_v_{rcc}")
         with col_cp3:
-            p45_val = st.text_input("Preço P45 (/und)", placeholder="xx,xx")
+            p45_val = st.text_input("Preço P45 (/und)", placeholder="xx,xx", key=f"p45_v_{rcc}")
 
         st.markdown("**Consumo mensal previsto (qntd):**")
         col_cc1, col_cc2, col_cc3 = st.columns(3)
         with col_cc1:
-            p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1)
+            p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1, key=f"p13_q_{rcc}")
         with col_cc2:
-            p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1)
+            p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1, key=f"p20_q_{rcc}")
         with col_cc3:
-            p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1)
+            p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1, key=f"p45_q_{rcc}")
         
         consumo_cilindro_total = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
 
@@ -666,11 +722,11 @@ elif menu == "📝 Elaboração de Contrato":
     col_fin1, col_fin2 = st.columns(2)
     with col_fin1:
         st.markdown("Cliente possui débitos?")
-        possui_debito_fin = st.radio("Cliente possui débitos?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed")
+        possui_debito_fin = st.radio("Cliente possui débitos?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed", key=f"possui_deb_{rcc}")
         
         resp_pendentes = "n/a"
         if possui_debito_fin == "Sim":
-            resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", placeholder="Ex: Cliente")
+            resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", placeholder="Ex: Cliente", key=f"resp_pend_{rcc}")
 
     # --- DADOS DE ASSINATURA E TESTEMUNHAS ---
     responsaveis_dados = []
@@ -682,20 +738,20 @@ elif menu == "📝 Elaboração de Contrato":
         
         col_t1, col_t2 = st.columns(2)
         with col_t1:
-            nome_testemunha = st.text_input("Nome da Testemunha", placeholder="")
+            nome_testemunha = st.text_input("Nome da Testemunha", placeholder="", key=f"nome_test_{rcc}")
         with col_t2:
-            email_testemunha = st.text_input("E-mail da Testemunha", placeholder="")
+            email_testemunha = st.text_input("E-mail da Testemunha", placeholder="", key=f"email_test_{rcc}")
 
         st.markdown("---")
-        qtd_responsaveis = st.selectbox("Quantidade de Responsáveis pela Assinatura", [1, 2, 3, 4], index=0)
+        qtd_responsaveis = st.selectbox("Quantidade de Responsáveis pela Assinatura", [1, 2, 3, 4], index=0, key=f"qtd_resp_{rcc}")
 
         for i in range(1, qtd_responsaveis + 1):
             st.markdown(f"**Responsável {i}**")
             col_r1, col_r2 = st.columns(2)
             with col_r1:
-                nome_resp = st.text_input(f"Nome do Responsável {i}", placeholder="", key=f"nome_resp_{i}")
+                nome_resp = st.text_input(f"Nome do Responsável {i}", placeholder="", key=f"nome_resp_{i}_{rcc}")
             with col_r2:
-                email_resp = st.text_input(f"E-mail do Responsável {i}", placeholder="", key=f"email_resp_{i}")
+                email_resp = st.text_input(f"E-mail do Responsável {i}", placeholder="", key=f"email_resp_{i}_{rcc}")
             responsaveis_dados.append({"nome": nome_resp, "email": email_resp})
 
     st.divider()
@@ -703,7 +759,7 @@ elif menu == "📝 Elaboração de Contrato":
     # --- TEMA 7: CONTA SIM ---
     st.subheader("7. Condomínio CONTA SIM")
     st.markdown("Condomínio CONTA SIM?")
-    conta_sim = st.radio("Condomínio CONTA SIM?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed")
+    conta_sim = st.radio("Condomínio CONTA SIM?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed", key=f"conta_sim_{rcc}")
 
     num_unidades = ""
     qtd_torres = ""
@@ -714,16 +770,16 @@ elif menu == "📝 Elaboração de Contrato":
     if conta_sim == "Sim":
         col_cs1, col_cs2, col_cs3 = st.columns(3)
         with col_cs1:
-            num_unidades = st.text_input("N° Unid autônomas (Aptos + áreas comuns/zeladoria)", placeholder="")
-            qtd_torres = st.text_input("Qtd Torres", placeholder="")
+            num_unidades = st.text_input("N° Unid autônomas (Aptos + áreas comuns/zeladoria)", placeholder="", key=f"num_unid_{rcc}")
+            qtd_torres = st.text_input("Qtd Torres", placeholder="", key=f"qtd_torres_{rcc}")
         with col_cs2:
-            qtd_blocos = st.text_input("Qtd Blocos", placeholder="")
-            preco_religue = st.text_input("Valor preço de religue", placeholder="")
+            qtd_blocos = st.text_input("Qtd Blocos", placeholder="", key=f"qtd_blocos_{rcc}")
+            preco_religue = st.text_input("Valor preço de religue", placeholder="", key=f"preco_rel_{rcc}")
         with col_cs3:
-            preco_servico = st.text_input("Valor preço de serviço", placeholder="")
+            preco_servico = st.text_input("Valor preço de serviço", placeholder="", key=f"preco_serv_{rcc}")
 
     st.write("")
-    observacoes_contrato = st.text_area("Obs.", placeholder="Ex: Cliente trocou de CNPJ...")
+    observacoes_contrato = st.text_area("Obs.", placeholder="Ex: Cliente trocou de CNPJ...", key=f"obs_c_{rcc}")
 
     st.divider()
     if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
@@ -813,13 +869,15 @@ Valor preço de serviço: {preco_servico}"""
 Obs.: {observacoes_contrato}"""
 
         st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
-        st.text_area("Copie o texto abaixo:", value=texto_padrao_contrato, height=250)
+        botao_copiar_customizado(texto_padrao_contrato, "contrato_txt")
 
 
 # =====================================================================
 # TELA 3: ANIVERSÁRIO DE CONTRATO
 # =====================================================================
 elif menu == "🎂 Aniversário de Contrato":
+    rca = st.session_state.reset_counter_aniv
+
     col_logo, col_titulo = st.columns([1, 4])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -830,18 +888,20 @@ elif menu == "🎂 Aniversário de Contrato":
 
     st.divider()
 
+    st.button("🔄 Novo Cliente / Limpar", on_click=resetar_dados_aniv)
+
     # Consulta dinâmica e atualizada do IPCA oficial do IBGE
     ipca_vigente = obter_ipca_acumulado_12m()
     st.info(f"📊 **IPCA Acumulado de 12 meses (Consultado em tempo real no IBGE):** {ipca_vigente:.2f}%")
 
     col_an1, col_an2 = st.columns(2)
     with col_an1:
-        preco_anterior_input = st.text_input("Preço Anterior (R$)", placeholder="Ex: 6,9789")
+        preco_anterior_input = st.text_input("Preço Anterior (R$)", placeholder="Ex: 6,9789", key=f"preco_ant_{rca}")
     with col_an2:
         st.write("")
 
     st.markdown("Cliente possui cláusula em contrato?")
-    clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=0, label_visibility="collapsed")
+    clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=0, label_visibility="collapsed", key=f"clausula_{rca}")
 
     st.divider()
 
@@ -870,13 +930,13 @@ Preço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}
 Preço Aniversário: R$ {p_aniv_str}"""
 
         st.success("✅ Texto gerado com sucesso! Copie abaixo:")
-        st.text_area("Copie o texto de Aniversário abaixo:", value=texto_aniversario, height=180)
+        botao_copiar_customizado(texto_aniversario, "aniversario_txt")
 
     st.divider()
 
     # --- CAMPO DE C.I. E BOTÃO ADICIONAL ---
     st.subheader("Tratativa com C.I.")
-    ci_input = st.text_input("Número da C.I.", placeholder="Ex: 588.386.687")
+    ci_input = st.text_input("Número da C.I.", placeholder="Ex: 588.386.687", key=f"ci_num_{rca}")
 
     if st.button("📝 Gerar Texto com C.I.", type="primary"):
         texto_ci = f"""Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."""
@@ -892,4 +952,4 @@ Preço Aniversário: R$ {p_aniv_str}
 CI.: {ci_input if ci_input else '000.000.000'} - Preço Aniversário"""
 
         st.success("✅ Texto com C.I. gerado com sucesso! Copie abaixo:")
-        st.text_area("Copie o texto com C.I. abaixo:", value=texto_ci, height=200)
+        botao_copiar_customizado(texto_ci, "ci_txt")
