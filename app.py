@@ -457,28 +457,25 @@ if menu == "📷 Visita de Transferência":
                 pdf.cell(50, 7, f"{v_tot_str} kg/h", border=1, align="C", fill=True, ln=1)
                 pdf.ln(4)
 
-        # Tratamento compatível para a versão atual do fpdf2
         pdf_output = pdf.output(dest="S")
         if isinstance(pdf_output, str):
             return pdf_output.encode("latin-1")
-        return pdf_output
+        return bytes(pdf_output)
 
     st.subheader("6. Ações Finais")
     col_a1, col_a2 = st.columns(2)
 
     with col_a1:
-        if st.button("📄 Gerar Relatório PDF"):
-            if not cod_cliente.strip() or not nome_cliente.strip():
-                st.error("⚠️ Preencha pelo menos o Código e o Nome do Cliente.")
-            else:
-                pdf_bytes = gerar_pdf(st.session_state.equipamentos, dic_fotos_final, cod_cliente, nome_cliente, qtd_centrais)
-                st.success("✅ PDF gerado com sucesso!")
-                st.download_button(
-                    label="📥 Baixar Relatório (PDF)",
-                    data=pdf_bytes,
-                    file_name=f"relatorio_{cod_cliente}.pdf",
-                    mime="application/pdf"
-                )
+        if not cod_cliente.strip() or not nome_cliente.strip():
+            st.warning("⚠️ Preencha pelo menos o Código e o Nome do Cliente para habilitar o PDF.")
+        else:
+            pdf_bytes = gerar_pdf(st.session_state.equipamentos, dic_fotos_final, cod_cliente, nome_cliente, qtd_centrais)
+            st.download_button(
+                label="📥 Baixar Relatório (PDF)",
+                data=pdf_bytes,
+                file_name=f"relatorio_{cod_cliente}.pdf",
+                mime="application/pdf"
+            )
 
     with col_a2:
         if st.button("📝 Gerar Texto para Sistema"):
