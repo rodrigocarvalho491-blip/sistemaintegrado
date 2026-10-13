@@ -42,10 +42,8 @@ def consultar_cnpj_api(cnpj_input):
 
 # --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES DO IBGE ---
 def obter_ipca_acumulado_12m():
-    # Valor padrão de segurança caso a API pública demore ou esteja indisponível
-    ipca_padrao = 4.58
+    ipca_padrao = 4.22
     try:
-        # Endpoint de indicadores do IBGE explicando inflação / agregados recentes
         url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/202609/variaveis/2266?localidades=N1[1]"
         response = requests.get(url, timeout=3)
         if response.status_code == 200:
@@ -828,7 +826,7 @@ elif menu == "🎂 Aniversário de Contrato":
 
     col_an1, col_an2 = st.columns(2)
     with col_an1:
-        preco_anterior_input = st.text_input("Preço Anterior (R$)", placeholder="Ex: 7,50")
+        preco_anterior_input = st.text_input("Preço Anterior (R$)", placeholder="Ex: 6,9789")
     with col_an2:
         st.write("")
 
@@ -837,22 +835,20 @@ elif menu == "🎂 Aniversário de Contrato":
 
     st.divider()
 
-    if st.button("📝 Gerar Texto de Aniversário de Contrato", type="primary"):
-        # Tratamento do valor anterior para cálculo
-        try:
-            val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
-            p_ant = float(val_limpo)
-            # Cálculo: Preço Aniversário = Preço Anterior + IPCA
-            p_aniv = p_ant * (1 + (ipca_vigente / 100.0))
-            p_aniv_str = f"{p_aniv:.2f}".replace(".", ",")
-        except ValueError:
-            p_aniv_str = "xx,xx"
+    # Cálculo dinâmico do preço aniversário
+    p_aniv_str = "xx,xx"
+    try:
+        val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+        p_ant = float(val_limpo)
+        p_aniv = p_ant * (1 + (ipca_vigente / 100.0))
+        p_aniv_str = f"{p_aniv:.4f}".replace(".", ",")
+    except ValueError:
+        pass
 
-        # Aviso de atenção caso não possua cláusula (não impede a geração)
+    if st.button("📝 Gerar Texto de Aniversário de Contrato", type="primary"):
         if clausula_contrato == "Não":
             st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
 
-        # Montagem do texto final
         texto_aniversario = f"""Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."""
 
         if clausula_contrato == "Sim":
@@ -865,3 +861,25 @@ Preço Aniversário: R$ {p_aniv_str}"""
 
         st.success("✅ Texto gerado com sucesso! Copie abaixo:")
         st.code(texto_aniversario, language="text")
+
+    st.divider()
+
+    # --- CAMPO DE C.I. E BOTÃO ADICIONAL ---
+    st.subheader("Tratativa com C.I.")
+    ci_input = st.text_input("Número da C.I.", placeholder="Ex: 588.386.687")
+
+    if st.button("📝 Gerar Texto com C.I.", type="primary"):
+        texto_ci = f"""Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."""
+
+        if clausula_contrato == "Sim":
+            texto_ci += "\n\nCliente possui cláusula em contrato."
+
+        texto_ci += f"""
+
+Preço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}
+Preço Aniversário: R$ {p_aniv_str}
+
+CI.: {ci_input if ci_input else '000.000.000'} - Preço Aniversário"""
+
+        st.success("✅ Texto com C.I. gerado com sucesso! Copie abaixo:")
+        st.code(texto_ci, language="text")
