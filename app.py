@@ -647,21 +647,31 @@ elif menu == "📝 Elaboração de Contrato":
         if possui_debito_fin == "Sim":
             resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", placeholder="Ex: Cliente")
 
+    # --- DADOS DE ASSINATURA E TESTEMUNHAS ---
+    responsaveis_dados = []
+    nome_testemunha, email_testemunha = "", ""
+
     if tipo_fluxo == "Enviar para Assinatura":
         st.markdown("---")
-        st.markdown("### Dados de Assinatura e Testemunhas")
-        col_a1, col_a2 = st.columns(2)
-        with col_a1:
+        st.subheader("Dados de Assinatura e Testemunhas")
+        
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
             nome_testemunha = st.text_input("Nome da Testemunha", placeholder="")
+        with col_t2:
             email_testemunha = st.text_input("E-mail da Testemunha", placeholder="")
-        with col_a2:
-            nome_responsavel = st.text_input("Nome do Responsável pela assinatura", placeholder="")
-            email_responsavel = st.text_input("E-mail do Responsável pela assinatura", placeholder="")
-    else:
-        nome_testemunha = ""
-        email_testemunha = ""
-        nome_responsavel = ""
-        email_responsavel = ""
+
+        st.markdown("---")
+        qtd_responsaveis = st.selectbox("Quantidade de Responsáveis pela Assinatura", [1, 2, 3, 4], index=0)
+
+        for i in range(1, qtd_responsaveis + 1):
+            st.markdown(f"**Responsável {i}**")
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                nome_resp = st.text_input(f"Nome do Responsável {i}", placeholder="", key=f"nome_resp_{i}")
+            with col_r2:
+                email_resp = st.text_input(f"E-mail do Responsável {i}", placeholder="", key=f"email_resp_{i}")
+            responsaveis_dados.append({"nome": nome_resp, "email": email_resp})
 
     st.divider()
 
@@ -749,9 +759,17 @@ Quem será o responsável pelas NF's pendentes? {resp_pendentes}"""
         if tipo_fluxo == "Enviar para Assinatura":
             texto_padrao_contrato += f"""
 Nome da Testemunha: {nome_testemunha}
-E-mail da Testemunha: {email_testemunha}
-Nome do Responsável pela assinatura: {nome_responsavel}
-E-mail do Responsável pela assinatura: {email_responsavel}"""
+E-mail da Testemunha: {email_testemunha}"""
+
+            if len(responsaveis_dados) == 1:
+                texto_padrao_contrato += f"""
+Nome do Responsável pela assinatura: {responsaveis_dados[0]['nome']}
+E-mail do Responsável pela assinatura: {responsaveis_dados[0]['email']}"""
+            else:
+                for idx, resp in enumerate(responsaveis_dados, 1):
+                    texto_padrao_contrato += f"""
+Nome do Responsável {idx}: {resp['nome']}
+E-mail do Responsável {idx}: {resp['email']}"""
 
         texto_padrao_contrato += f"""
 
