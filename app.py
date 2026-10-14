@@ -928,13 +928,13 @@ elif menu == "📋 Aprovação de Contrato":
 
     # --- 3. REDIMENSIONAMENTO ---
     st.subheader("3. Redimensionamento")
-    redim = st.radio("Redimensionamento:", ["não", "sim"], horizontal=True, index=0, key=f"ap_redim_{rcap}")
+    redim = st.radio("Redimensionamento:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_redim_{rcap}")
     
     comodato_de, comodato_para = "", ""
-    inc_tanques = "não"
-    env_pecas = "não"
+    inc_tanques = "Não"
+    env_pecas = "Não"
 
-    if redim == "sim":
+    if redim == "Sim":
         c_p1, c_p2 = st.columns(2)
         with c_p1:
             comodato_de = st.text_input("Comodato passou de:", placeholder="Ex: 01 B190", key=f"ap_com_de_{rcap}")
@@ -943,13 +943,58 @@ elif menu == "📋 Aprovação de Contrato":
         
         c_p3, c_p4 = st.columns(2)
         with c_p3:
-            inc_tanques = st.radio("Inclusão de tanques?", ["não", "sim"], horizontal=True, index=0, key=f"ap_inc_tanq_{rcap}")
+            inc_tanques = st.radio("Inclusão de tanques?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_inc_tanq_{rcap}")
         with c_p4:
-            env_pecas = st.radio("Necessário lista de peças?", ["não", "sim"], horizontal=True, index=0, key=f"ap_env_pec_{rcap}")
+            env_pecas = st.radio("Necessário lista de peças?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_env_pec_{rcap}")
 
     st.divider()
 
-    # --- PROJETO PADRÃO (OBRIGATÓRIO OU CILINDROS) ---
+    # --- 4. CONTA SIM & PORTARIA ---
+    st.subheader("4. Condomínio Conta Sim & Portaria")
+    implantacao_csim = st.radio("Implantação de conta sim:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_csim_{rcap}")
+    
+    env_pecas_ficha = "Não"
+    env_ficha_cliente = "Não"
+    tp_portaria = ""
+    contato_resp_port = ""
+    part_local = ""
+    contato_sindico = ""
+
+    if implantacao_csim == "Sim":
+        c_cs1, c_cs2 = st.columns(2)
+        with c_cs1:
+            env_pecas_ficha = st.radio("Foi enviado lista de peças?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_csim_pec_{rcap}")
+        with c_cs2:
+            env_ficha_cliente = st.radio("Foi enviado ficha de clientes?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_csim_ficha_{rcap}")
+
+        tp_portaria = st.text_input("Tipo de portaria", placeholder="Ex: Remota / Presencial", key=f"ap_tp_port_{rcap}")
+        contato_resp_port = st.text_input("Contato do responsável (portaria remota, nº ap ou contato)", placeholder="Ex: Apto 42 ou Tel...", key=f"ap_cont_resp_{rcap}")
+        part_local = st.text_input("Particularidades do local", placeholder="Ex: Acesso pela lateral...", key=f"ap_part_local_{rcap}")
+        contato_sindico = st.text_input("Contato atualizado do síndico", placeholder="Ex: 11 99999-1111 (Síndico Carlos)", key=f"ap_cont_sind_{rcap}")
+
+    st.divider()
+
+    # --- 5. ALTERAÇÃO DE CNPJ / RAZÃO SOCIAL ---
+    st.subheader("5. Alteração de CNPJ ou Razão Social")
+    alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_alt_cnpj_{rcap}")
+    
+    mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_mesmo_prop_{rcap}")
+    neg_tit_opt = st.radio("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_neg_tit_{rcap}")
+    projeto_alt = st.text_input("Projeto (Informe o número completo do projeto)", placeholder="Ex: PRJ-ALT-2026", key=f"ap_proj_alt_{rcap}")
+
+    st.divider()
+
+    # --- 6. REDUÇÃO DE VIGÊNCIA ---
+    st.subheader("6. Redução de Vigência")
+    red_vig = st.radio("Redução de vigência?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_red_vig_{rcap}")
+    
+    motivo_red_vig = ""
+    if red_vig == "Sim":
+        motivo_red_vig = st.text_input("Descreva o motivo da redução de vigência:", placeholder="Ex: Acordo comercial...", key=f"ap_mot_red_{rcap}")
+
+    st.divider()
+
+    # --- PROJETO PADRÃO (ÚNICO NO FINAL) ---
     st.subheader("Projeto Padrão")
     col_proj1, col_proj2 = st.columns([3, 1])
     with col_proj1:
@@ -961,50 +1006,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 4. CONTA SIM & PORTARIA ---
-    st.subheader("4. Condomínio Conta Sim & Portaria")
-    implantacao_csim = st.radio("Implantação de conta sim:", ["não", "sim"], horizontal=True, index=0, key=f"ap_csim_{rcap}")
-    
-    env_pecas_ficha = "não"
-    env_ficha_cliente = "não"
-    tp_portaria = ""
-    contato_resp_port = ""
-    part_local = ""
-    contato_sindico = ""
-
-    if implantacao_csim == "sim":
-        c_cs1, c_cs2 = st.columns(2)
-        with c_cs1:
-            env_pecas_ficha = st.radio("Foi enviado lista de peças?", ["não", "sim"], horizontal=True, index=0, key=f"ap_csim_pec_{rcap}")
-        with c_cs2:
-            env_ficha_cliente = st.radio("Foi enviado ficha de clientes?", ["não", "sim"], horizontal=True, index=0, key=f"ap_csim_ficha_{rcap}")
-
-        tp_portaria = st.text_input("Tipo de portaria", placeholder="Ex: Remota / Presencial", key=f"ap_tp_port_{rcap}")
-        contato_resp_port = st.text_input("Contato do responsável (portaria remota, nº ap ou contato)", placeholder="Ex: Apto 42 ou Tel...", key=f"ap_cont_resp_{rcap}")
-        part_local = st.text_input("Particularidades do local", placeholder="Ex: Acesso pela lateral...", key=f"ap_part_local_{rcap}")
-        contato_sindico = st.text_input("Contato atualizado do síndico", placeholder="Ex: 11 99999-1111 (Síndico Carlos)", key=f"ap_cont_sind_{rcap}")
-
-    st.divider()
-
-    # --- 5. ALTERAÇÃO DE CNPJ / RAZÃO SOCIAL ---
-    st.subheader("5. Alteração de CNPJ ou Razão Social")
-    alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["não", "sim"], horizontal=True, index=0, key=f"ap_alt_cnpj_{rcap}")
-    
-    mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["NÃO", "SIM"], horizontal=True, index=0, key=f"ap_mesmo_prop_{rcap}")
-    neg_tit_opt = st.radio("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", ["NÃO", "SIM"], horizontal=True, index=0, key=f"ap_neg_tit_{rcap}")
-    projeto_alt = st.text_input("Projeto (Informe o número completo do projeto)", placeholder="Ex: PRJ-ALT-2026", key=f"ap_proj_alt_{rcap}")
-
-    st.divider()
-
-    # --- 6. REDUÇÃO DE VIGÊNCIA ---
-    st.subheader("6. Redução de Vigência")
-    red_vig = st.radio("Redução de vigência?", ["não", "sim"], horizontal=True, index=0, key=f"ap_red_vig_{rcap}")
-    
-    motivo_red_vig = ""
-    if red_vig == "sim":
-        motivo_red_vig = st.text_input("Descreva o motivo da redução de vigência:", placeholder="Ex: Acordo comercial...", key=f"ap_mot_red_{rcap}")
-
-    st.divider()
     if st.button("📝 Gerar Texto de Aprovação de Contrato", type="primary"):
         
         # Validação do Projeto Padrão
@@ -1012,17 +1013,6 @@ elif menu == "📋 Aprovação de Contrato":
             st.error("⚠️ O campo 'Projeto' é obrigatório, a menos que a opção 'Cilindros' esteja marcada.")
         else:
             proj_final = "N/A" if is_cilindros else projeto_num
-
-            sim_nao_redim = "sim" if redim == "sim" else "não"
-            sim_nao_tanq = "sim" if inc_tanques == "sim" else "não"
-            sim_nao_pecas = "sim" if env_pecas == "sim" else "não"
-            
-            sim_nao_csim = "sim" if implantacao_csim == "sim" else "não"
-            sim_nao_csim_pec = "sim" if env_pecas_ficha == "sim" else "não"
-            sim_nao_csim_ficha = "sim" if env_ficha_cliente == "sim" else "não"
-            
-            sim_nao_alt = "sim" if alt_cnpj == "sim" else "não"
-            sim_nao_red_vig = "sim" if red_vig == "sim" else "não"
 
             texto_aprovacao = f"""Contato: {contato_ap}
 Telefone: {telefone_ap}
@@ -1036,28 +1026,28 @@ Vigência: {vigencia_ap}
 Equipamentos: {equipamentos_ap}
 Existe especificidade sobre a solicitação: {especificidade_ap}
 
-Redimensionamento: [ {'x' if sim_nao_redim == 'sim' else ' '} ] sim [ {'x' if sim_nao_redim == 'não' else ' '} ] não
+Redimensionamento: [ {'x' if redim == 'Sim' else ' '} ] sim [ {'x' if redim == 'Não' else ' '} ] não
 Projeto (Informe o número completo do projeto): {proj_final}
 Comodato passou de: {comodato_de}
 Para: {comodato_para}
-Inclusão de tanques? [ {'x' if sim_nao_tanq == 'sim' else ' '} ] sim [ {'x' if sim_nao_tanq == 'não' else ' '} ] não (se sim, enviar informações para a ficha)
-Necessário lista de peças? [ {'x' if sim_nao_pecas == 'sim' else ' '} ] sim [ {'x' if sim_nao_pecas == 'não' else ' '} ] não (se sim, enviar lista de peças):
+Inclusão de tanques? [ {'x' if inc_tanques == 'Sim' else ' '} ] sim [ {'x' if inc_tanques == 'Não' else ' '} ] não (se sim, enviar informações para a ficha)
+Necessário lista de peças? [ {'x' if env_pecas == 'Sim' else ' '} ] sim [ {'x' if env_pecas == 'Não' else ' '} ] não (se sim, enviar lista de peças):
 
-Implantação de conta sim: [ {'x' if sim_nao_csim == 'sim' else ' '} ] sim [ {'x' if sim_nao_csim == 'não' else ' '} ] não
-Foi enviado lista de peças? [ {'x' if sim_nao_csim_pec == 'sim' else ' '} ] sim [ {'x' if sim_nao_csim_pec == 'não' else ' '} ] não
-Foi enviado ficha de clientes? [ {'x' if sim_nao_csim_ficha == 'sim' else ' '} ] sim [ {'x' if sim_nao_csim_ficha == 'não' else ' '} ] não
+Implantação de conta sim: [ {'x' if implantacao_csim == 'Sim' else ' '} ] sim [ {'x' if implantacao_csim == 'Não' else ' '} ] não
+Foi enviado lista de peças? [ {'x' if env_pecas_ficha == 'Sim' else ' '} ] sim [ {'x' if env_pecas_ficha == 'Não' else ' '} ] não
+Foi enviado ficha de clientes? [ {'x' if env_ficha_cliente == 'Sim' else ' '} ] sim [ {'x' if env_ficha_cliente == 'Não' else ' '} ] não
 Tipo de portaria: {tp_portaria}
 Contato do responsável (em caso de portaria remota, informar o número do apartamento ou a forma de contato do responsável): {contato_resp_port}
 Particularidades do local: {part_local}
 Contato atualizado do síndico: {contato_sindico}
 
-Alteração de CNPJ ou razão social? [ {'x' if sim_nao_alt == 'sim' else ' '} ] sim [ {'x' if sim_nao_alt == 'não' else ' '} ] não
-Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'SIM' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'NÃO' else ' '} ) NÃO
-Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: ( {'X' if neg_tit_opt == 'SIM' else ' '} ) SIM ( {'X' if neg_tit_opt == 'NÃO' else ' '} ) NÃO;
+Alteração de CNPJ ou razão social? [ {'x' if alt_cnpj == 'Sim' else ' '} ] sim [ {'x' if alt_cnpj == 'Não' else ' '} ] não
+Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'Sim' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'Não' else ' '} ) NÃO
+Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: ( {'X' if neg_tit_opt == 'Sim' else ' '} ) SIM ( {'X' if neg_tit_opt == 'Não' else ' '} ) NÃO;
 
 Projeto (Informe o número completo do projeto): {projeto_alt}
 
-Redução de vigência? [ {'x' if sim_nao_red_vig == 'sim' else ' '} ] sim [ {'x' if sim_nao_red_vig == 'não' else ' '} ] não
+Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red_vig == 'Não' else ' '} ] não
 (Se sim, descreva o motivo): {motivo_red_vig}"""
 
             st.success("✅ Texto de Aprovação gerado com sucesso! Copie abaixo:")
