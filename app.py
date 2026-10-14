@@ -55,7 +55,7 @@ def obter_ipca_acumulado_12m():
     except Exception:
         pass
     
-    return 4.58  # Valor oficial de referência atualizado (Set/2026)
+    return 4.58  # Valor oficial de referência atualizado
 
 # --- INICIALIZAÇÃO DO SESSION STATE ---
 if "reset_counter" not in st.session_state:
@@ -63,6 +63,9 @@ if "reset_counter" not in st.session_state:
 
 if "reset_counter_contrato" not in st.session_state:
     st.session_state.reset_counter_contrato = 0
+
+if "reset_counter_aprov" not in st.session_state:
+    st.session_state.reset_counter_aprov = 0
 
 if "reset_counter_aniv" not in st.session_state:
     st.session_state.reset_counter_aniv = 0
@@ -88,6 +91,9 @@ def resetar_dados_cliente():
 
 def resetar_dados_contrato():
     st.session_state.reset_counter_contrato += 1
+
+def resetar_dados_aprov():
+    st.session_state.reset_counter_aprov += 1
 
 def resetar_dados_aniv():
     st.session_state.reset_counter_aniv += 1
@@ -139,6 +145,7 @@ menu = st.sidebar.radio(
     [
         "📷 Visita de Transferência",
         "📝 Elaboração de Contrato",
+        "📋 Aprovação de Contrato",
         "🎂 Aniversário de Contrato"
     ]
 )
@@ -147,6 +154,7 @@ st.sidebar.divider()
 if st.sidebar.button("🔄 Novo Cliente"):
     resetar_dados_cliente()
     resetar_dados_contrato()
+    resetar_dados_aprov()
     resetar_dados_aniv()
     st.rerun()
 
@@ -871,7 +879,179 @@ Obs.: {observacoes_contrato}"""
 
 
 # =====================================================================
-# TELA 3: ANIVERSÁRIO DE CONTRATO
+# TELA 3: APROVAÇÃO DE CONTRATO
+# =====================================================================
+elif menu == "📋 Aprovação de Contrato":
+    rcap = st.session_state.reset_counter_aprov
+
+    col_logo, col_titulo = st.columns([1, 4])
+    with col_logo:
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, width=150)
+    with col_titulo:
+        st.title("Aprovação de Contrato")
+        st.markdown("Formulário de preenchimento para solicitação de aprovação.")
+
+    st.divider()
+
+    # --- 1. CONTATO ---
+    st.subheader("1. Informações de Contato")
+    c_ap1, c_ap2, c_ap3 = st.columns(3)
+    with c_ap1:
+        contato_ap = st.text_input("Contato", placeholder="Ex: Roberto", key=f"ap_cont_{rcap}")
+    with c_ap2:
+        telefone_ap = st.text_input("Telefone", placeholder="Ex: 11 98888-7777", key=f"ap_tel_{rcap}")
+    with c_ap3:
+        email_ap = st.text_input("E-mail", placeholder="Ex: contato@cliente.com", key=f"ap_email_{rcap}")
+
+    st.divider()
+
+    # --- 2. DADOS PRINCIPAIS ---
+    st.subheader("2. Dados e Motivo da Solicitação")
+    motivo_reg = st.text_input("Motivo da regularização", placeholder="Ex: Adequação de infraestrutura...", key=f"ap_motivo_{rcap}")
+
+    c_ap4, c_ap5, c_ap6 = st.columns(3)
+    with c_ap4:
+        atualizar_email = st.selectbox("Atualizar E-mail?", ["Não", "Sim"], index=0, key=f"ap_atu_email_{rcap}")
+    with c_ap5:
+        contrato_adit = st.radio("Contrato / Aditamento", ["Contrato", "Aditamento"], horizontal=True, index=None, key=f"ap_tp_cont_{rcap}")
+    with c_ap6:
+        vigencia_ap = st.text_input("Vigência", placeholder="Ex: 60 meses", key=f"ap_vig_{rcap}")
+
+    c_ap7, c_ap8 = st.columns(2)
+    with c_ap7:
+        equipamentos_ap = st.text_input("Equipamentos", placeholder="Ex: 01 B190...", key=f"ap_eq_{rccap}" if "ap_eq_{rccap}" in locals() else f"ap_eq_{rcap}")
+    with c_ap8:
+        especificidade_ap = st.text_input("Existe especificidade sobre a solicitação?", placeholder="Ex: Nenhuma", key=f"ap_esp_{rcap}")
+
+    st.divider()
+
+    # --- 3. REDIMENSIONAMENTO ---
+    st.subheader("3. Redimensionamento & Projeto")
+    redim = st.radio("Redimensionamento:", ["não", "sim"], horizontal=True, index=0, key=f"ap_redim_{rcap}")
+    
+    projeto_num = ""
+    comodato_de, comodato_para = "", ""
+    inc_tanques = "não"
+    env_pecas = "não"
+
+    if redim == "sim":
+        projeto_num = st.text_input("Projeto (Informe o número completo do projeto)", placeholder="Ex: PRJ-2026/001", key=f"ap_proj_{rcap}")
+        c_p1, c_p2 = st.columns(2)
+        with c_p1:
+            comodato_de = st.text_input("Comodato passou de:", placeholder="Ex: 01 B190", key=f"ap_com_de_{rcap}")
+        with c_p2:
+            comodato_para = st.text_input("Para:", placeholder="Ex: 02 B190", key=f"ap_com_para_{rcap}")
+        
+        c_p3, c_p4 = st.columns(2)
+        with c_p3:
+            inc_tanques = st.radio("Inclusão de tanques?", ["não", "sim"], horizontal=True, index=0, key=f"ap_inc_tanq_{rcap}")
+        with c_p4:
+            env_pecas = st.radio("Necessário lista de peças?", ["não", "sim"], horizontal=True, index=0, key=f"ap_env_pec_{rcap}")
+
+    st.divider()
+
+    # --- 4. CONTA SIM & PORTARIA ---
+    st.subheader("4. Condomínio Conta Sim & Portaria")
+    implantacao_csim = st.radio("Implantação de conta sim:", ["não", "sim"], horizontal=True, index=0, key=f"ap_csim_{rcap}")
+    
+    env_pecas_ficha = "não"
+    tp_portaria = ""
+    contato_resp_port = ""
+    part_local = ""
+    contato_sindico = ""
+
+    if implantacao_csim == "sim":
+        env_pecas_ficha = st.radio("Foi enviado lista de peças e ficha de clientes?", ["não", "sim"], horizontal=True, index=0, key=f"ap_csim_pec_{rcap}")
+        tp_portaria = st.text_input("Tipo de portaria", placeholder="Ex: Remota / Presencial", key=f"ap_tp_port_{rcap}")
+        contato_resp_port = st.text_input("Contato do responsável (portaria remota, nº ap ou contato)", placeholder="Ex: Apto 42 ou Tel...", key=f"ap_cont_resp_{rcap}")
+        part_local = st.text_input("Particularidades do local", placeholder="Ex: Acesso pela lateral...", key=f"ap_part_local_{rcap}")
+        contato_sindico = st.text_input("Contato atualizado do síndico", placeholder="Ex: 11 99999-1111 (Síndico Carlos)", key=f"ap_cont_sind_{rccap}" if "ap_cont_sind_{rccap}" in locals() else f"ap_cont_sind_{rcap}")
+
+    st.divider()
+
+    # --- 5. ALTERAÇÃO DE CNPJ / RAZÃO SOCIAL ---
+    st.subheader("5. Alteração de CNPJ ou Razão Social")
+    alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["não", "sim"], horizontal=True, index=0, key=f"ap_alt_cnpj_{rcap}")
+    
+    mesmo_prop = "NÃO"
+    negociacao_titulos = "NÃO"
+    projeto_alt = ""
+
+    if alt_cnpj == "sim":
+        mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["NÃO", "SIM"], horizontal=True, index=0, key=f"ap_mesmo_prop_{rcap}")
+        mesmo_prop = mesmo_prop_opt
+        
+        neg_tit_opt = st.radio("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", ["NÃO", "SIM"], horizontal=True, index=0, key=f"ap_neg_tit_{rcap}")
+        negociacao_titulos = neg_tit_opt
+        
+        projeto_alt = st.text_input("Projeto (Informe o número completo do projeto)", placeholder="Ex: PRJ-ALT-2026", key=f"ap_proj_alt_{rcap}")
+
+    st.divider()
+
+    # --- 6. REDUÇÃO DE VIGÊNCIA ---
+    st.subheader("6. Redução de Vigência")
+    red_vig = st.radio("Redução de vigência?", ["não", "sim"], horizontal=True, index=0, key=f"ap_red_vig_{rcap}")
+    
+    motivo_red_vig = ""
+    if red_vig == "sim":
+        motivo_red_vig = st.text_input("Descreva o motivo da redução de vigência:", placeholder="Ex: Acordo comercial...", key=f"ap_mot_red_{rcap}")
+
+    st.divider()
+    if st.button("📝 Gerar Texto de Aprovação de Contrato", type="primary"):
+        
+        # Montagem do texto seguindo rigorosamente o template solicitado
+        sim_nao_redim = "sim" if redim == "sim" else "não"
+        sim_nao_tanq = "sim" if inc_tanques == "sim" else "não"
+        sim_nao_pecas = "sim" if env_pecas == "sim" else "não"
+        
+        sim_nao_csim = "sim" if implantacao_csim == "sim" else "não"
+        sim_nao_csim_pec = "sim" if env_pecas_ficha == "sim" else "não"
+        
+        sim_nao_alt = "sim" if alt_cnpj == "sim" else "não"
+        sim_nao_red_vig = "sim" if red_vig == "sim" else "não"
+
+        texto_aprovacao = f"""Contato: {contato_ap}
+Telefone: {telefone_ap}
+E-mail: {email_ap}
+
+Motivo da regularização: {motivo_reg}
+
+Atualizar E-mail? {atualizar_email}
+Contrato / Aditamento: {contrato_adit if contrato_adit else ''}
+Vigência: {vigencia_ap}
+Equipamentos: {equipamentos_ap}
+Existe especificidade sobre a solicitação: {especificidade_ap}
+
+Redimensionamento: [ {'x' if sim_nao_redim == 'sim' else ' '} ] sim [ {'x' if sim_nao_redim == 'não' else ' '} ] não
+Projeto (Informe o número completo do projeto): {projeto_num}
+Comodato passou de: {comodato_de}
+Para: {comodato_para}
+Inclusão de tanques? [ {'x' if sim_nao_tanq == 'sim' else ' '} ] sim [ {'x' if sim_nao_tanq == 'não' else ' '} ] não (se sim, enviar informações para a ficha)
+Necessário lista de peças? [ {'x' if sim_nao_pecas == 'sim' else ' '} ] sim [ {'x' if sim_nao_pecas == 'não' else ' '} ] não (se sim, enviar lista de peças):
+
+Implantação de conta sim: [ {'x' if sim_nao_csim == 'sim' else ' '} ] sim [ {'x' if sim_nao_csim == 'não' else ' '} ] não
+Foi enviado lista de peças e ficha de clientes ? [ {'x' if sim_nao_csim_pec == 'sim' else ' '} ] sim [ {'x' if sim_nao_csim_pec == 'não' else ' '} ] não
+Tipo de portaria: {tp_portaria}
+Contato do responsável (em caso de portaria remota, informar o número do apartamento ou a forma de contato do responsável): {contato_resp_port}
+Particularidades do local: {part_local}
+Contato atualizado do síndico: {contato_sindico}
+
+Alteração de CNPJ ou razão social? [ {'x' if sim_nao_alt == 'sim' else ' '} ] sim [ {'x' if sim_nao_alt == 'não' else ' '} ] não
+Se trata do mesmo proprietário: ( {'X' if mesmo_prop == 'SIM' else ' '} ) SIM ( {'X' if mesmo_prop == 'NÃO' else ' '} ) NÃO
+Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: ( {'X' if negociacao_titulos == 'SIM' else ' '} ) SIM ( {'X' if negociacao_titulos == 'NÃO' else ' '} ) NÃO;
+
+Projeto (Informe o número completo do projeto): {projeto_alt}
+
+Redução de vigência? [ {'x' if sim_nao_red_vig == 'sim' else ' '} ] sim [ {'x' if sim_nao_red_vig == 'não' else ' '} ] não
+(Se sim, descreva o motivo): {motivo_red_vig}"""
+
+        st.success("✅ Texto de Aprovação gerado com sucesso! Copie abaixo:")
+        botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
+
+
+# =====================================================================
+# TELA 4: ANIVERSÁRIO DE CONTRATO
 # =====================================================================
 elif menu == "🎂 Aniversário de Contrato":
     rca = st.session_state.reset_counter_aniv
