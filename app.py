@@ -977,7 +977,9 @@ elif menu == "📋 Aprovação de Contrato":
     alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_alt_cnpj_{rcap}")
     
     mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_mesmo_prop_{rcap}")
-    neg_tit_opt = st.radio("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_neg_tit_{rcap}")
+    
+    # Caixa de texto solicitada para negociação com novo proprietário (com fallback para 'n/a')
+    neg_tit_input = st.text_input("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", key=f"ap_neg_tit_{rcap}")
 
     st.divider()
 
@@ -1010,6 +1012,7 @@ elif menu == "📋 Aprovação de Contrato":
             st.error("⚠️ O campo 'Projeto' é obrigatório, a menos que a opção 'Cilindros' esteja marcada.")
         else:
             proj_final = "N/A" if is_cilindros else projeto_num
+            neg_final = neg_tit_input.strip() if neg_tit_input.strip() else "n/a"
 
             texto_aprovacao = f"""Motivo da regularização: {motivo_reg}
 
@@ -1040,7 +1043,7 @@ Contato atualizado do síndico: {contato_sindico}
 
 Alteração de CNPJ ou razão social? [ {'x' if alt_cnpj == 'Sim' else ' '} ] sim [ {'x' if alt_cnpj == 'Não' else ' '} ] não
 Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'Sim' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'Não' else ' '} ) NÃO
-Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: ( {'X' if neg_tit_opt == 'Sim' else ' '} ) SIM ( {'X' if neg_tit_opt == 'Não' else ' '} ) NÃO;
+Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: {neg_final}
 
 Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red_vig == 'Não' else ' '} ] não
 (Se sim, descreva o motivo): {motivo_red_vig}"""
