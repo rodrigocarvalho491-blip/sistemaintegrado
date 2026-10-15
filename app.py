@@ -676,7 +676,18 @@ elif menu == "📝 Elaboração de Contrato":
     with col_con2:
         cond_pagamento = st.text_input("Condição de pagamento", key=f"cond_pag_{rcc}")
         vigencia = st.text_input("Vigência", key=f"vigencia_{rcc}")
-        equipamentos_contrato = st.text_input("Equipamentos", key=f"eq_contrato_c_{rcc}")
+        
+        # Seleção de quantidade de endereços de entrega/centrais
+        qtd_entregas_c = st.number_input("Quantidade de endereços de entrega / centrais", min_value=1, value=1, step=1, key=f"qtd_ent_c_{rcc}")
+        
+        equipamentos_contrato = ""
+        if qtd_entregas_c == 1:
+            equipamentos_contrato = st.text_input("Equipamentos", key=f"eq_contrato_c_{rcc}")
+        else:
+            eq_dict_c = {}
+            st.markdown("**Equipamentos por Endereço de Entrega:**")
+            for i in range(1, int(qtd_entregas_c) + 1):
+                eq_dict_c[i] = st.text_input(f"Equipamentos - [Entrega {i}]", key=f"eq_ent_{i}_{rcc}")
 
     st.divider()
 
@@ -834,8 +845,19 @@ Tipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"""
 
         texto_padrao_contrato += f"""
 Condição de pagamento: {cond_pagamento}
-Vigência: {vigencia}
-Equipamentos: {equipamentos_contrato}
+Vigência: {vigencia}"""
+
+        if qtd_entregas_c == 1:
+            texto_padrao_contrato += f"\nEquipamentos: {equipamentos_contrato}"
+        else:
+            eq_linhas = []
+            for i in range(1, int(qtd_entregas_c) + 1):
+                val_eq_i = eq_dict_c[i].strip()
+                if val_eq_i:
+                    eq_linhas.append(f"[Entrega {i}] {val_eq_i}")
+            texto_padrao_contrato += "\nEquipamentos: " + "\n".join(eq_linhas)
+
+        texto_padrao_contrato += f"""
 
 Cliente possui débitos?: {possui_debito_fin}
 Quem será o responsável pelas NF's pendentes? {resp_pendentes}"""
@@ -916,11 +938,19 @@ elif menu == "📋 Aprovação de Contrato":
     with c_ap6:
         vigencia_ap = st.text_input("Vigência", key=f"ap_vig_{rcap}")
 
-    c_ap7, c_ap8 = st.columns(2)
-    with c_ap7:
+    # Quantidade de endereços de entrega/centrais
+    qtd_entregas_ap = st.number_input("Quantidade de endereços de entrega / centrais", min_value=1, value=1, step=1, key=f"qtd_ent_ap_{rcap}")
+
+    equipamentos_ap = ""
+    eq_dict_ap = {}
+    if qtd_entregas_ap == 1:
         equipamentos_ap = st.text_input("Equipamentos", key=f"ap_eq_{rcap}")
-    with c_ap8:
-        especificidade_ap = st.text_input("Existe especificidade sobre a solicitação?", key=f"ap_esp_{rcap}")
+    else:
+        st.markdown("**Equipamentos por Endereço de Entrega:**")
+        for i in range(1, int(qtd_entregas_ap) + 1):
+            eq_dict_ap[i] = st.text_input(f"Equipamentos - [Entrega {i}]", key=f"ap_eq_ent_{i}_{rcap}")
+
+    especificidade_ap = st.text_input("Existe especificidade sobre a solicitação?", key=f"ap_esp_{rcap}")
 
     st.divider()
 
@@ -972,14 +1002,18 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 5. ALTERAÇÃO DE CNPJ / RAZÃO SOCIAL ---
-    st.subheader("5. Alteração de CNPJ ou Razão Social")
+    # --- 5. ALTERAÇÃO DE CNPJ / RAZÃO SOCIAL & TÍTULOS ---
+    st.subheader("5. Alteração de CNPJ ou Razão Social & Títulos")
     alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_alt_cnpj_{rcap}")
     
     mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_mesmo_prop_{rcap}")
     
-    # Caixa de texto solicitada para negociação com novo proprietário (com fallback para 'n/a')
-    neg_tit_input = st.text_input("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", key=f"ap_neg_tit_{rcap}")
+    # Pergunta de Títulos em Aberto com lógica condicional
+    possui_titulos_aberto = st.radio("Possui títulos em aberto?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_tit_aberto_{rcap}")
+    
+    neg_tit_input = ""
+    if possui_titulos_aberto == "Sim":
+        neg_tit_input = st.text_input("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", key=f"ap_neg_tit_{rcap}")
 
     st.divider()
 
@@ -1012,7 +1046,25 @@ elif menu == "📋 Aprovação de Contrato":
             st.error("⚠️ O campo 'Projeto' é obrigatório, a menos que a opção 'Cilindros' esteja marcada.")
         else:
             proj_final = "N/A" if is_cilindros else projeto_num
-            neg_final = neg_tit_input.strip() if neg_tit_input.strip() else "n/a"
+            
+            # Tratamento da negociação de títulos
+            if possui_titulos_aberto == "Não":
+                neg_final = "n/a"
+            elif possui_titulos_aberto == "Sim":
+                neg_final = neg_tit_input.strip() if neg_tit_input.strip() else "n/a"
+            else:
+                neg_final = "n/a"
+
+            # Tratamento de equipamentos na aprovação
+            if qtd_entregas_ap == 1:
+                eq_ap_texto = equipamentos_ap
+            else:
+                eq_ap_linhas = []
+                for i in range(1, int(qtd_entregas_ap) + 1):
+                    val_e = eq_dict_ap[i].strip()
+                    if val_e:
+                        eq_ap_linhas.append(f"[Entrega {i}] {val_e}")
+                eq_ap_texto = "\n" + "\n".join(eq_ap_linhas) if eq_ap_linhas else ""
 
             texto_aprovacao = f"""Motivo da regularização: {motivo_reg}
 
@@ -1023,7 +1075,7 @@ E-mail: {email_ap}
 Atualizar E-mail? {atualizar_email if atualizar_email else ''}
 Contrato / Aditamento: {contrato_adit if contrato_adit else ''}
 Vigência: {vigencia_ap}
-Equipamentos: {equipamentos_ap}
+Equipamentos: {eq_ap_texto}
 Existe especificidade sobre a solicitação: {especificidade_ap}
 
 Redimensionamento: [ {'x' if redim == 'Sim' else ' '} ] sim [ {'x' if redim == 'Não' else ' '} ] não
