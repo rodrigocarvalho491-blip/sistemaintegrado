@@ -200,11 +200,11 @@ if menu == "📷 Visita de Transferência":
     st.subheader("2. Informações Contratuais")
     s2_l1_c1, s2_l1_c2, s2_l1_c3, s2_l1_c4 = st.columns(4)
     with s2_l1_c1:
-        eq_contrato = st.selectbox("Equipamentos de acordo com contrato? *", ["Sim", "Não"], index=None, placeholder="", key=f"eq_contrato_{rc}")
+        eq_contrato = st.radio("Equipamentos de acordo com contrato? *", ["Sim", "Não"], horizontal=True, index=None, key=f"eq_contrato_{rc}")
     with s2_l1_c2:
         desc_eq_contrato = st.text_input("Quais equipamentos disponíveis? *", key=f"desc_eq_contrato_{rc}")
     with s2_l1_c3:
-        tem_freq = st.selectbox("Possui programação cadastrada? *", ["Sim", "Não"], index=None, placeholder="", key=f"tem_freq_{rc}")
+        tem_freq = st.radio("Possui programação cadastrada? *", ["Sim", "Não"], horizontal=True, index=None, key=f"tem_freq_{rc}")
     with s2_l1_c4:
         desc_freq = ""
         if tem_freq == "Sim":
@@ -222,7 +222,7 @@ if menu == "📷 Visita de Transferência":
 
     s2_l3_c1, s2_l3_c2 = st.columns(2)
     with s2_l3_c1:
-        possui_art = st.selectbox("Possui ART? *", ["Sim", "Não"], index=None, placeholder="", key=f"possui_art_{rc}")
+        possui_art = st.radio("Possui ART? *", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_art_{rc}")
     with s2_l3_c2:
         desc_art = ""
         if possui_art == "Sim":
@@ -234,19 +234,19 @@ if menu == "📷 Visita de Transferência":
 
     s2_l4_c1, s2_l4_c2 = st.columns(2)
     with s2_l4_c1:
-        possui_debitos = st.selectbox("Cliente possui débitos? *", ["Sim", "Não"], index=None, placeholder="", key=f"possui_debitos_{rc}")
+        possui_debitos = st.radio("Cliente possui débitos? *", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_debitos_{rc}")
     with s2_l4_c2:
         desc_debitos = st.text_input("Detalhes dos Débitos (se houver)", key=f"desc_debitos_{rc}") if possui_debitos == "Sim" else ""
 
     s2_l5_c1, s2_l5_c2 = st.columns(2)
     with s2_l5_c1:
-        central_norma = st.selectbox("Central dentro de norma? *", ["Sim", "Não"], index=None, placeholder="", key=f"central_norma_{rc}")
+        central_norma = st.radio("Central dentro de norma? *", ["Sim", "Não"], horizontal=True, index=None, key=f"central_norma_{rc}")
     with s2_l5_c2:
         desc_central_norma = st.text_input("Motivo da Central fora de norma", key=f"desc_central_norma_{rc}") if central_norma == "Não" else ""
 
     s2_l6_c1, s2_l6_c2 = st.columns(2)
     with s2_l6_c1:
-        rep2_correto = st.selectbox("Representante 2 está correto? *", ["Sim", "Não"], index=None, placeholder="", key=f"rep2_correto_{rc}")
+        rep2_correto = st.radio("Representante 2 está correto? *", ["Sim", "Não"], horizontal=True, index=None, key=f"rep2_correto_{rc}")
     with s2_l6_c2:
         desc_rep2 = st.text_input("Nº OC de Regularização", key=f"desc_rep2_{rc}") if rep2_correto == "Não" else ""
 
@@ -390,9 +390,9 @@ if menu == "📷 Visita de Transferência":
     st.subheader("4. Satisfação & Observações")
     s4_l1_c1, s4_l1_c2 = st.columns(2)
     with s4_l1_c1:
-        indica_negocios = st.selectbox("Indicou novos negócios? *", ["Sim", "Não"], index=None, placeholder="", key=f"ind_neg_{rc}")
+        indica_negocios = st.radio("Indicou novos negócios? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ind_neg_{rc}")
     with s4_l1_c2:
-        cliente_satisfeito = st.selectbox("Cliente satisfeito com a Consigaz? *", ["Sim", "Não"], index=None, placeholder="", key=f"cli_sat_{rc}")
+        cliente_satisfeito = st.radio("Cliente satisfeito com a Consigaz? *", ["Sim", "Não"], horizontal=True, index=None, key=f"cli_sat_{rc}")
 
     observacoes = st.text_area("Observações Gerais", key=f"obs_{rc}")
 
@@ -579,6 +579,7 @@ Cliente está satisfeito com o atendimento da Consigaz? {cliente_satisfeito}
 Obs.: {observacoes}
 """
             st.success("✅ Texto gerado com sucesso! Copie abaixo:")
+            st.text_area("Texto Gerado:", value=texto_final, height=250, key=f"txt_area_transf_{rc}")
             botao_copiar_customizado(texto_final, "transferencia_txt")
 
 
@@ -602,6 +603,7 @@ elif menu == "📝 Elaboração de Contrato":
         "Selecione o objetivo da solicitação:", 
         ["Gerar Minuta", "Enviar para Assinatura"],
         horizontal=True,
+        index=None,
         key=f"fluxo_c_{rcc}"
     )
 
@@ -642,14 +644,12 @@ elif menu == "📝 Elaboração de Contrato":
     with col_con1:
         endereco_padrao = st.text_input("Endereço padrão ou entrega?", key=f"end_padrao_{rcc}")
         
-        st.markdown("Mesmo proprietário?")
-        mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed", key=f"mesmo_prop_{rcc}")
+        mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_prop_{rcc}")
         
         if mesmo_prop_opt == "Não":
             email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", key=f"email_novo_{rcc}")
 
-        st.markdown("Mesmo CNPJ?")
-        mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None, label_visibility="collapsed", key=f"mesmo_cnpj_{rcc}")
+        mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_cnpj_{rcc}")
         
         if mesmo_cnpj_opt == "Sim":
             cnpj_campo_val = st.text_input("CNPJ", key=f"cnpj_val_{rcc}")
@@ -683,8 +683,7 @@ elif menu == "📝 Elaboração de Contrato":
     # --- TEMA 5: COMODATO / FORNECIMENTO ---
     st.subheader("5. Comodato / Fornecimento")
     
-    st.markdown("Tipo de Fornecimento")
-    tipo_fornecimento = st.radio("Tipo de Fornecimento", ["Granel", "Cilindro"], horizontal=True, index=None, label_visibility="collapsed", key=f"tp_forn_{rcc}")
+    tipo_fornecimento = st.radio("Tipo de Fornecimento", ["Granel", "Cilindro"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
     
     preco_granel = ""
     consumo_granel = ""
@@ -727,8 +726,7 @@ elif menu == "📝 Elaboração de Contrato":
     st.subheader("6. Financeiro")
     col_fin1, col_fin2 = st.columns(2)
     with col_fin1:
-        st.markdown("Cliente possui débitos?")
-        possui_debito_fin = st.radio("Cliente possui débitos?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed", key=f"possui_deb_{rcc}")
+        possui_debito_fin = st.radio("Cliente possui débitos?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
         
         resp_pendentes = "n/a"
         if possui_debito_fin == "Sim":
@@ -764,8 +762,7 @@ elif menu == "📝 Elaboração de Contrato":
 
     # --- TEMA 7: CONTA SIM ---
     st.subheader("7. Condomínio CONTA SIM")
-    st.markdown("Condomínio CONTA SIM?")
-    conta_sim = st.radio("Condomínio CONTA SIM?", ["Não", "Sim"], horizontal=True, index=0, label_visibility="collapsed", key=f"conta_sim_{rcc}")
+    conta_sim = st.radio("Condomínio CONTA SIM?", ["Sim", "Não"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
 
     num_unidades = ""
     qtd_torres = ""
@@ -875,6 +872,7 @@ Valor preço de serviço: {preco_servico}"""
 Obs.: {observacoes_contrato}"""
 
         st.success("✅ Texto padrão gerado com sucesso! Copie abaixo:")
+        st.text_area("Texto Gerado:", value=texto_padrao_contrato, height=250, key=f"txt_area_contrato_{rcc}")
         botao_copiar_customizado(texto_padrao_contrato, "contrato_txt")
 
 
@@ -912,7 +910,7 @@ elif menu == "📋 Aprovação de Contrato":
 
     c_ap4, c_ap5, c_ap6 = st.columns(3)
     with c_ap4:
-        atualizar_email = st.selectbox("Atualizar E-mail?", ["Não", "Sim"], index=0, key=f"ap_atu_email_{rcap}")
+        atualizar_email = st.radio("Atualizar E-mail?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_atu_email_{rcap}")
     with c_ap5:
         contrato_adit = st.radio("Contrato / Aditamento", ["Contrato", "Aditamento"], horizontal=True, index=None, key=f"ap_tp_cont_{rcap}")
     with c_ap6:
@@ -928,7 +926,7 @@ elif menu == "📋 Aprovação de Contrato":
 
     # --- 3. REDIMENSIONAMENTO ---
     st.subheader("3. Redimensionamento")
-    redim = st.radio("Redimensionamento:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_redim_{rcap}")
+    redim = st.radio("Redimensionamento:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_redim_{rcap}")
     
     comodato_de, comodato_para = "", ""
     inc_tanques = "Não"
@@ -943,15 +941,15 @@ elif menu == "📋 Aprovação de Contrato":
         
         c_p3, c_p4 = st.columns(2)
         with c_p3:
-            inc_tanques = st.radio("Inclusão de tanques?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_inc_tanq_{rcap}")
+            inc_tanques = st.radio("Inclusão de tanques?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_inc_tanq_{rcap}")
         with c_p4:
-            env_pecas = st.radio("Necessário lista de peças?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_env_pec_{rcap}")
+            env_pecas = st.radio("Necessário lista de peças?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_env_pec_{rcap}")
 
     st.divider()
 
     # --- 4. CONTA SIM & PORTARIA ---
     st.subheader("4. Condomínio Conta Sim & Portaria")
-    implantacao_csim = st.radio("Implantação de conta sim:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_csim_{rcap}")
+    implantacao_csim = st.radio("Implantação de conta sim:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_{rcap}")
     
     env_pecas_ficha = "Não"
     env_ficha_cliente = "Não"
@@ -963,9 +961,9 @@ elif menu == "📋 Aprovação de Contrato":
     if implantacao_csim == "Sim":
         c_cs1, c_cs2 = st.columns(2)
         with c_cs1:
-            env_pecas_ficha = st.radio("Foi enviado lista de peças?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_csim_pec_{rcap}")
+            env_pecas_ficha = st.radio("Foi enviado lista de peças?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_pec_{rcap}")
         with c_cs2:
-            env_ficha_cliente = st.radio("Foi enviado ficha de clientes?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_csim_ficha_{rcap}")
+            env_ficha_cliente = st.radio("Foi enviado ficha de clientes?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_ficha_{rcap}")
 
         tp_portaria = st.text_input("Tipo de portaria", key=f"ap_tp_port_{rcap}")
         contato_resp_port = st.text_input("Contato do responsável (portaria remota, nº ap ou contato)", key=f"ap_cont_resp_{rcap}")
@@ -976,16 +974,16 @@ elif menu == "📋 Aprovação de Contrato":
 
     # --- 5. ALTERAÇÃO DE CNPJ / RAZÃO SOCIAL ---
     st.subheader("5. Alteração de CNPJ ou Razão Social")
-    alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_alt_cnpj_{rcap}")
+    alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_alt_cnpj_{rcap}")
     
-    mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_mesmo_prop_{rcap}")
-    neg_tit_opt = st.radio("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_neg_tit_{rcap}")
+    mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_mesmo_prop_{rcap}")
+    neg_tit_opt = st.radio("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_neg_tit_{rcap}")
 
     st.divider()
 
     # --- 6. REDUÇÃO DE VIGÊNCIA ---
     st.subheader("6. Redução de Vigência")
-    red_vig = st.radio("Redução de vigência?", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_red_vig_{rcap}")
+    red_vig = st.radio("Redução de vigência?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_red_vig_{rcap}")
     
     motivo_red_vig = ""
     if red_vig == "Sim":
@@ -1019,7 +1017,7 @@ E-mail: {email_ap}
 
 Motivo da regularização: {motivo_reg}
 
-Atualizar E-mail? {atualizar_email}
+Atualizar E-mail? {atualizar_email if atualizar_email else ''}
 Contrato / Aditamento: {contrato_adit if contrato_adit else ''}
 Vigência: {vigencia_ap}
 Equipamentos: {equipamentos_ap}
@@ -1048,6 +1046,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 (Se sim, descreva o motivo): {motivo_red_vig}"""
 
             st.success("✅ Texto de Aprovação gerado com sucesso! Copie abaixo:")
+            st.text_area("Texto Gerado:", value=texto_aprovacao, height=350, key=f"txt_area_aprov_{rcap}")
             botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
 
 
@@ -1077,8 +1076,7 @@ elif menu == "🎂 Aniversário de Contrato":
     with col_an2:
         st.write("")
 
-    st.markdown("Cliente possui cláusula em contrato?")
-    clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=0, label_visibility="collapsed", key=f"clausula_{rca}")
+    clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=None, key=f"clausula_{rca}")
 
     st.divider()
 
@@ -1107,6 +1105,7 @@ Preço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}
 Preço Aniversário: R$ {p_aniv_str}"""
 
         st.success("✅ Texto gerado com sucesso! Copie abaixo:")
+        st.text_area("Texto Gerado:", value=texto_aniversario, height=180, key=f"txt_area_aniv_{rca}")
         botao_copiar_customizado(texto_aniversario, "aniversario_txt")
 
     st.divider()
@@ -1129,4 +1128,5 @@ Preço Aniversário: R$ {p_aniv_str}
 CI.: {ci_input if ci_input else '000.000.000'} - Preço Aniversário"""
 
         st.success("✅ Texto com C.I. gerado com sucesso! Copie abaixo:")
+        st.text_area("Texto Gerado:", value=texto_ci, height=200, key=f"txt_area_ci_{rca}")
         botao_copiar_customizado(texto_ci, "ci_txt")
