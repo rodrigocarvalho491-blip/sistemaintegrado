@@ -980,7 +980,6 @@ elif menu == "📋 Aprovação de Contrato":
     
     mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_mesmo_prop_{rcap}")
     neg_tit_opt = st.radio("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", ["Não", "Sim"], horizontal=True, index=0, key=f"ap_neg_tit_{rcap}")
-    projeto_alt = st.text_input("Projeto (Informe o número completo do projeto)", key=f"ap_proj_alt_{rcap}")
 
     st.divider()
 
@@ -1044,8 +1043,6 @@ Contato atualizado do síndico: {contato_sindico}
 Alteração de CNPJ ou razão social? [ {'x' if alt_cnpj == 'Sim' else ' '} ] sim [ {'x' if alt_cnpj == 'Não' else ' '} ] não
 Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'Sim' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'Não' else ' '} ) NÃO
 Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: ( {'X' if neg_tit_opt == 'Sim' else ' '} ) SIM ( {'X' if neg_tit_opt == 'Não' else ' '} ) NÃO;
-
-Projeto (Informe o número completo do projeto): {projeto_alt}
 
 Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red_vig == 'Não' else ' '} ] não
 (Se sim, descreva o motivo): {motivo_red_vig}"""
