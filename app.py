@@ -681,10 +681,10 @@ elif menu == "📝 Elaboração de Contrato":
         qtd_entregas_c = st.number_input("Quantidade de endereços de entrega / centrais", min_value=1, value=1, step=1, key=f"qtd_ent_c_{rcc}")
         
         equipamentos_contrato = ""
+        eq_dict_c = {}
         if qtd_entregas_c == 1:
             equipamentos_contrato = st.text_input("Equipamentos", key=f"eq_contrato_c_{rcc}")
         else:
-            eq_dict_c = {}
             st.markdown("**Equipamentos por Endereço de Entrega:**")
             for i in range(1, int(qtd_entregas_c) + 1):
                 eq_dict_c[i] = st.text_input(f"Equipamentos - [Entrega {i}]", key=f"eq_ent_{i}_{rcc}")
@@ -839,7 +839,16 @@ Tipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"""
             texto_padrao_contrato += f"\nConsumo mensal previsto: {consumo_granel}"
             
         elif tipo_fornecimento == "Cilindro":
-            preco_cilindro_str = f"[P13 = {p13_val} / und] [P20 = {p20_val} / und] [P45 = {p45_val} / und]"
+            # Montagem dinâmica apenas com os cilindros preenchidos
+            partes_cil = []
+            if p13_val.strip():
+                partes_cil.append(f"[P13 = {p13_val.strip()} / und]")
+            if p20_val.strip():
+                partes_cil.append(f"[P20 = {p20_val.strip()} / und]")
+            if p45_val.strip():
+                partes_cil.append(f"[P45 = {p45_val.strip()} / und]")
+            
+            preco_cilindro_str = " ".join(partes_cil) if partes_cil else ""
             texto_padrao_contrato += f"\nPreço Cilindro: {preco_cilindro_str}"
             texto_padrao_contrato += f"\nConsumo mensal previsto: {consumo_cilindro_total} KGs"
 
@@ -855,7 +864,7 @@ Vigência: {vigencia}"""
                 val_eq_i = eq_dict_c[i].strip()
                 if val_eq_i:
                     eq_linhas.append(f"[Entrega {i}] {val_eq_i}")
-            texto_padrao_contrato += "\nEquipamentos: " + "\n".join(eq_linhas)
+            texto_padrao_contrato += "\nEquipamentos:\n" + "\n".join(eq_linhas)
 
         texto_padrao_contrato += f"""
 
