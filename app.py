@@ -1011,11 +1011,11 @@ elif menu == "📋 Aprovação de Contrato":
         else:
             proj_final = "N/A" if is_cilindros else projeto_num
 
-            texto_aprovacao = f"""Contato: {contato_ap}
+            texto_aprovacao = f"""Motivo da regularização: {motivo_reg}
+
+Contato: {contato_ap}
 Telefone: {telefone_ap}
 E-mail: {email_ap}
-
-Motivo da regularização: {motivo_reg}
 
 Atualizar E-mail? {atualizar_email if atualizar_email else ''}
 Contrato / Aditamento: {contrato_adit if contrato_adit else ''}
