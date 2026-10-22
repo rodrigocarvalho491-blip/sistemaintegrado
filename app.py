@@ -27,7 +27,7 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - FORÇANDO TEMA CLARO E BRANCO TOTAL
+# IDENTIDADE VISUAL CONSIGAZ - LIMPEZA TOTAL (TEMA CLARO PURO)
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -114,7 +114,7 @@ html, body, [class*="css"], .stApp {
 }
 
 /* ===================================================================== */
-/* CAMPOS BRANCOS, TEXTOS ESCUROS E BORDAS DELICADAS EM TODAS AS TELAS    */
+/* CAMPOS, INPUTS, UPLOADERS, BOTÕES SECUNDÁRIOS E RÁDIOS BRANCOS PUROS  */
 /* ===================================================================== */
 input, textarea, select, 
 [data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div,
@@ -135,7 +135,6 @@ div[data-baseweb="input"] > div, div[data-baseweb="base-input"] > input,
   background-color: rgba(0, 85, 165, 0.02) !important;
 }
 
-/* Textos e instruções dentro do uploader */
 [data-testid="stFileUploaderDropzone"] small, 
 [data-testid="stFileUploaderDropzone"] span, 
 [data-testid="stFileUploaderDropzone"] div {
@@ -154,30 +153,51 @@ div[data-baseweb="input"] > div, div[data-baseweb="base-input"] > input,
   box-shadow: 0 0 0 4px rgba(0, 85, 165, 0.12) !important;
 }
 
-/* Textos, labels e rádios visíveis e destacados */
-label, .stRadio p, .stCheckbox p, p, span {
-  color: #1E293B !important;
+/* Controles numéricos (+ / -) com fundo branco e contorno delicado */
+button[kind="secondary"], [data-testid="stNumberInput"] button {
+  background-color: #FFFFFF !important;
+  border: 1px solid rgba(120, 140, 160, 0.3) !important;
+  color: #003366 !important;
+}
+[data-testid="stNumberInput"] button:hover {
+  background-color: rgba(0, 85, 165, 0.05) !important;
+  border-color: var(--cg-azul-vibrante) !important;
 }
 
-/* Botões modernos, arredondados e com sombras suaves */
-.stButton > button, .stDownloadButton > button {
-  border-radius: 14px !important;
-  font-weight: 700 !important;
-  padding: 0.6rem 1.4rem !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+/* Botões padrão (secundários) totalmente limpos com fundo branco e borda */
+.stButton > button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]), 
+.stDownloadButton > button:not([kind="primary"]) {
+  background-color: #FFFFFF !important;
+  color: #003366 !important;
+  border: 1.5px solid rgba(120, 140, 160, 0.3) !important;
+}
+.stButton > button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]):hover {
+  background-color: rgba(0, 85, 165, 0.04) !important;
+  border-color: var(--cg-azul-vibrante) !important;
 }
 
-.stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"], .stDownloadButton > button {
+/* Botões principais (Primary) com o gradiente Consigaz */
+.stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"], .stDownloadButton > button[kind="primary"] {
   background: linear-gradient(135deg, var(--cg-azul-vibrante) 0%, var(--cg-azul-principal) 100%) !important;
   color: #FFFFFF !important;
   border: none !important;
   box-shadow: 0 4px 15px rgba(0, 85, 165, 0.25) !important;
 }
-.stButton > button[kind="primary"]:hover, .stButton > button[data-testid="stBaseButton-primary"]:hover, .stDownloadButton > button:hover {
+.stButton > button[kind="primary"]:hover, .stButton > button[data-testid="stBaseButton-primary"]:hover {
   opacity: 0.95;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 85, 165, 0.35) !important;
+}
+
+/* Radio buttons e checkboxes com fundo branco e bolinhas/quadrados limpos */
+[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p,
+.stCheckbox label div[data-testid="stMarkdownContainer"] p {
+  color: #1E293B !important;
+}
+
+/* Texto geral e labels */
+label, p, span {
+  color: #1E293B !important;
 }
 
 /* Sidebar limpa e com fundo claro fixo */
