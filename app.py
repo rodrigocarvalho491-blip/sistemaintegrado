@@ -22,126 +22,34 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ
-# Para ajustar as cores da marca, altere SOMENTE os valores deste bloco.
-# (Se mudar o azul principal, mude também o primaryColor em .streamlit/config.toml)
+# IDENTIDADE VISUAL CONSIGAZ & CSS ADAPTATIVO AO TEMA (CLARO/ESCURO)
 # =====================================================================
-COR_AZUL = "#004080"          # Azul Consigaz (principal)
-COR_AZUL_ESCURO = "#0A2540"   # Títulos e textos de destaque
-COR_AZUL_HOVER = "#003060"    # Botão principal ao passar o mouse
-COR_AZUL_CLARO = "#E7EFF9"    # Fundos suaves, item ativo do menu
-COR_DESTAQUE = "#F28C28"      # Detalhe de destaque (usado com muita moderação)
-COR_FUNDO = "#F1F5FA"         # Fundo da página
-COR_TEXTO = "#1B2A3A"
-COR_TEXTO_SUAVE = "#5B6B7C"
-COR_BORDA = "#D3DDEA"
-
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
-:root {
-  --cg-azul: __AZUL__;
-  --cg-azul-escuro: __AZUL_ESCURO__;
-  --cg-azul-hover: __AZUL_HOVER__;
-  --cg-azul-claro: __AZUL_CLARO__;
-  --cg-destaque: __DESTAQUE__;
-  --cg-fundo: __FUNDO__;
-  --cg-texto: __TEXTO__;
-  --cg-texto-suave: __TEXTO_SUAVE__;
-  --cg-borda: __BORDA__;
-}
+
 html, body, .stApp, .stApp p, .stApp label, .stApp input, .stApp textarea, .stApp button,
 .stApp li, .stApp h1, .stApp h2, .stApp h3, .stApp h4 {
   font-family: 'Manrope', 'Segoe UI', Arial, sans-serif;
 }
-.stApp { background: var(--cg-fundo); color: var(--cg-texto); }
+
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
-/* Painel central */
-.block-container, [data-testid="stMainBlockContainer"] {
-  max-width: 1180px !important;
-  margin: 1.2rem auto 2rem auto !important;
-  padding: 1.8rem 2.4rem 2.4rem 2.4rem !important;
-  background: #FFFFFF;
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(10,37,64,.06), 0 8px 28px rgba(10,37,64,.07);
-}
-
 /* Cabeçalho da página */
 .cg-header { display: flex; align-items: center; gap: 1.1rem; position: relative;
-  padding-bottom: 1.1rem; margin-bottom: 1.3rem; border-bottom: 1px solid var(--cg-borda); }
-.cg-header::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 132px; height: 3px;
-  border-radius: 3px; background: linear-gradient(90deg, var(--cg-azul) 0 72%, var(--cg-destaque) 72% 100%); }
+  padding-bottom: 1.1rem; margin-bottom: 1.3rem; border-bottom: 1px solid rgba(150,150,150,0.2); }
 .cg-logo { height: 50px; width: auto; display: block; }
-.cg-header-sep { width: 1px; align-self: stretch; background: var(--cg-borda); }
-.cg-title { font-size: 1.55rem; font-weight: 800; color: var(--cg-azul-escuro); line-height: 1.2; letter-spacing: -0.01em; }
-.cg-subtitle { font-size: .93rem; color: var(--cg-texto-suave); margin-top: .2rem; }
+.cg-header-sep { width: 1px; align-self: stretch; background: rgba(150,150,150,0.2); }
+.cg-title { font-size: 1.55rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; }
+.cg-subtitle { font-size: .93rem; margin-top: .2rem; opacity: 0.8; }
 
-/* Títulos de seção */
-.stApp h1, .stApp h2 { color: var(--cg-azul-escuro) !important; font-weight: 800 !important; }
-.stApp h3 { font-size: 1.08rem !important; font-weight: 800 !important; color: var(--cg-azul) !important;
-  padding: 0 0 0 .75rem !important; border-left: 4px solid var(--cg-azul); line-height: 1.3 !important; }
-hr { border-color: var(--cg-borda) !important; margin: 1.6rem 0 !important; }
-
-/* Rótulos e campos */
-[data-testid="stWidgetLabel"] p { font-size: .86rem; font-weight: 600; color: #2F4156; }
-[data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
-  background: #FFFFFF !important; border-radius: 10px !important; border: 1px solid var(--cg-borda) !important; }
-[data-baseweb="base-input"] { background: transparent !important; }
-[data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
-  border-color: var(--cg-azul) !important; box-shadow: 0 0 0 3px rgba(0,64,128,.14) !important; }
-
-/* Botões: secundário (contorno) e principal (sólido) */
+/* Botões customizados */
 .stButton > button, .stDownloadButton > button {
-  border-radius: 10px; border: 1.5px solid var(--cg-azul); background: #FFFFFF; color: var(--cg-azul);
-  font-weight: 700; padding: .45rem 1.1rem; transition: background .15s ease, color .15s ease; }
-.stButton > button p, .stDownloadButton > button p { color: inherit; font-weight: 700; }
-.stButton > button:hover { background: var(--cg-azul-claro); border-color: var(--cg-azul); color: var(--cg-azul); }
-.stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"],
-.stDownloadButton > button {
-  background: var(--cg-azul); color: #FFFFFF; border-color: var(--cg-azul); }
-.stButton > button[kind="primary"]:hover, .stButton > button[data-testid="stBaseButton-primary"]:hover,
-.stDownloadButton > button:hover {
-  background: var(--cg-azul-hover); border-color: var(--cg-azul-hover); color: #FFFFFF; }
-.stButton > button:focus-visible, .stDownloadButton > button:focus-visible {
-  outline: 3px solid rgba(0,64,128,.3); outline-offset: 2px; }
-
-/* Upload de fotos, alertas */
-[data-testid="stFileUploaderDropzone"] { border: 1.5px dashed #9DB5D0; border-radius: 12px; background: #F7FAFD; }
-[data-testid="stAlert"] { border-radius: 12px; }
-
-/* Menu lateral */
-[data-testid="stSidebar"] { background: #FFFFFF; border-right: 1px solid var(--cg-borda); }
-.cg-side-brand { padding: .3rem .2rem 1rem .2rem; margin-bottom: 1rem; border-bottom: 1px solid var(--cg-borda); }
-.cg-side-logo { height: 42px; width: auto; display: block; }
-.cg-side-name { margin-top: .6rem; font-size: .82rem; font-weight: 600; color: var(--cg-texto-suave); line-height: 1.35; }
-[data-testid="stSidebar"] [role="radiogroup"] { gap: .2rem; }
-[data-testid="stSidebar"] [role="radiogroup"] label { width: 100%; padding: .6rem .8rem; border-radius: 10px;
-  cursor: pointer; transition: background .15s ease; }
-[data-testid="stSidebar"] [role="radiogroup"] label:hover { background: var(--cg-azul-claro); }
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-  background: var(--cg-azul-claro); box-shadow: inset 3px 0 0 var(--cg-destaque); }
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p { color: var(--cg-azul); font-weight: 800; }
-
-@media (max-width: 768px) {
-  .block-container, [data-testid="stMainBlockContainer"] { padding: 1rem !important; border-radius: 0; margin: 0 auto !important; }
-  .cg-header { flex-wrap: wrap; gap: .7rem; }
-  .cg-header-sep { display: none; }
-  .cg-logo { height: 40px; }
-  .cg-title { font-size: 1.25rem; }
+  border-radius: 10px; font-weight: 700; padding: .45rem 1.1rem; 
 }
 </style>
 """
-
-for _chave, _valor in {
-    "__AZUL_ESCURO__": COR_AZUL_ESCURO, "__AZUL_HOVER__": COR_AZUL_HOVER, "__AZUL_CLARO__": COR_AZUL_CLARO,
-    "__AZUL__": COR_AZUL, "__DESTAQUE__": COR_DESTAQUE, "__FUNDO__": COR_FUNDO,
-    "__TEXTO_SUAVE__": COR_TEXTO_SUAVE, "__TEXTO__": COR_TEXTO, "__BORDA__": COR_BORDA,
-}.items():
-    CUSTOM_CSS = CUSTOM_CSS.replace(_chave, _valor)
-
-CUSTOM_CSS = "\n".join(l for l in CUSTOM_CSS.splitlines() if l.strip())
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
@@ -1246,7 +1154,6 @@ elif menu == "📋 Aprovação de Contrato":
                         eq_ap_linhas.append(f"[Entrega {i}] {val_e}")
                 eq_ap_texto = "\n" + "\n".join(eq_ap_linhas) if eq_ap_linhas else ""
 
-            # Bloco de Conta Sim estritamente condicional (se Não, omite os sub-campos)
             conta_sim_bloco = f"Implantação de conta sim: [ {'x' if implantacao_csim == 'Sim' else ' '} ] sim [ {'x' if implantacao_csim == 'Não' else ' '} ] não"
             if implantacao_csim == "Sim":
                 conta_sim_bloco += f"""
