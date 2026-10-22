@@ -141,7 +141,6 @@ for _chave, _valor in {
 }.items():
     CUSTOM_CSS = CUSTOM_CSS.replace(_chave, _valor)
 
-# O Markdown do Streamlit encerra blocos HTML em linhas em branco; por isso removemos linhas vazias do CSS
 CUSTOM_CSS = "\n".join(l for l in CUSTOM_CSS.splitlines() if l.strip())
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
@@ -163,7 +162,6 @@ def _logo_html(classe):
 
 
 def cabecalho_pagina(titulo, subtitulo):
-    """Cabeçalho padrão das telas: logo Consigaz + título + subtítulo."""
     logo = _logo_html("cg-logo")
     separador = '<div class="cg-header-sep"></div>' if logo else ""
     st.markdown(
@@ -188,20 +186,15 @@ def consultar_cnpj_api(cnpj_input):
     return None
 
 # --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES ATUALIZADO DO IBGE ---
-# Tabela 1737 do IBGE | Variável 2265 = "IPCA - Variação acumulada em 12 meses (%)"
-# (a variável 2266 é o número-índice, e não o acumulado em 12 meses)
-IPCA_VALOR_RESERVA = 4.58  # Usado apenas como sugestão inicial se o IBGE estiver fora do ar
-
+IPCA_VALOR_RESERVA = 4.58
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _buscar_ipca_ibge():
-    """Consulta o IBGE. Em caso de erro, levanta exceção (e assim a falha NÃO fica em cache)."""
     url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
     response = requests.get(url, timeout=6)
     response.raise_for_status()
     data = response.json()
     resultado = data[0]["resultados"][0]
-    # A API do IBGE devolve as chaves sem acento ("series"/"serie"); aceitamos as duas grafias
     series = resultado.get("series") or resultado.get("séries")
     serie = series[0].get("serie") or series[0].get("série")
     ultimo_periodo = sorted(serie.keys())[-1]
@@ -210,9 +203,7 @@ def _buscar_ipca_ibge():
         raise ValueError("IBGE retornou valor vazio para o período.")
     return float(val_str), ultimo_periodo
 
-
 def obter_ipca_acumulado_12m():
-    """Retorna (valor, periodo_formatado). Se falhar, retorna (None, None)."""
     try:
         valor, periodo = _buscar_ipca_ibge()
         if len(periodo) == 6:
@@ -262,10 +253,8 @@ def resetar_dados_aprov():
 def resetar_dados_aniv():
     st.session_state.reset_counter_aniv += 1
 
-# --- COMPONENTE DE BOTÃO DE CÓPIA (preserva as quebras de linha) ---
+# --- COMPONENTE DE BOTÃO DE CÓPIA ---
 def botao_copiar_customizado(texto_para_copiar, chave_unica):
-    # Normaliza as quebras de linha e embute o texto como string JSON,
-    # que escapa corretamente qualquer caractere (barra invertida, aspas, crase, $, </script>, etc.)
     texto_norm = str(texto_para_copiar).replace("\r\n", "\n").replace("\r", "\n")
     texto_js = json.dumps(texto_norm).replace("</", "<\\/")
 
@@ -326,8 +315,6 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
         let ok = false;
         try {{
             if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {{
-                // Copia em texto simples (com \\n) e também em HTML (com <br>),
-                // assim campos de texto simples e editores formatados mantêm as quebras de linha
                 const html = '<div>' + escapeHtml_{chave_unica}(texto).replace(/\\n/g, '<br>') + '</div>';
                 const item = new ClipboardItem({{
                     'text/plain': new Blob([texto], {{ type: 'text/plain' }}),
@@ -388,7 +375,6 @@ if menu == "📷 Visita de Transferência":
 
     st.divider()
 
-    # --- SEÇÃO 1: DADOS DO CLIENTE ---
     st.subheader("1. Identificação do Cliente")
     s1_l1_c1, s1_l1_c2, s1_l1_c3 = st.columns(3)
     with s1_l1_c1:
@@ -408,7 +394,6 @@ if menu == "📷 Visita de Transferência":
 
     st.divider()
 
-    # --- SEÇÃO 2: INFORMAÇÕES CONTRATUAIS ---
     st.subheader("2. Informações Contratuais")
     s2_l1_c1, s2_l1_c2, s2_l1_c3, s2_l1_c4 = st.columns(4)
     with s2_l1_c1:
@@ -464,7 +449,6 @@ if menu == "📷 Visita de Transferência":
 
     st.divider()
 
-    # --- SEÇÃO 3: CADASTRO DE EQUIPAMENTOS / CENTRAIS ---
     st.subheader("3. Cadastro de Instalação e Equipamentos")
     col_cent1, col_cent2 = st.columns(2)
     with col_cent1:
@@ -681,7 +665,6 @@ if menu == "📷 Visita de Transferência":
                         img = Image.open(arq)
                         if img.mode != "RGB": img = img.convert("RGB")
 
-                        # Arquivo temporário com nome ÚNICO (evita colisão entre usuários simultâneos)
                         fd, t_path = tempfile.mkstemp(suffix=f"_{uuid.uuid4().hex}.jpg")
                         os.close(fd)
                         img.save(t_path, format="JPEG")
@@ -825,13 +808,11 @@ elif menu == "📝 Elaboração de Contrato":
 
     st.divider()
 
-    # --- TEMA 1: MOTIVO ---
     st.subheader("1. Motivo")
     motivo_solicitacao = st.text_input("Motivo da solicitação", key=f"motivo_{rcc}")
 
     st.divider()
 
-    # --- TEMA 2: DADOS DO CLIENTE ---
     st.subheader("2. Dados do Cliente")
     col_cli1, col_cli2, col_cli3 = st.columns(3)
     with col_cli1:
@@ -843,13 +824,11 @@ elif menu == "📝 Elaboração de Contrato":
 
     st.divider()
 
-    # --- TEMA 3: SOLICITAÇÃO ---
     st.subheader("3. Solicitação")
     tipo_contrato = st.radio("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
 
     st.divider()
 
-    # --- TEMA 4: DADOS DO CONTRATO ---
     st.subheader("4. Dados do Contrato")
     col_con1, col_con2 = st.columns(2)
     
@@ -893,7 +872,6 @@ elif menu == "📝 Elaboração de Contrato":
         cond_pagamento = st.text_input("Condição de pagamento", key=f"cond_pag_{rcc}")
         vigencia = st.text_input("Vigência", key=f"vigencia_{rcc}")
         
-        # Seleção de quantidade de endereços de entrega/centrais
         qtd_entregas_c = st.number_input("Quantidade de endereços de entrega / centrais", min_value=1, value=1, step=1, key=f"qtd_ent_c_{rcc}")
         
         equipamentos_contrato = ""
@@ -907,7 +885,6 @@ elif menu == "📝 Elaboração de Contrato":
 
     st.divider()
 
-    # --- TEMA 5: COMODATO / FORNECIMENTO ---
     st.subheader("5. Comodato / Fornecimento")
     
     tipo_fornecimento = st.radio("Tipo de Fornecimento", ["Granel", "Cilindro"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
@@ -949,7 +926,6 @@ elif menu == "📝 Elaboração de Contrato":
 
     st.divider()
 
-    # --- TEMA 6: FINANCEIRO ---
     st.subheader("6. Financeiro")
     col_fin1, col_fin2 = st.columns(2)
     with col_fin1:
@@ -959,7 +935,6 @@ elif menu == "📝 Elaboração de Contrato":
         if possui_debito_fin == "Sim":
             resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", key=f"resp_pend_{rcc}")
 
-    # --- DADOS DE ASSINATURA E TESTEMUNHAS ---
     responsaveis_dados = []
     nome_testemunha, email_testemunha = "", ""
 
@@ -987,7 +962,6 @@ elif menu == "📝 Elaboração de Contrato":
 
     st.divider()
 
-    # --- TEMA 7: CONTA SIM ---
     st.subheader("7. Condomínio CONTA SIM")
     conta_sim = st.radio("Condomínio CONTA SIM?", ["Sim", "Não"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
 
@@ -1132,7 +1106,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 1. CONTATO ---
     st.subheader("1. Informações de Contato")
     c_ap1, c_ap2, c_ap3 = st.columns(3)
     with c_ap1:
@@ -1144,7 +1117,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 2. DADOS PRINCIPAIS ---
     st.subheader("2. Dados e Motivo da Solicitação")
     motivo_reg = st.text_input("Motivo da regularização *", key=f"ap_motivo_{rcap}")
 
@@ -1156,7 +1128,6 @@ elif menu == "📋 Aprovação de Contrato":
     with c_ap6:
         vigencia_ap = st.text_input("Vigência", key=f"ap_vig_{rcap}")
 
-    # Quantidade de endereços de entrega/centrais
     qtd_entregas_ap = st.number_input("Quantidade de endereços de entrega / centrais", min_value=1, value=1, step=1, key=f"qtd_ent_ap_{rcap}")
 
     equipamentos_ap = ""
@@ -1172,7 +1143,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 3. REDIMENSIONAMENTO ---
     st.subheader("3. Redimensionamento")
     redim = st.radio("Redimensionamento:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_redim_{rcap}")
     
@@ -1195,7 +1165,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 4. CONTA SIM & PORTARIA ---
     st.subheader("4. Condomínio Conta Sim & Portaria")
     implantacao_csim = st.radio("Implantação de conta sim:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_{rcap}")
     
@@ -1220,7 +1189,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 5. ALTERAÇÃO DE CNPJ / RAZÃO SOCIAL & TÍTULOS ---
     st.subheader("5. Alteração de CNPJ ou Razão Social & Títulos")
     alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_alt_cnpj_{rcap}")
     
@@ -1234,7 +1202,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- 6. REDUÇÃO DE VIGÊNCIA ---
     st.subheader("6. Redução de Vigência")
     red_vig = st.radio("Redução de vigência?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_red_vig_{rcap}")
     
@@ -1244,7 +1211,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     st.divider()
 
-    # --- PROJETO PADRÃO (ÚNICO NO FINAL) ---
     st.subheader("Projeto Padrão")
     col_proj1, col_proj2 = st.columns([3, 1])
     with col_proj1:
@@ -1280,7 +1246,7 @@ elif menu == "📋 Aprovação de Contrato":
                         eq_ap_linhas.append(f"[Entrega {i}] {val_e}")
                 eq_ap_texto = "\n" + "\n".join(eq_ap_linhas) if eq_ap_linhas else ""
 
-            # Bloco de Conta Sim condicional
+            # Bloco de Conta Sim estritamente condicional (se Não, omite os sub-campos)
             conta_sim_bloco = f"Implantação de conta sim: [ {'x' if implantacao_csim == 'Sim' else ' '} ] sim [ {'x' if implantacao_csim == 'Não' else ' '} ] não"
             if implantacao_csim == "Sim":
                 conta_sim_bloco += f"""
@@ -1334,7 +1300,6 @@ elif menu == "🎂 Aniversário de Contrato":
 
     st.divider()
 
-    # Consulta do IPCA oficial do IBGE (acumulado 12 meses). Se falhar, o usuário informa manualmente.
     ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
     if ipca_api is not None:
         ipca_vigente = ipca_api
@@ -1363,7 +1328,6 @@ elif menu == "🎂 Aniversário de Contrato":
 
     st.divider()
 
-    # Cálculo dinâmico do preço aniversário utilizando o IPCA atual
     p_aniv_str = "xx,xx"
     try:
         val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
@@ -1393,7 +1357,6 @@ Preço Aniversário: R$ {p_aniv_str}"""
 
     st.divider()
 
-    # --- CAMPO DE C.I. E BOTÃO ADICIONAL ---
     st.subheader("Tratativa com C.I.")
     ci_input = st.text_input("Número da C.I.", key=f"ci_num_{rca}")
 
