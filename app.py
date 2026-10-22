@@ -1,4 +1,6 @@
 import os
+import uuid
+import tempfile
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -41,21 +43,38 @@ def consultar_cnpj_api(cnpj_input):
     return None
 
 # --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES ATUALIZADO DO IBGE ---
+# Tabela 1737 do IBGE | Variável 2265 = "IPCA - Variação acumulada em 12 meses (%)"
+# (a variável 2266 é o número-índice, e não o acumulado em 12 meses)
+IPCA_VALOR_RESERVA = 4.58  # Usado apenas como sugestão inicial se o IBGE estiver fora do ar
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _buscar_ipca_ibge():
+    """Consulta o IBGE. Em caso de erro, levanta exceção (e assim a falha NÃO fica em cache)."""
+    url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
+    response = requests.get(url, timeout=6)
+    response.raise_for_status()
+    data = response.json()
+    resultado = data[0]["resultados"][0]
+    # A API do IBGE devolve as chaves sem acento ("series"/"serie"); aceitamos as duas grafias
+    series = resultado.get("series") or resultado.get("séries")
+    serie = series[0].get("serie") or series[0].get("série")
+    ultimo_periodo = sorted(serie.keys())[-1]
+    val_str = serie[ultimo_periodo]
+    if not val_str or str(val_str).strip() in ("-", "..", "...", "X"):
+        raise ValueError("IBGE retornou valor vazio para o período.")
+    return float(val_str), ultimo_periodo
+
+
 def obter_ipca_acumulado_12m():
+    """Retorna (valor, periodo_formatado). Se falhar, retorna (None, None)."""
     try:
-        url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2266?localidades=N1[1]"
-        response = requests.get(url, timeout=4)
-        if response.status_code == 200:
-            data = response.json()
-            serie = data[0]["resultados"][0]["séries"][0]["série"]
-            ultimo_periodo = sorted(serie.keys())[-1]
-            val_str = serie[ultimo_periodo]
-            if val_str:
-                return float(val_str)
+        valor, periodo = _buscar_ipca_ibge()
+        if len(periodo) == 6:
+            periodo = f"{periodo[4:6]}/{periodo[0:4]}"
+        return valor, periodo
     except Exception:
-        pass
-    
-    return 4.58  # Valor oficial de referência atualizado
+        return None, None
 
 # --- INICIALIZAÇÃO DO SESSION STATE ---
 if "reset_counter" not in st.session_state:
@@ -464,11 +483,16 @@ if menu == "📷 Visita de Transferência":
                 pdf.cell(0, 6, cat.upper(), ln=1, align="L")
                 pdf.ln(2)
                 for idx, arq in enumerate(arquivos):
+                    t_path = None
                     try:
                         img = Image.open(arq)
                         if img.mode != "RGB": img = img.convert("RGB")
-                        t_path = f"temp_{cat}_{idx}.jpg"
-                        img.save(t_path)
+
+                        # Arquivo temporário com nome ÚNICO (evita colisão entre usuários simultâneos)
+                        fd, t_path = tempfile.mkstemp(suffix=f"_{uuid.uuid4().hex}.jpg")
+                        os.close(fd)
+                        img.save(t_path, format="JPEG")
+
                         w_p, h_p = img.size
                         prop = h_p / w_p
                         w_alv = 130
@@ -480,9 +504,14 @@ if menu == "📷 Visita de Transferência":
                         if pdf.get_y() + h_alv > 270: pdf.add_page()
                         pdf.image(t_path, x=pos_x, y=pdf.get_y(), w=w_alv, h=h_alv)
                         pdf.set_y(pdf.get_y() + h_alv + 5)
-                        if os.path.exists(t_path): os.remove(t_path)
                     except Exception:
                         pass
+                    finally:
+                        if t_path and os.path.exists(t_path):
+                            try:
+                                os.remove(t_path)
+                            except OSError:
+                                pass
 
         if equipamentos:
             pdf.add_page()
@@ -839,7 +868,6 @@ Tipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"""
             texto_padrao_contrato += f"\nConsumo mensal previsto: {consumo_granel}"
             
         elif tipo_fornecimento == "Cilindro":
-            # Montagem dinâmica apenas com os cilindros preenchidos
             partes_cil = []
             if p13_val.strip():
                 partes_cil.append(f"[P13 = {p13_val.strip()} / und]")
@@ -1017,7 +1045,6 @@ elif menu == "📋 Aprovação de Contrato":
     
     mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_mesmo_prop_{rcap}")
     
-    # Pergunta de Títulos em Aberto com lógica condicional
     possui_titulos_aberto = st.radio("Possui títulos em aberto?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_tit_aberto_{rcap}")
     
     neg_tit_input = ""
@@ -1050,13 +1077,11 @@ elif menu == "📋 Aprovação de Contrato":
 
     if st.button("📝 Gerar Texto de Aprovação de Contrato", type="primary"):
         
-        # Validação do Projeto Padrão
         if not is_cilindros and not projeto_num.strip():
             st.error("⚠️ O campo 'Projeto' é obrigatório, a menos que a opção 'Cilindros' esteja marcada.")
         else:
             proj_final = "N/A" if is_cilindros else projeto_num
             
-            # Tratamento da negociação de títulos
             if possui_titulos_aberto == "Não":
                 neg_final = "n/a"
             elif possui_titulos_aberto == "Sim":
@@ -1064,7 +1089,6 @@ elif menu == "📋 Aprovação de Contrato":
             else:
                 neg_final = "n/a"
 
-            # Tratamento de equipamentos na aprovação
             if qtd_entregas_ap == 1:
                 eq_ap_texto = equipamentos_ap
             else:
@@ -1074,6 +1098,17 @@ elif menu == "📋 Aprovação de Contrato":
                     if val_e:
                         eq_ap_linhas.append(f"[Entrega {i}] {val_e}")
                 eq_ap_texto = "\n" + "\n".join(eq_ap_linhas) if eq_ap_linhas else ""
+
+            # Bloco de Conta Sim condicional
+            conta_sim_bloco = f"Implantação de conta sim: [ {'x' if implantacao_csim == 'Sim' else ' '} ] sim [ {'x' if implantacao_csim == 'Não' else ' '} ] não"
+            if implantacao_csim == "Sim":
+                conta_sim_bloco += f"""
+Foi enviado lista de peças? [ {'x' if env_pecas_ficha == 'Sim' else ' '} ] sim [ {'x' if env_pecas_ficha == 'Não' else ' '} ] não
+Foi enviado ficha de clientes? [ {'x' if env_ficha_cliente == 'Sim' else ' '} ] sim [ {'x' if env_ficha_cliente == 'Não' else ' '} ] não
+Tipo de portaria: {tp_portaria}
+Contato do responsável (em caso de portaria remota, informar o número do apartamento ou a forma de contato do responsável): {contato_resp_port}
+Particularidades do local: {part_local}
+Contato atualizado do síndico: {contato_sindico}"""
 
             texto_aprovacao = f"""Motivo da regularização: {motivo_reg}
 
@@ -1094,13 +1129,7 @@ Para: {comodato_para}
 Inclusão de tanques? [ {'x' if inc_tanques == 'Sim' else ' '} ] sim [ {'x' if inc_tanques == 'Não' else ' '} ] não (se sim, enviar informações para a ficha)
 Necessário lista de peças? [ {'x' if env_pecas == 'Sim' else ' '} ] sim [ {'x' if env_pecas == 'Não' else ' '} ] não (se sim, enviar lista de peças):
 
-Implantação de conta sim: [ {'x' if implantacao_csim == 'Sim' else ' '} ] sim [ {'x' if implantacao_csim == 'Não' else ' '} ] não
-Foi enviado lista de peças? [ {'x' if env_pecas_ficha == 'Sim' else ' '} ] sim [ {'x' if env_pecas_ficha == 'Não' else ' '} ] não
-Foi enviado ficha de clientes? [ {'x' if env_ficha_cliente == 'Sim' else ' '} ] sim [ {'x' if env_ficha_cliente == 'Não' else ' '} ] não
-Tipo de portaria: {tp_portaria}
-Contato do responsável (em caso de portaria remota, informar o número do apartamento ou a forma de contato do responsável): {contato_resp_port}
-Particularidades do local: {part_local}
-Contato atualizado do síndico: {contato_sindico}
+{conta_sim_bloco}
 
 Alteração de CNPJ ou razão social? [ {'x' if alt_cnpj == 'Sim' else ' '} ] sim [ {'x' if alt_cnpj == 'Não' else ' '} ] não
 Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'Sim' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'Não' else ' '} ) NÃO
@@ -1130,9 +1159,24 @@ elif menu == "🎂 Aniversário de Contrato":
 
     st.divider()
 
-    # Consulta dinâmica e atualizada do IPCA oficial do IBGE
-    ipca_vigente = obter_ipca_acumulado_12m()
-    st.info(f"📊 **IPCA Acumulado de 12 meses (Consultado em tempo real no IBGE):** {ipca_vigente:.2f}%")
+    # Consulta do IPCA oficial do IBGE (acumulado 12 meses). Se falhar, o usuário informa manualmente.
+    ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
+    if ipca_api is not None:
+        ipca_vigente = ipca_api
+        st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE, referência {ipca_periodo}):** {ipca_vigente:.2f}%")
+    else:
+        st.warning(
+            "⚠️ Não foi possível consultar o IPCA no IBGE agora. "
+            "Confira o índice oficial e informe o valor abaixo antes de gerar o texto."
+        )
+        ipca_vigente = st.number_input(
+            "IPCA acumulado de 12 meses (%) - informado manualmente",
+            min_value=0.0,
+            value=float(IPCA_VALOR_RESERVA),
+            step=0.01,
+            format="%.2f",
+            key=f"ipca_manual_{rca}"
+        )
 
     col_an1, col_an2 = st.columns(2)
     with col_an1:
