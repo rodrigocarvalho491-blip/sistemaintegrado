@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import requests
+from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from io import BytesIO
 from PIL import Image
@@ -176,31 +177,44 @@ def consultar_cnpj_api(cnpj_input):
             return None
     return None
 
-# --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES DIRETAMENTE DO SITE DO IBGE ---
+# --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DIRETAMENTE DO SITE OFICIAL DO IBGE ---
 IPCA_VALOR_RESERVA = 4.58
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def _buscar_ipca_ibge():
-    # Prioridade 1: API oficial agregada do IBGE correspondente aos dados de https://www.ibge.gov.br/explica/inflacao.php
-    url_api = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
-    response = requests.get(url_api, timeout=6)
-    response.raise_for_status()
-    data = response.json()
-    resultado = data[0]["resultados"][0]
-    series = resultado.get("series") or resultado.get("séries")
-    serie = series[0].get("serie") or series[0].get("série")
-    ultimo_periodo = sorted(serie.keys())[-1]
-    val_str = serie[ultimo_periodo]
-    if not val_str or str(val_str).strip() in ("-", "..", "...", "X"):
-        raise ValueError("IBGE retornou valor vazio para o período.")
-    return float(val_str), ultimo_periodo
-
 def obter_ipca_acumulado_12m():
+    url = "https://www.ibge.gov.br/explica/inflacao.php"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
-        valor, periodo = _buscar_ipca_ibge()
-        if len(periodo) == 6:
-            periodo = f"{periodo[4:6]}/{periodo[0:4]}"
-        return valor, periodo
+        response = requests.get(url, headers=headers, timeout=8)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Procura no texto da página pelo padrão do IPCA acumulado em 12 meses
+        # O site do IBGE exibe blocos como: "IPCA acumulado de 12 meses" seguido pelo valor percentual e período
+        texto_pagina = soup.get_text()
+        
+        import re
+        # Busca por algo como "IPCA acumulado de 12 meses" ou busca na estrutura de itens da página
+        # Vamos varrer os elementos de destaque ou parágrafos
+        for p in soup.find_all(['p', 'div', 'span', 'li', 'strong']):
+            txt = p.get_text().strip()
+            if "acumulado de 12 meses" in txt.lower():
+                # Tenta extrair o percentual próximo
+                match = re.search(r'([0-9]+[.,][0-9]+)\s*%', txt)
+                if match:
+                    val_str = match.group(1).replace(',', '.')
+                    # Procura também o mês de referência se houver no texto
+                    match_mes = re.search(r'([A-Za-zÇç/]{3,10}\s*/\s*[0-9]{4})', txt)
+                    periodo = match_mes.group(1) if match_mes else "recente"
+                    return float(val_str), periodo
+
+        # Fallback de busca genérica por regex no corpo todo se a tag exata variar
+        match_geral = re.search(r'acumulado\s+de\s+12\s+meses[^0-9]*([0-9]+[.,][0-9]+)\s*%', texto_pagina, re.IGNORECASE)
+        if match_geral:
+            val_str = match_geral.group(1).replace(',', '.')
+            return float(val_str), "recente"
+
+        return None, None
     except Exception:
         return None, None
 
@@ -1275,7 +1289,7 @@ elif menu == "🎂 Aniversário de Contrato":
     ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
     if ipca_api is not None:
         ipca_vigente = ipca_api
-        st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE - Referência {ipca_periodo}):** **{ipca_vigente:.2f}%** (Consultado de https://www.ibge.gov.br/explica/inflacao.php)")
+        st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE - Referência {ipca_periodo}):** **{ipca_vigente:.2f}%** (Consultado diretamente de https://www.ibge.gov.br/explica/inflacao.php)")
     else:
         st.warning(
             "⚠️ Não foi possível consultar o IPCA acumulado de 12 meses diretamente no site oficial do IBGE. "
