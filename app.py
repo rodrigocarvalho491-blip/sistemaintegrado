@@ -27,7 +27,7 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - FORÇANDO TEMA CLARO RIGOROSO
+# IDENTIDADE VISUAL CONSIGAZ - FORÇANDO TEMA CLARO E INPUTS BRANCOS
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -113,14 +113,22 @@ html, body, [class*="css"], .stApp {
   margin-bottom: 1.2rem !important;
 }
 
-/* Inputs, selects e textareas claros */
-[data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
+/* ===================================================================== */
+/* CORREÇÃO DOS CAMPOS DE PREENCHIMENTO (INPUTS, SELECTS E TEXTAREAS)     */
+/* ===================================================================== */
+input, textarea, select, 
+[data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div,
+div[data-baseweb="input"] > div, div[data-baseweb="base-input"] > input {
   background-color: #FFFFFF !important;
+  color: #1E293B !important;
+}
+
+[data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
   border-radius: 14px !important;
   border: 1.5px solid rgba(120, 140, 160, 0.3) !important;
-  color: #1E293B !important;
   transition: all 0.2s ease;
 }
+
 [data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
   border-color: var(--cg-azul-vibrante) !important;
   box-shadow: 0 0 0 4px rgba(0, 85, 165, 0.15) !important;
