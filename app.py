@@ -10,7 +10,7 @@ import streamlit as st
 import requests
 from datetime import datetime, timedelta
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageChops
 from fpdf import FPDF
 import streamlit.components.v1 as components
 
@@ -54,7 +54,7 @@ html, body, .stApp, .stApp p, .stApp label, .stApp input, .stApp textarea, .stAp
 .stApp li, .stApp h1, .stApp h2, .stApp h3, .stApp h4 {
   font-family: 'Manrope', 'Segoe UI', Arial, sans-serif;
 }
-.stApp { background: var(--cg-fundo); color: var(--cg-texto); }
+.stApp { background: var(--cg-fundo); color: var(--cg-texto); color-scheme: light; }
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
@@ -73,7 +73,7 @@ html, body, .stApp, .stApp p, .stApp label, .stApp input, .stApp textarea, .stAp
   padding-bottom: 1.1rem; margin-bottom: 1.3rem; border-bottom: 1px solid var(--cg-borda); }
 .cg-header::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 132px; height: 3px;
   border-radius: 3px; background: linear-gradient(90deg, var(--cg-azul) 0 72%, var(--cg-destaque) 72% 100%); }
-.cg-logo { height: 50px; width: auto; display: block; }
+.cg-logo { height: 32px; width: auto; display: block; }
 .cg-header-sep { width: 1px; align-self: stretch; background: var(--cg-borda); }
 .cg-title { font-size: 1.55rem; font-weight: 800; color: var(--cg-azul-escuro); line-height: 1.2; letter-spacing: -0.01em; }
 .cg-subtitle { font-size: .93rem; color: var(--cg-texto-suave); margin-top: .2rem; }
@@ -81,14 +81,24 @@ html, body, .stApp, .stApp p, .stApp label, .stApp input, .stApp textarea, .stAp
 /* Títulos de seção */
 .stApp h1, .stApp h2 { color: var(--cg-azul-escuro) !important; font-weight: 800 !important; }
 .stApp h3 { font-size: 1.08rem !important; font-weight: 800 !important; color: var(--cg-azul) !important;
-  padding: 0 0 0 .75rem !important; border-left: 4px solid var(--cg-azul); line-height: 1.3 !important; }
+  padding: 0 0 0 .75rem !important; border-left: 4px solid var(--cg-azul); line-height: 1.3 !important; margin-bottom: .8rem !important; }
 hr { border-color: var(--cg-borda) !important; margin: 1.6rem 0 !important; }
 
 /* Rótulos e campos */
 [data-testid="stWidgetLabel"] p { font-size: .86rem; font-weight: 600; color: #2F4156; }
 [data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
   background: #FFFFFF !important; border-radius: 10px !important; border: 1px solid var(--cg-borda) !important; }
-[data-baseweb="base-input"] { background: transparent !important; }
+[data-baseweb="base-input"] { background: #FFFFFF !important; border-radius: 10px !important; }
+[data-baseweb="input"] input, [data-baseweb="base-input"] input, [data-baseweb="textarea"] textarea, textarea, input {
+  background-color: #FFFFFF !important; color: var(--cg-texto) !important; -webkit-text-fill-color: var(--cg-texto) !important; }
+::placeholder { color: #8A99AA !important; -webkit-text-fill-color: #8A99AA !important; opacity: 1; }
+[data-baseweb="select"] div, [data-baseweb="select"] span { color: var(--cg-texto) !important; }
+[data-baseweb="select"] svg { fill: var(--cg-texto-suave) !important; }
+[data-baseweb="popover"] [role="listbox"], [data-baseweb="popover"] ul, [data-baseweb="menu"] { background: #FFFFFF !important; }
+[data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"] { background: #FFFFFF !important; color: var(--cg-texto) !important; }
+[data-baseweb="popover"] li:hover, [data-baseweb="popover"] [role="option"]:hover { background: var(--cg-azul-claro) !important; }
+[data-testid="stNumberInput"] button { background: var(--cg-fundo) !important; color: var(--cg-texto) !important; }
+[data-testid="stNumberInput"] button svg { fill: var(--cg-texto) !important; }
 [data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
   border-color: var(--cg-azul) !important; box-shadow: 0 0 0 3px rgba(0,64,128,.14) !important; }
 
@@ -96,7 +106,7 @@ hr { border-color: var(--cg-borda) !important; margin: 1.6rem 0 !important; }
 .stButton > button, .stDownloadButton > button {
   border-radius: 10px; border: 1.5px solid var(--cg-azul); background: #FFFFFF; color: var(--cg-azul);
   font-weight: 700; padding: .45rem 1.1rem; transition: background .15s ease, color .15s ease; }
-.stButton > button p, .stDownloadButton > button p { color: inherit; font-weight: 700; }
+.stButton > button p, .stDownloadButton > button p { color: inherit !important; font-weight: 700; }
 .stButton > button:hover { background: var(--cg-azul-claro); border-color: var(--cg-azul); color: var(--cg-azul); }
 .stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"],
 .stDownloadButton > button {
@@ -110,11 +120,27 @@ hr { border-color: var(--cg-borda) !important; margin: 1.6rem 0 !important; }
 /* Upload de fotos, alertas */
 [data-testid="stFileUploaderDropzone"] { border: 1.5px dashed #9DB5D0; border-radius: 12px; background: #F7FAFD; }
 [data-testid="stAlert"] { border-radius: 12px; }
+/* Garante textos legíveis mesmo com o Streamlit em tema escuro */
+.stApp [data-testid="stMarkdownContainer"] p, .stApp [data-testid="stMarkdownContainer"] li,
+.stApp [data-testid="stMarkdownContainer"] strong, .stApp [data-testid="stMarkdownContainer"] em,
+.stApp [data-testid="stText"], .stApp [data-testid="stCaptionContainer"] { color: var(--cg-texto); }
+[data-testid="stRadio"] label p, [data-testid="stRadio"] label div,
+[data-testid="stCheckbox"] label p, [data-testid="stCheckbox"] label span { color: var(--cg-texto) !important; }
+[data-testid="stAlert"] p, [data-testid="stAlert"] div, [data-testid="stAlert"] li { color: var(--cg-texto) !important; }
+[data-testid="stFileUploaderDropzone"], [data-testid="stFileUploaderDropzone"] div,
+[data-testid="stFileUploaderDropzone"] span, [data-testid="stFileUploaderDropzone"] small { color: var(--cg-texto-suave) !important; }
+[data-testid="stFileUploaderDropzone"] button { background: #FFFFFF !important; border: 1.5px solid var(--cg-azul) !important; border-radius: 10px; }
+[data-testid="stFileUploaderDropzone"] button * { color: var(--cg-azul) !important; }
+[data-testid="stFileUploaderFile"] * { color: var(--cg-texto) !important; }
+/* Bolinhas de Sim/Não nas cores da marca */
+[data-baseweb="radio"] > div:first-of-type { background-color: #FFFFFF !important; border: 2px solid #7F98B5 !important; }
+[data-baseweb="radio"] > div:first-of-type > div { background-color: #FFFFFF !important; }
+[data-baseweb="radio"]:has(input:checked) > div:first-of-type { background-color: var(--cg-azul) !important; border-color: var(--cg-azul) !important; }
 
 /* Menu lateral */
 [data-testid="stSidebar"] { background: #FFFFFF; border-right: 1px solid var(--cg-borda); }
 .cg-side-brand { padding: .3rem .2rem 1rem .2rem; margin-bottom: 1rem; border-bottom: 1px solid var(--cg-borda); }
-.cg-side-logo { height: 42px; width: auto; display: block; }
+.cg-side-logo { height: 28px; width: auto; display: block; }
 .cg-side-name { margin-top: .6rem; font-size: .82rem; font-weight: 600; color: var(--cg-texto-suave); line-height: 1.35; }
 [data-testid="stSidebar"] [role="radiogroup"] { gap: .2rem; }
 [data-testid="stSidebar"] [role="radiogroup"] label { width: 100%; padding: .6rem .8rem; border-radius: 10px;
@@ -122,13 +148,14 @@ hr { border-color: var(--cg-borda) !important; margin: 1.6rem 0 !important; }
 [data-testid="stSidebar"] [role="radiogroup"] label:hover { background: var(--cg-azul-claro); }
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
   background: var(--cg-azul-claro); box-shadow: inset 3px 0 0 var(--cg-destaque); }
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p { color: var(--cg-azul); font-weight: 800; }
+[data-testid="stSidebar"] [role="radiogroup"] label p { color: var(--cg-texto) !important; }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p { color: var(--cg-azul) !important; font-weight: 800; }
 
 @media (max-width: 768px) {
   .block-container, [data-testid="stMainBlockContainer"] { padding: 1rem !important; border-radius: 0; margin: 0 auto !important; }
   .cg-header { flex-wrap: wrap; gap: .7rem; }
   .cg-header-sep { display: none; }
-  .cg-logo { height: 40px; }
+  .cg-logo { height: 28px; }
   .cg-title { font-size: 1.25rem; }
 }
 </style>
@@ -148,9 +175,27 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 @st.cache_data(show_spinner=False)
 def _logo_base64(caminho):
+    """Lê a logo, corta as margens vazias (transparentes ou de fundo liso) e devolve em base64."""
     try:
-        with open(caminho, "rb") as f:
-            return base64.b64encode(f.read()).decode("ascii")
+        img = Image.open(caminho).convert("RGBA")
+        try:
+            alpha = img.getchannel("A")
+            if alpha.getextrema()[0] < 255:
+                caixa = alpha.point(lambda a: 255 if a > 10 else 0).getbbox()
+            else:
+                fundo = Image.new("RGBA", img.size, img.getpixel((0, 0)))
+                diff = ImageChops.difference(img, fundo).convert("L")
+                caixa = diff.point(lambda v: 255 if v > 12 else 0).getbbox()
+            if caixa:
+                m = 4
+                caixa = (max(caixa[0] - m, 0), max(caixa[1] - m, 0),
+                         min(caixa[2] + m, img.width), min(caixa[3] + m, img.height))
+                img = img.crop(caixa)
+        except Exception:
+            pass
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode("ascii")
     except Exception:
         return ""
 
@@ -385,8 +430,6 @@ if menu == "📷 Visita de Transferência":
     ekc = st.session_state.eq_key_counter
 
     cabecalho_pagina("Visita de Transferência & Relatório Técnico", "Gerador automatizado de relatórios técnicos e inspeções.")
-
-    st.divider()
 
     # --- SEÇÃO 1: DADOS DO CLIENTE ---
     st.subheader("1. Identificação do Cliente")
@@ -813,8 +856,6 @@ elif menu == "📝 Elaboração de Contrato":
 
     cabecalho_pagina("Elaboração de Contrato", "Formulário de preenchimento e geração do padrão de solicitação.")
 
-    st.divider()
-
     tipo_fluxo = st.radio(
         "Selecione o objetivo da solicitação:", 
         ["Gerar Minuta", "Enviar para Assinatura"],
@@ -1130,8 +1171,6 @@ elif menu == "📋 Aprovação de Contrato":
 
     cabecalho_pagina("Aprovação de Contrato", "Formulário de preenchimento para solicitação de aprovação.")
 
-    st.divider()
-
     # --- 1. CONTATO ---
     st.subheader("1. Informações de Contato")
     c_ap1, c_ap2, c_ap3 = st.columns(3)
@@ -1331,8 +1370,6 @@ elif menu == "🎂 Aniversário de Contrato":
     rca = st.session_state.reset_counter_aniv
 
     cabecalho_pagina("Aniversário de Contrato", "Tratativa de reajuste por IPCA acumulado de 12 meses.")
-
-    st.divider()
 
     # Consulta do IPCA oficial do IBGE (acumulado 12 meses). Se falhar, o usuário informa manualmente.
     ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
