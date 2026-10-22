@@ -14,7 +14,7 @@ from PIL import Image
 from fpdf import FPDF
 import streamlit.components.v1 as components
 
-# --- CONFIGURAÇÃO GLOBAL DA PÁGINA (LOGO / FOGUINHO NA ABA) ---
+# --- CONFIGURAÇÃO GLOBAL DA PÁGINA ---
 st.set_page_config(
     page_title="Sistema Integrado | Consigaz", 
     page_icon="🔥", 
@@ -27,7 +27,7 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - DESIGN MODERNO & LOGO INTEGRADO
+# IDENTIDADE VISUAL CONSIGAZ - FORÇANDO TEMA CLARO RIGOROSO
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -39,18 +39,22 @@ CUSTOM_CSS = """
   --cg-laranja: #F28C28;
 }
 
-html, body, [class*="css"] {
+/* Força absoluta de fundo claro e texto escuro em toda a aplicação */
+html, body, [class*="css"], .stApp {
   font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  background-color: #F8FAFC !important;
+  color: #1E293B !important;
 }
 
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
-/* Bloco principal flutuante e moderno com bordas arredondadas */
+/* Bloco principal flutuante e moderno com fundo branco e bordas suaves */
 .block-container, [data-testid="stMainBlockContainer"] {
   max-width: 1200px !important;
   margin: 1.5rem auto !important;
   padding: 2.5rem !important;
+  background-color: #FFFFFF !important;
   border-radius: 24px !important;
   box-shadow: 0 10px 30px rgba(0, 51, 102, 0.08);
   border: 1px solid rgba(120, 140, 160, 0.2);
@@ -77,28 +81,30 @@ html, body, [class*="css"] {
   background: linear-gradient(90deg, var(--cg-azul-vibrante) 0%, var(--cg-laranja) 100%); 
 }
 
-/* Logotipo em evidência com cantos arredondados, padding e sombra suave para integrar ao tema escuro */
+/* Logotipo em evidência com cantos arredondados, padding e sombra suave */
 .cg-logo-wrapper {
   background: #FFFFFF;
   padding: 8px 14px;
   border-radius: 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 51, 102, 0.1);
 }
 .cg-logo { height: 68px; width: auto; display: block; }
 
 .cg-header-sep { width: 2px; align-self: stretch; background: rgba(120, 140, 160, 0.3); }
-.cg-title { font-size: 1.8rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
-.cg-subtitle { font-size: 0.98rem; margin-top: 0.3rem; opacity: 0.8; font-weight: 500; }
+.cg-title { font-size: 1.8rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; color: #003366 !important; }
+.cg-subtitle { font-size: 0.98rem; margin-top: 0.3rem; color: #475569 !important; font-weight: 500; }
 
 /* Títulos de Seção Estilizados */
+.stApp h1, .stApp h2, .stApp h3 {
+  color: #003366 !important;
+}
 .stApp h3 {
   font-size: 1.15rem !important;
   font-weight: 700 !important;
-  color: var(--cg-azul-vibrante) !important;
   padding: 0.3rem 0 0.3rem 0.8rem !important;
   border-left: 5px solid var(--cg-laranja) !important;
   background: linear-gradient(90deg, rgba(242, 140, 40, 0.08) 0%, transparent 100%);
@@ -107,15 +113,22 @@ html, body, [class*="css"] {
   margin-bottom: 1.2rem !important;
 }
 
-/* Inputs, selects e textareas super arredondados e fluidos */
+/* Inputs, selects e textareas claros */
 [data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
+  background-color: #FFFFFF !important;
   border-radius: 14px !important;
   border: 1.5px solid rgba(120, 140, 160, 0.3) !important;
+  color: #1E293B !important;
   transition: all 0.2s ease;
 }
 [data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
   border-color: var(--cg-azul-vibrante) !important;
   box-shadow: 0 0 0 4px rgba(0, 85, 165, 0.15) !important;
+}
+
+/* Textos e Labels visíveis em fundo claro */
+label, .stRadio p, .stCheckbox p, p, span {
+  color: #1E293B !important;
 }
 
 /* Botões modernos, arredondados e com sombras suaves */
@@ -139,8 +152,9 @@ html, body, [class*="css"] {
   box-shadow: 0 6px 20px rgba(0, 85, 165, 0.35) !important;
 }
 
-/* Sidebar moderna e limpa */
+/* Sidebar limpa e com fundo claro fixo */
 [data-testid="stSidebar"] {
+  background-color: #F1F5F9 !important;
   border-right: 1px solid rgba(120, 140, 160, 0.2);
 }
 .cg-side-brand { 
@@ -154,10 +168,10 @@ html, body, [class*="css"] {
   padding: 8px 12px;
   border-radius: 12px;
   display: inline-block;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
 }
 .cg-side-logo { height: 42px; width: auto; display: inline-block; }
-.cg-side-name { margin-top: 0.8rem; font-size: 0.75rem; font-weight: 700; opacity: 0.7; letter-spacing: 0.08em; text-transform: uppercase; }
+.cg-side-name { margin-top: 0.8rem; font-size: 0.75rem; font-weight: 700; color: #475569 !important; letter-spacing: 0.08em; text-transform: uppercase; }
 
 [data-testid="stSidebar"] [role="radiogroup"] label {
   border-radius: 12px !important;
@@ -165,14 +179,16 @@ html, body, [class*="css"] {
   margin-bottom: 0.4rem !important;
   transition: all 0.2s ease;
   border: 1px solid transparent;
+  background-color: #FFFFFF !important;
 }
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-  background: linear-gradient(90deg, rgba(0, 85, 165, 0.15) 0%, rgba(0, 85, 165, 0.03) 100%);
+  background: linear-gradient(90deg, rgba(0, 85, 165, 0.15) 0%, rgba(0, 85, 165, 0.03) 100%) !important;
   border-left: 4px solid var(--cg-laranja);
   box-shadow: 0 2px 8px rgba(0,85,165,0.06);
 }
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p {
   font-weight: 800 !important;
+  color: var(--cg-azul-principal) !important;
 }
 
 /* Divisor elegante */
@@ -322,10 +338,6 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
     </div>
     <script>
     const TEXTO_{chave_unica} = {texto_js};
-
-    function escapeHtml_{chave_unica}(s) {{
-        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }}
 
     function copiarFallback_{chave_unica}(texto) {{
         const ta = document.createElement('textarea');
