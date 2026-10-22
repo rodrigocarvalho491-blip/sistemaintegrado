@@ -27,7 +27,7 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - FORÇANDO TEMA CLARO E INPUTS BRANCOS
+# IDENTIDADE VISUAL CONSIGAZ - FORÇANDO TEMA CLARO E BRANCO TOTAL
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -114,27 +114,47 @@ html, body, [class*="css"], .stApp {
 }
 
 /* ===================================================================== */
-/* CORREÇÃO DOS CAMPOS DE PREENCHIMENTO (INPUTS, SELECTS E TEXTAREAS)     */
+/* CAMPOS BRANCOS, TEXTOS ESCUROS E BORDAS DELICADAS EM TODAS AS TELAS    */
 /* ===================================================================== */
 input, textarea, select, 
 [data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div,
-div[data-baseweb="input"] > div, div[data-baseweb="base-input"] > input {
+div[data-baseweb="input"] > div, div[data-baseweb="base-input"] > input,
+[data-testid="stFileUploader"], [data-testid="stFileUploaderDropzone"] {
   background-color: #FFFFFF !important;
   color: #1E293B !important;
 }
 
+/* Força fundo branco em caixas de upload e suas áreas internas */
+[data-testid="stFileUploaderDropzone"] {
+  background-color: #FFFFFF !important;
+  border: 1.5px dashed rgba(120, 140, 160, 0.4) !important;
+  border-radius: 16px !important;
+}
+[data-testid="stFileUploaderDropzone"]:hover {
+  border-color: var(--cg-azul-vibrante) !important;
+  background-color: rgba(0, 85, 165, 0.02) !important;
+}
+
+/* Textos e instruções dentro do uploader */
+[data-testid="stFileUploaderDropzone"] small, 
+[data-testid="stFileUploaderDropzone"] span, 
+[data-testid="stFileUploaderDropzone"] div {
+  color: #475569 !important;
+}
+
+/* Bordas e contornos delicados nos inputs e selects */
 [data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
   border-radius: 14px !important;
-  border: 1.5px solid rgba(120, 140, 160, 0.3) !important;
+  border: 1.5px solid rgba(120, 140, 160, 0.25) !important;
   transition: all 0.2s ease;
 }
 
 [data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
   border-color: var(--cg-azul-vibrante) !important;
-  box-shadow: 0 0 0 4px rgba(0, 85, 165, 0.15) !important;
+  box-shadow: 0 0 0 4px rgba(0, 85, 165, 0.12) !important;
 }
 
-/* Textos e Labels visíveis em fundo claro */
+/* Textos, labels e rádios visíveis e destacados */
 label, .stRadio p, .stCheckbox p, p, span {
   color: #1E293B !important;
 }
@@ -186,12 +206,13 @@ label, .stRadio p, .stCheckbox p, p, span {
   padding: 0.7rem 1rem !important;
   margin-bottom: 0.4rem !important;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
+  border: 1px solid rgba(120, 140, 160, 0.15);
   background-color: #FFFFFF !important;
 }
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-  background: linear-gradient(90deg, rgba(0, 85, 165, 0.15) 0%, rgba(0, 85, 165, 0.03) 100%) !important;
+  background: linear-gradient(90deg, rgba(0, 85, 165, 0.12) 0%, rgba(0, 85, 165, 0.02) 100%) !important;
   border-left: 4px solid var(--cg-laranja);
+  border-color: rgba(0, 85, 165, 0.3);
   box-shadow: 0 2px 8px rgba(0,85,165,0.06);
 }
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p {
