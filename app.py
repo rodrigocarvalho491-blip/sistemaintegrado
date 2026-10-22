@@ -14,6 +14,20 @@ from PIL import Image
 from fpdf import FPDF
 import streamlit.components.v1 as components
 
+# --- FORÇAR TEMA CLARO NATIVO NO STREAMLIT ---
+os.makedirs(".streamlit", exist_ok=True)
+config_path = os.path.join(".streamlit", "config.toml")
+if not os.path.exists(config_path):
+    with open(config_path, "w", encoding="utf-8") as f:
+        f.write(
+            '[theme]\n'
+            'base="light"\n'
+            'primaryColor="#0055A5"\n'
+            'backgroundColor="#FFFFFF"\n'
+            'secondaryBackgroundColor="#F8FAFC"\n'
+            'textColor="#1E293B"\n'
+        )
+
 # --- CONFIGURAÇÃO GLOBAL DA PÁGINA ---
 st.set_page_config(
     page_title="Sistema Integrado | Consigaz", 
@@ -27,7 +41,7 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - FORMULÁRIO LIMPO E PADRÃO
+# IDENTIDADE VISUAL CONSIGAZ - FORMULÁRIO LIMPO E TEMA CLARO FIXO
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -35,6 +49,8 @@ CUSTOM_CSS = """
 
 html, body, [class*="css"], .stApp {
   font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  background-color: #FFFFFF !important;
+  color: #1E293B !important;
 }
 
 [data-testid="stHeader"] { background: transparent; }
@@ -89,6 +105,10 @@ html, body, [class*="css"], .stApp {
 }
 
 /* Sidebar Estilizada */
+[data-testid="stSidebar"] {
+  background-color: #F8FAFC !important;
+  border-right: 1px solid #E2E8F0;
+}
 .cg-side-brand { 
   padding: 0.8rem 0.5rem 1.2rem 0.5rem; 
   margin-bottom: 1rem; 
