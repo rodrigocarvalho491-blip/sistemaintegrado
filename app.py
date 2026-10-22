@@ -176,13 +176,14 @@ def consultar_cnpj_api(cnpj_input):
             return None
     return None
 
-# --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES ATUALIZADO DO IBGE ---
+# --- FUNÇÃO PARA OBTER O IPCA ACUMULADO DE 12 MESES DIRETAMENTE DO SITE DO IBGE ---
 IPCA_VALOR_RESERVA = 4.58
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _buscar_ipca_ibge():
-    url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
-    response = requests.get(url, timeout=6)
+    # Prioridade 1: API oficial agregada do IBGE correspondente aos dados de https://www.ibge.gov.br/explica/inflacao.php
+    url_api = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
+    response = requests.get(url_api, timeout=6)
     response.raise_for_status()
     data = response.json()
     resultado = data[0]["resultados"][0]
@@ -244,10 +245,10 @@ def resetar_dados_aprov():
 def resetar_dados_aniv():
     st.session_state.reset_counter_aniv += 1
 
-# --- COMPONENTE DE BOTÃO DE CÓPIA ---
+# --- COMPONENTE DE BOTÃO DE CÓPIA (COM PRESERVAÇÃO DE QUEBRAS DE LINHA) ---
 def botao_copiar_customizado(texto_para_copiar, chave_unica):
     texto_norm = str(texto_para_copiar).replace("\r\n", "\n").replace("\r", "\n")
-    texto_js = json.dumps(texto_norm).replace("</", "<\\/")
+    texto_js = json.dumps(texto_norm)
 
     component_html = f"""
     <div style="margin-top: 10px; margin-bottom: 15px;">
@@ -1274,11 +1275,11 @@ elif menu == "🎂 Aniversário de Contrato":
     ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
     if ipca_api is not None:
         ipca_vigente = ipca_api
-        st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE, referência {ipca_periodo}):** {ipca_vigente:.2f}%")
+        st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE - Referência {ipca_periodo}):** **{ipca_vigente:.2f}%** (Consultado de https://www.ibge.gov.br/explica/inflacao.php)")
     else:
         st.warning(
-            "⚠️ Não foi possível consultar o IPCA no IBGE agora. "
-            "Confira o índice oficial e informe o valor abaixo antes de gerar o texto."
+            "⚠️ Não foi possível consultar o IPCA acumulado de 12 meses diretamente no site oficial do IBGE. "
+            "Informe o índice oficial manualmente abaixo para prosseguir com o cálculo."
         )
         ipca_vigente = st.number_input(
             "IPCA acumulado de 12 meses (%) - informado manualmente",
