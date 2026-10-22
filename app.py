@@ -27,7 +27,7 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - DESIGN MODERNO (COMPATÍVEL DARK/LIGHT)
+# IDENTIDADE VISUAL CONSIGAZ - DESIGN MODERNO & LOGO INTEGRADO
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -60,7 +60,7 @@ html, body, [class*="css"] {
 .cg-header { 
   display: flex; 
   align-items: center; 
-  gap: 1.5rem; 
+  gap: 1.8rem; 
   position: relative;
   padding-bottom: 1.5rem; 
   margin-bottom: 2rem; 
@@ -76,7 +76,20 @@ html, body, [class*="css"] {
   border-radius: 4px; 
   background: linear-gradient(90deg, var(--cg-azul-vibrante) 0%, var(--cg-laranja) 100%); 
 }
-.cg-logo { height: 55px; width: auto; display: block; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
+
+/* Logotipo em evidência com cantos arredondados, padding e sombra suave para integrar ao tema escuro */
+.cg-logo-wrapper {
+  background: #FFFFFF;
+  padding: 8px 14px;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.cg-logo { height: 68px; width: auto; display: block; }
+
 .cg-header-sep { width: 2px; align-self: stretch; background: rgba(120, 140, 160, 0.3); }
 .cg-title { font-size: 1.8rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
 .cg-subtitle { font-size: 0.98rem; margin-top: 0.3rem; opacity: 0.8; font-weight: 500; }
@@ -136,7 +149,14 @@ html, body, [class*="css"] {
   border-bottom: 1px solid rgba(120, 140, 160, 0.2); 
   text-align: center;
 }
-.cg-side-logo { height: 45px; width: auto; display: inline-block; }
+.cg-side-logo-wrapper {
+  background: #FFFFFF;
+  padding: 8px 12px;
+  border-radius: 12px;
+  display: inline-block;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.cg-side-logo { height: 42px; width: auto; display: inline-block; }
 .cg-side-name { margin-top: 0.8rem; font-size: 0.75rem; font-weight: 700; opacity: 0.7; letter-spacing: 0.08em; text-transform: uppercase; }
 
 [data-testid="stSidebar"] [role="radiogroup"] label {
@@ -171,15 +191,18 @@ def _logo_base64(caminho):
         return ""
 
 
-def _logo_html(classe):
+def _logo_html(classe_img, classe_wrapper=""):
     b64 = _logo_base64(LOGO_PATH)
     if not b64:
         return ""
-    return f'<img class="{classe}" src="data:image/png;base64,{b64}" alt="Consigaz">'
+    img_tag = f'<img class="{classe_img}" src="data:image/png;base64,{b64}" alt="Consigaz">'
+    if classe_wrapper:
+        return f'<div class="{classe_wrapper}">{img_tag}</div>'
+    return img_tag
 
 
 def cabecalho_pagina(titulo, subtitulo):
-    logo = _logo_html("cg-logo")
+    logo = _logo_html("cg-logo", "cg-logo-wrapper")
     separador = '<div class="cg-header-sep"></div>' if logo else ""
     st.markdown(
         f'<div class="cg-header">{logo}{separador}<div>'
@@ -347,8 +370,9 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
     components.html(component_html, height=60)
 
 # --- MENU LATERAL DE NAVEGAÇÃO ---
+side_logo_html = _logo_html("cg-side-logo", "cg-side-logo-wrapper")
 st.sidebar.markdown(
-    f'<div class="cg-side-brand">{_logo_html("cg-side-logo")}'
+    f'<div class="cg-side-brand">{side_logo_html}'
     f'<div class="cg-side-name">Central de Atendimentos</div></div>',
     unsafe_allow_html=True,
 )
