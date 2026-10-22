@@ -27,171 +27,85 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - ESTRUTURA ORIGINAL MODERNA
+# IDENTIDADE VISUAL CONSIGAZ - FORMULÁRIO LIMPO E PADRÃO
 # =====================================================================
-COR_AZUL = "#003366"
-COR_AZUL_ESCURO = "#002244"
-COR_AZUL_HOVER = "#004080"
-COR_AZUL_CLARO = "#F1F5F9"
-COR_DESTAQUE = "#F28C28"
-COR_FUNDO = "#F8FAFC"
-COR_TEXTO = "#1E293B"
-COR_TEXTO_SUAVE = "#475569"
-COR_BORDA = "#CBD5E1"
-
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 html, body, [class*="css"], .stApp {
   font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-  background-color: FUNDO_PLACEHOLDER !important;
-  color: TEXTO_PLACEHOLDER !important;
 }
 
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
-/* Bloco principal flutuante */
-.block-container, [data-testid="stMainBlockContainer"] {
-  max-width: 1200px !important;
-  margin: 1.5rem auto !important;
-  padding: 2.5rem !important;
-  background-color: #FFFFFF !important;
-  border-radius: 20px !important;
-  box-shadow: 0 10px 30px rgba(0, 51, 102, 0.06);
-  border: 1px solid BORDA_PLACEHOLDER;
-}
-
 /* Cabeçalho Consigaz */
 .cg-header { 
   display: flex; 
   align-items: center; 
-  gap: 1.8rem; 
+  gap: 1.5rem; 
   position: relative;
-  padding-bottom: 1.5rem; 
+  padding-bottom: 1.2rem; 
   margin-bottom: 2rem; 
-  border-bottom: 2px solid BORDA_PLACEHOLDER; 
+  border-bottom: 2px solid #E2E8F0; 
 }
 .cg-header::after { 
   content: ""; 
   position: absolute; 
   left: 0; 
   bottom: -2px; 
-  width: 160px; 
+  width: 140px; 
   height: 4px; 
   border-radius: 4px; 
-  background: linear-gradient(90deg, AZUL_PLACEHOLDER 0%, DESTAQUE_PLACEHOLDER 100%); 
+  background: linear-gradient(90deg, #0055A5 0%, #F28C28 100%); 
 }
 
 .cg-logo-wrapper {
   background: #FFFFFF;
-  padding: 8px 14px;
-  border-radius: 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 6px 12px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(0, 51, 102, 0.1);
+  border: 1px solid #E2E8F0;
 }
-.cg-logo { height: 68px; width: auto; display: block; }
+.cg-logo { height: 55px; width: auto; display: block; }
 
-.cg-header-sep { width: 2px; align-self: stretch; background: BORDA_PLACEHOLDER; }
-.cg-title { font-size: 1.8rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; color: AZUL_ESCURO_PLACEHOLDER !important; }
-.cg-subtitle { font-size: 0.98rem; margin-top: 0.3rem; color: TEXTO_SUAVE_PLACEHOLDER !important; font-weight: 500; }
+.cg-header-sep { width: 2px; align-self: stretch; background: #E2E8F0; }
+.cg-title { font-size: 1.65rem; font-weight: 800; line-height: 1.2; color: #003366 !important; }
+.cg-subtitle { font-size: 0.95rem; margin-top: 0.2rem; color: #64748B !important; font-weight: 500; }
 
 /* Títulos de Seção */
-.stApp h1, .stApp h2, .stApp h3 {
-  color: AZUL_ESCURO_PLACEHOLDER !important;
-}
 .stApp h3 {
-  font-size: 1.15rem !important;
+  font-size: 1.1rem !important;
   font-weight: 700 !important;
-  padding: 0.3rem 0 0.3rem 0.8rem !important;
-  border-left: 5px solid DESTAQUE_PLACEHOLDER !important;
-  background: linear-gradient(90deg, rgba(242, 140, 40, 0.08) 0%, transparent 100%);
-  border-radius: 0 8px 8px 0;
-  margin-top: 1.8rem !important;
-  margin-bottom: 1.2rem !important;
+  color: #003366 !important;
+  padding: 0.2rem 0 0.2rem 0.6rem !important;
+  border-left: 4px solid #F28C28 !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 1rem !important;
 }
 
-/* Botões Modernos */
-.stButton > button, .stDownloadButton > button {
-  border-radius: 12px !important;
-  font-weight: 700 !important;
-  padding: 0.6rem 1.4rem !important;
-  transition: all 0.2s ease;
-}
-
-.stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"], .stDownloadButton > button {
-  background: linear-gradient(135deg, AZUL_PLACEHOLDER 0%, AZUL_ESCURO_PLACEHOLDER 100%) !important;
-  color: #FFFFFF !important;
-  border: none !important;
-  box-shadow: 0 4px 15px rgba(0, 51, 102, 0.2);
-}
-.stButton > button[kind="primary"]:hover, .stButton > button[data-testid="stBaseButton-primary"]:hover {
-  opacity: 0.95;
-  transform: translateY(-1px);
-}
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-  background-color: AZUL_CLARO_PLACEHOLDER !important;
-  border-right: 1px solid BORDA_PLACEHOLDER;
-}
+/* Sidebar Estilizada */
 .cg-side-brand { 
-  padding: 1rem 0.5rem 1.5rem 0.5rem; 
-  margin-bottom: 1.2rem; 
-  border-bottom: 1px solid BORDA_PLACEHOLDER; 
+  padding: 0.8rem 0.5rem 1.2rem 0.5rem; 
+  margin-bottom: 1rem; 
+  border-bottom: 1px solid #E2E8F0; 
   text-align: center;
 }
 .cg-side-logo-wrapper {
   background: #FFFFFF;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
   display: inline-block;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
-.cg-side-logo { height: 42px; width: auto; display: inline-block; }
-.cg-side-name { margin-top: 0.8rem; font-size: 0.75rem; font-weight: 700; color: TEXTO_SUAVE_PLACEHOLDER !important; letter-spacing: 0.08em; text-transform: uppercase; }
-
-[data-testid="stSidebar"] [role="radiogroup"] label {
-  border-radius: 10px !important;
-  padding: 0.6rem 1rem !important;
-  margin-bottom: 0.4rem !important;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-  background-color: #FFFFFF !important;
-}
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-  background: linear-gradient(90deg, rgba(0, 51, 102, 0.1) 0%, rgba(0, 51, 102, 0.02) 100%) !important;
-  border-left: 4px solid DESTAQUE_PLACEHOLDER;
-  border-color: rgba(0, 51, 102, 0.15);
-}
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p {
-  font-weight: 800 !important;
-  color: AZUL_ESCURO_PLACEHOLDER !important;
-}
-
-hr { border-color: BORDA_PLACEHOLDER !important; margin: 2rem 0 !important; }
+.cg-side-logo { height: 38px; width: auto; display: inline-block; }
+.cg-side-name { margin-top: 0.6rem; font-size: 0.7rem; font-weight: 700; color: #64748B !important; letter-spacing: 0.08em; text-transform: uppercase; }
 </style>
 """
-
-# Substituição de Variáveis no CSS
-substituicoes = {
-    "AZUL_PLACEHOLDER": COR_AZUL,
-    "AZUL_ESCURO_PLACEHOLDER": COR_AZUL_ESCURO,
-    "AZUL_HOVER_PLACEHOLDER": COR_AZUL_HOVER,
-    "AZUL_CLARO_PLACEHOLDER": COR_AZUL_CLARO,
-    "DESTAQUE_PLACEHOLDER": COR_DESTAQUE,
-    "FUNDO_PLACEHOLDER": COR_FUNDO,
-    "TEXTO_PLACEHOLDER": COR_TEXTO,
-    "TEXTO_SUAVE_PLACEHOLDER": COR_TEXTO_SUAVE,
-    "BORDA_PLACEHOLDER": COR_BORDA,
-}
-for k, v in substituicoes.items():
-    CUSTOM_CSS = CUSTOM_CSS.replace(k, v)
-
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
@@ -314,24 +228,23 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
     component_html = f"""
     <div style="margin-top: 10px; margin-bottom: 15px;">
         <button id="btn_{chave_unica}" onclick="copiarTexto_{chave_unica}()" style="
-            background: linear-gradient(135deg, #003366 0%, #002244 100%);
+            background: #003366;
             color: white;
-            padding: 10px 20px;
+            padding: 9px 18px;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             font-family: 'Plus Jakarta Sans', sans-serif;
             font-weight: 700;
-            font-size: 14px;
+            font-size: 13.5px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
-            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0, 51, 102, 0.2);
         ">
             📋 Copiar Texto Completo
         </button>
-        <span id="msg_{chave_unica}" style="margin-left: 12px; color: #10B981; font-weight: bold; font-size: 13.5px; display: none;">Copiado com sucesso!</span>
+        <span id="msg_{chave_unica}" style="margin-left: 10px; color: #10B981; font-weight: bold; font-size: 13px; display: none;">Copiado com sucesso!</span>
     </div>
     <script>
     const TEXTO_{chave_unica} = {texto_js};
@@ -352,11 +265,9 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
 
     function mostrarMsg_{chave_unica}(ok) {{
         const msg = document.getElementById("msg_{chave_unica}");
-        msg.textContent = ok ? "Copiado com sucesso!" : "Não foi possível copiar automaticamente.";
+        msg.textContent = ok ? "Copiado com sucesso!" : "Não foi possível copiar.";
         msg.style.display = "inline";
-        setTimeout(function() {{
-            msg.style.display = "none";
-        }}, 2500);
+        setTimeout(function() {{ msg.style.display = "none"; }}, 2000);
     }}
 
     async function copiarTexto_{chave_unica}() {{
@@ -366,17 +277,13 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
                 await navigator.clipboard.writeText(TEXTO_{chave_unica});
                 ok = true;
             }}
-        }} catch (e) {{
-            ok = false;
-        }}
-        if (!ok) {{
-            ok = copiarFallback_{chave_unica}(TEXTO_{chave_unica});
-        }}
+        }} catch (e) {{ ok = false; }}
+        if (!ok) {{ ok = copiarFallback_{chave_unica}(TEXTO_{chave_unica}); }}
         mostrarMsg_{chave_unica}(ok);
     }}
     </script>
     """
-    components.html(component_html, height=60)
+    components.html(component_html, height=55)
 
 # --- MENU LATERAL DE NAVEGAÇÃO ---
 side_logo_html = _logo_html("cg-side-logo", "cg-side-logo-wrapper")
