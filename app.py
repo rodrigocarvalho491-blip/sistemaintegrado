@@ -1,4 +1,7 @@
 import os
+import json
+import base64
+import html as html_lib
 import uuid
 import tempfile
 import pandas as pd
@@ -18,16 +21,158 @@ DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
+# =====================================================================
+# IDENTIDADE VISUAL CONSIGAZ
+# Para ajustar as cores da marca, altere SOMENTE os valores deste bloco.
+# (Se mudar o azul principal, mude também o primaryColor em .streamlit/config.toml)
+# =====================================================================
+COR_AZUL = "#004080"          # Azul Consigaz (principal)
+COR_AZUL_ESCURO = "#0A2540"   # Títulos e textos de destaque
+COR_AZUL_HOVER = "#003060"    # Botão principal ao passar o mouse
+COR_AZUL_CLARO = "#E7EFF9"    # Fundos suaves, item ativo do menu
+COR_DESTAQUE = "#F28C28"      # Detalhe de destaque (usado com muita moderação)
+COR_FUNDO = "#F1F5FA"         # Fundo da página
+COR_TEXTO = "#1B2A3A"
+COR_TEXTO_SUAVE = "#5B6B7C"
+COR_BORDA = "#D3DDEA"
+
 CUSTOM_CSS = """
 <style>
-    h1, h2, h3 { color: #004080 !important; font-family: 'Segoe UI', sans-serif; }
-    div.stButton > button:first-child {
-        background-color: #004080 !important; color: #ffffff !important;
-        border-radius: 8px !important; border: none !important; font-weight: bold !important;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+:root {
+  --cg-azul: __AZUL__;
+  --cg-azul-escuro: __AZUL_ESCURO__;
+  --cg-azul-hover: __AZUL_HOVER__;
+  --cg-azul-claro: __AZUL_CLARO__;
+  --cg-destaque: __DESTAQUE__;
+  --cg-fundo: __FUNDO__;
+  --cg-texto: __TEXTO__;
+  --cg-texto-suave: __TEXTO_SUAVE__;
+  --cg-borda: __BORDA__;
+}
+html, body, .stApp, .stApp p, .stApp label, .stApp input, .stApp textarea, .stApp button,
+.stApp li, .stApp h1, .stApp h2, .stApp h3, .stApp h4 {
+  font-family: 'Manrope', 'Segoe UI', Arial, sans-serif;
+}
+.stApp { background: var(--cg-fundo); color: var(--cg-texto); }
+[data-testid="stHeader"] { background: transparent; }
+#MainMenu, footer { visibility: hidden; }
+
+/* Painel central */
+.block-container, [data-testid="stMainBlockContainer"] {
+  max-width: 1180px !important;
+  margin: 1.2rem auto 2rem auto !important;
+  padding: 1.8rem 2.4rem 2.4rem 2.4rem !important;
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(10,37,64,.06), 0 8px 28px rgba(10,37,64,.07);
+}
+
+/* Cabeçalho da página */
+.cg-header { display: flex; align-items: center; gap: 1.1rem; position: relative;
+  padding-bottom: 1.1rem; margin-bottom: 1.3rem; border-bottom: 1px solid var(--cg-borda); }
+.cg-header::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 132px; height: 3px;
+  border-radius: 3px; background: linear-gradient(90deg, var(--cg-azul) 0 72%, var(--cg-destaque) 72% 100%); }
+.cg-logo { height: 50px; width: auto; display: block; }
+.cg-header-sep { width: 1px; align-self: stretch; background: var(--cg-borda); }
+.cg-title { font-size: 1.55rem; font-weight: 800; color: var(--cg-azul-escuro); line-height: 1.2; letter-spacing: -0.01em; }
+.cg-subtitle { font-size: .93rem; color: var(--cg-texto-suave); margin-top: .2rem; }
+
+/* Títulos de seção */
+.stApp h1, .stApp h2 { color: var(--cg-azul-escuro) !important; font-weight: 800 !important; }
+.stApp h3 { font-size: 1.08rem !important; font-weight: 800 !important; color: var(--cg-azul) !important;
+  padding: 0 0 0 .75rem !important; border-left: 4px solid var(--cg-azul); line-height: 1.3 !important; }
+hr { border-color: var(--cg-borda) !important; margin: 1.6rem 0 !important; }
+
+/* Rótulos e campos */
+[data-testid="stWidgetLabel"] p { font-size: .86rem; font-weight: 600; color: #2F4156; }
+[data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
+  background: #FFFFFF !important; border-radius: 10px !important; border: 1px solid var(--cg-borda) !important; }
+[data-baseweb="base-input"] { background: transparent !important; }
+[data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
+  border-color: var(--cg-azul) !important; box-shadow: 0 0 0 3px rgba(0,64,128,.14) !important; }
+
+/* Botões: secundário (contorno) e principal (sólido) */
+.stButton > button, .stDownloadButton > button {
+  border-radius: 10px; border: 1.5px solid var(--cg-azul); background: #FFFFFF; color: var(--cg-azul);
+  font-weight: 700; padding: .45rem 1.1rem; transition: background .15s ease, color .15s ease; }
+.stButton > button p, .stDownloadButton > button p { color: inherit; font-weight: 700; }
+.stButton > button:hover { background: var(--cg-azul-claro); border-color: var(--cg-azul); color: var(--cg-azul); }
+.stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"],
+.stDownloadButton > button {
+  background: var(--cg-azul); color: #FFFFFF; border-color: var(--cg-azul); }
+.stButton > button[kind="primary"]:hover, .stButton > button[data-testid="stBaseButton-primary"]:hover,
+.stDownloadButton > button:hover {
+  background: var(--cg-azul-hover); border-color: var(--cg-azul-hover); color: #FFFFFF; }
+.stButton > button:focus-visible, .stDownloadButton > button:focus-visible {
+  outline: 3px solid rgba(0,64,128,.3); outline-offset: 2px; }
+
+/* Upload de fotos, alertas */
+[data-testid="stFileUploaderDropzone"] { border: 1.5px dashed #9DB5D0; border-radius: 12px; background: #F7FAFD; }
+[data-testid="stAlert"] { border-radius: 12px; }
+
+/* Menu lateral */
+[data-testid="stSidebar"] { background: #FFFFFF; border-right: 1px solid var(--cg-borda); }
+.cg-side-brand { padding: .3rem .2rem 1rem .2rem; margin-bottom: 1rem; border-bottom: 1px solid var(--cg-borda); }
+.cg-side-logo { height: 42px; width: auto; display: block; }
+.cg-side-name { margin-top: .6rem; font-size: .82rem; font-weight: 600; color: var(--cg-texto-suave); line-height: 1.35; }
+[data-testid="stSidebar"] [role="radiogroup"] { gap: .2rem; }
+[data-testid="stSidebar"] [role="radiogroup"] label { width: 100%; padding: .6rem .8rem; border-radius: 10px;
+  cursor: pointer; transition: background .15s ease; }
+[data-testid="stSidebar"] [role="radiogroup"] label:hover { background: var(--cg-azul-claro); }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+  background: var(--cg-azul-claro); box-shadow: inset 3px 0 0 var(--cg-destaque); }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p { color: var(--cg-azul); font-weight: 800; }
+
+@media (max-width: 768px) {
+  .block-container, [data-testid="stMainBlockContainer"] { padding: 1rem !important; border-radius: 0; margin: 0 auto !important; }
+  .cg-header { flex-wrap: wrap; gap: .7rem; }
+  .cg-header-sep { display: none; }
+  .cg-logo { height: 40px; }
+  .cg-title { font-size: 1.25rem; }
+}
 </style>
 """
+
+for _chave, _valor in {
+    "__AZUL_ESCURO__": COR_AZUL_ESCURO, "__AZUL_HOVER__": COR_AZUL_HOVER, "__AZUL_CLARO__": COR_AZUL_CLARO,
+    "__AZUL__": COR_AZUL, "__DESTAQUE__": COR_DESTAQUE, "__FUNDO__": COR_FUNDO,
+    "__TEXTO_SUAVE__": COR_TEXTO_SUAVE, "__TEXTO__": COR_TEXTO, "__BORDA__": COR_BORDA,
+}.items():
+    CUSTOM_CSS = CUSTOM_CSS.replace(_chave, _valor)
+
+# O Markdown do Streamlit encerra blocos HTML em linhas em branco; por isso removemos linhas vazias do CSS
+CUSTOM_CSS = "\n".join(l for l in CUSTOM_CSS.splitlines() if l.strip())
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+
+@st.cache_data(show_spinner=False)
+def _logo_base64(caminho):
+    try:
+        with open(caminho, "rb") as f:
+            return base64.b64encode(f.read()).decode("ascii")
+    except Exception:
+        return ""
+
+
+def _logo_html(classe):
+    b64 = _logo_base64(LOGO_PATH)
+    if not b64:
+        return ""
+    return f'<img class="{classe}" src="data:image/png;base64,{b64}" alt="Consigaz">'
+
+
+def cabecalho_pagina(titulo, subtitulo):
+    """Cabeçalho padrão das telas: logo Consigaz + título + subtítulo."""
+    logo = _logo_html("cg-logo")
+    separador = '<div class="cg-header-sep"></div>' if logo else ""
+    st.markdown(
+        f'<div class="cg-header">{logo}{separador}<div>'
+        f'<div class="cg-title">{html_lib.escape(titulo)}</div>'
+        f'<div class="cg-subtitle">{html_lib.escape(subtitulo)}</div>'
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
 
 # --- FUNÇÃO DE CONSULTA AUTOMÁTICA DE CNPJ ---
 def consultar_cnpj_api(cnpj_input):
@@ -117,9 +262,13 @@ def resetar_dados_aprov():
 def resetar_dados_aniv():
     st.session_state.reset_counter_aniv += 1
 
-# --- COMPONENTE DE BOTÃO DE CÓPIAS COM ÍCONE ESPECIAL ---
+# --- COMPONENTE DE BOTÃO DE CÓPIA (preserva as quebras de linha) ---
 def botao_copiar_customizado(texto_para_copiar, chave_unica):
-    texto_seguro = texto_para_copiar.replace('`', '\\`').replace('$', '\\$').replace('\n', '\\n')
+    # Normaliza as quebras de linha e embute o texto como string JSON,
+    # que escapa corretamente qualquer caractere (barra invertida, aspas, crase, $, </script>, etc.)
+    texto_norm = str(texto_para_copiar).replace("\r\n", "\n").replace("\r", "\n")
+    texto_js = json.dumps(texto_norm).replace("</", "<\\/")
+
     component_html = f"""
     <div style="margin-top: 5px; margin-bottom: 10px;">
         <button id="btn_{chave_unica}" onclick="copiarTexto_{chave_unica}()" style="
@@ -127,8 +276,9 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
             color: white;
             padding: 8px 16px;
             border: none;
-            border-radius: 6px;
-            font-weight: bold;
+            border-radius: 10px;
+            font-family: 'Manrope', 'Segoe UI', Arial, sans-serif;
+            font-weight: 700;
             font-size: 14px;
             cursor: pointer;
             display: inline-flex;
@@ -141,32 +291,81 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
         <span id="msg_{chave_unica}" style="margin-left: 10px; color: green; font-weight: bold; font-size: 13px; display: none;">Copiado com sucesso!</span>
     </div>
     <script>
-    function copiarTexto_{chave_unica}() {{
-        const texto = `{texto_seguro}`;
-        navigator.clipboard.writeText(texto).then(function() {{
-            const msg = document.getElementById("msg_{chave_unica}");
-            msg.style.display = "inline";
-            setTimeout(function() {{
-                msg.style.display = "none";
-            }}, 2500);
-        }}, function(err) {{
-            alert("Erro ao copiar texto: ", err);
-        }});
+    const TEXTO_{chave_unica} = {texto_js};
+
+    function escapeHtml_{chave_unica}(s) {{
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }}
+
+    function copiarFallback_{chave_unica}(texto) {{
+        const ta = document.createElement('textarea');
+        ta.value = texto;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        let ok = false;
+        try {{ ok = document.execCommand('copy'); }} catch (e) {{ ok = false; }}
+        document.body.removeChild(ta);
+        return ok;
+    }}
+
+    function mostrarMsg_{chave_unica}(ok) {{
+        const msg = document.getElementById("msg_{chave_unica}");
+        msg.textContent = ok ? "Copiado com sucesso!" : "Não foi possível copiar. Selecione o texto na caixa acima e use Ctrl+C.";
+        msg.style.color = ok ? "green" : "#b00020";
+        msg.style.display = "inline";
+        setTimeout(function() {{
+            msg.style.display = "none";
+        }}, ok ? 2500 : 6000);
+    }}
+
+    async function copiarTexto_{chave_unica}() {{
+        const texto = TEXTO_{chave_unica};
+        let ok = false;
+        try {{
+            if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {{
+                // Copia em texto simples (com \\n) e também em HTML (com <br>),
+                // assim campos de texto simples e editores formatados mantêm as quebras de linha
+                const html = '<div>' + escapeHtml_{chave_unica}(texto).replace(/\\n/g, '<br>') + '</div>';
+                const item = new ClipboardItem({{
+                    'text/plain': new Blob([texto], {{ type: 'text/plain' }}),
+                    'text/html': new Blob([html], {{ type: 'text/html' }})
+                }});
+                await navigator.clipboard.write([item]);
+                ok = true;
+            }} else if (navigator.clipboard && navigator.clipboard.writeText) {{
+                await navigator.clipboard.writeText(texto);
+                ok = true;
+            }}
+        }} catch (e) {{
+            ok = false;
+        }}
+        if (!ok) {{
+            ok = copiarFallback_{chave_unica}(texto);
+        }}
+        mostrarMsg_{chave_unica}(ok);
     }}
     </script>
     """
     components.html(component_html, height=50)
 
 # --- MENU LATERAL DE NAVEGAÇÃO ---
-st.sidebar.title("📌 Menu de Navegação")
+st.sidebar.markdown(
+    f'<div class="cg-side-brand">{_logo_html("cg-side-logo")}'
+    f'<div class="cg-side-name">Sistema Integrado de Ocorrências</div></div>',
+    unsafe_allow_html=True,
+)
 menu = st.sidebar.radio(
-    "Selecione a página:", 
+    "Selecione a página:",
     [
         "📷 Visita de Transferência",
         "📝 Elaboração de Contrato",
         "📋 Aprovação de Contrato",
         "🎂 Aniversário de Contrato"
-    ]
+    ],
+    label_visibility="collapsed"
 )
 
 st.sidebar.divider()
@@ -185,13 +384,7 @@ if menu == "📷 Visita de Transferência":
     rc = st.session_state.reset_counter
     ekc = st.session_state.eq_key_counter
 
-    col_logo, col_titulo = st.columns([1, 4])
-    with col_logo:
-        if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=150)
-    with col_titulo:
-        st.title("Visita de Transferência & Relatório Técnico")
-        st.markdown("Gerador automatizado de relatórios técnicos e inspeções.")
+    cabecalho_pagina("Visita de Transferência & Relatório Técnico", "Gerador automatizado de relatórios técnicos e inspeções.")
 
     st.divider()
 
@@ -618,13 +811,7 @@ Obs.: {observacoes}
 elif menu == "📝 Elaboração de Contrato":
     rcc = st.session_state.reset_counter_contrato
 
-    col_logo, col_titulo = st.columns([1, 4])
-    with col_logo:
-        if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=150)
-    with col_titulo:
-        st.title("Elaboração de Contrato")
-        st.markdown("Formulário de preenchimento e geração do padrão de solicitação.")
+    cabecalho_pagina("Elaboração de Contrato", "Formulário de preenchimento e geração do padrão de solicitação.")
 
     st.divider()
 
@@ -941,13 +1128,7 @@ Obs.: {observacoes_contrato}"""
 elif menu == "📋 Aprovação de Contrato":
     rcap = st.session_state.reset_counter_aprov
 
-    col_logo, col_titulo = st.columns([1, 4])
-    with col_logo:
-        if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=150)
-    with col_titulo:
-        st.title("Aprovação de Contrato")
-        st.markdown("Formulário de preenchimento para solicitação de aprovação.")
+    cabecalho_pagina("Aprovação de Contrato", "Formulário de preenchimento para solicitação de aprovação.")
 
     st.divider()
 
@@ -1149,13 +1330,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 elif menu == "🎂 Aniversário de Contrato":
     rca = st.session_state.reset_counter_aniv
 
-    col_logo, col_titulo = st.columns([1, 4])
-    with col_logo:
-        if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=150)
-    with col_titulo:
-        st.title("Aniversário de Contrato")
-        st.markdown("Tratativa de reajuste por IPCA acumulado de 12 meses.")
+    cabecalho_pagina("Aniversário de Contrato", "Tratativa de reajuste por IPCA acumulado de 12 meses.")
 
     st.divider()
 
