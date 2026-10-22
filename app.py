@@ -53,7 +53,11 @@ html, body, [class*="css"], .stApp {
   color: #1E293B !important;
 }
 
-[data-testid="stHeader"] { background: transparent; }
+/* Ocultar cabeçalho superior nativo do Streamlit (Share, GitHub, etc.) */
+[data-testid="stHeader"] { 
+  display: none !important; 
+  visibility: hidden !important; 
+}
 #MainMenu, footer { visibility: hidden; }
 
 /* Cabeçalho Consigaz */
