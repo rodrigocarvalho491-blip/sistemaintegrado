@@ -27,7 +27,7 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ - DESIGN MODERNO & ARREDONDADO
+# IDENTIDADE VISUAL CONSIGAZ - DESIGN MODERNO (COMPATÍVEL DARK/LIGHT)
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -37,8 +37,6 @@ CUSTOM_CSS = """
   --cg-azul-principal: #003366;
   --cg-azul-vibrante: #0055A5;
   --cg-laranja: #F28C28;
-  --cg-suave: #F4F7FB;
-  --cg-borda: #E2E8F0;
 }
 
 html, body, [class*="css"] {
@@ -48,15 +46,14 @@ html, body, [class*="css"] {
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
-/* Bloco principal com efeito de card flutuante e bordas super arredondadas */
+/* Bloco principal flutuante e moderno com bordas arredondadas */
 .block-container, [data-testid="stMainBlockContainer"] {
   max-width: 1200px !important;
   margin: 1.5rem auto !important;
   padding: 2.5rem !important;
-  background: rgba(255, 255, 255, 0.95);
   border-radius: 24px !important;
   box-shadow: 0 10px 30px rgba(0, 51, 102, 0.08);
-  border: 1px solid var(--cg-borda);
+  border: 1px solid rgba(120, 140, 160, 0.2);
 }
 
 /* Cabeçalho Consigaz com destaque refinado */
@@ -67,7 +64,7 @@ html, body, [class*="css"] {
   position: relative;
   padding-bottom: 1.5rem; 
   margin-bottom: 2rem; 
-  border-bottom: 2px solid var(--cg-borda); 
+  border-bottom: 2px solid rgba(120, 140, 160, 0.2); 
 }
 .cg-header::after { 
   content: ""; 
@@ -80,12 +77,11 @@ html, body, [class*="css"] {
   background: linear-gradient(90deg, var(--cg-azul-vibrante) 0%, var(--cg-laranja) 100%); 
 }
 .cg-logo { height: 55px; width: auto; display: block; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
-.cg-header-sep { width: 2px; align-self: stretch; background: var(--cg-borda); opacity: 0.6; }
-.cg-title { font-size: 1.8rem; font-weight: 800; color: var(--cg-azul-principal); line-height: 1.2; letter-spacing: -0.02em; }
-.cg-subtitle { font-size: 0.98rem; color: #64748B; margin-top: 0.3rem; font-weight: 500; }
+.cg-header-sep { width: 2px; align-self: stretch; background: rgba(120, 140, 160, 0.3); }
+.cg-title { font-size: 1.8rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
+.cg-subtitle { font-size: 0.98rem; margin-top: 0.3rem; opacity: 0.8; font-weight: 500; }
 
 /* Títulos de Seção Estilizados */
-.stApp h1, .stApp h2 { color: var(--cg-azul-principal) !important; font-weight: 800 !important; }
 .stApp h3 {
   font-size: 1.15rem !important;
   font-weight: 700 !important;
@@ -98,17 +94,15 @@ html, body, [class*="css"] {
   margin-bottom: 1.2rem !important;
 }
 
-/* Inputs, selects e textareas super arredondados e modernos */
+/* Inputs, selects e textareas super arredondados e fluidos */
 [data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {
   border-radius: 14px !important;
-  border: 1.5px solid var(--cg-borda) !important;
-  background-color: #FAFCFF !important;
+  border: 1.5px solid rgba(120, 140, 160, 0.3) !important;
   transition: all 0.2s ease;
 }
 [data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
   border-color: var(--cg-azul-vibrante) !important;
-  box-shadow: 0 0 0 4px rgba(0, 85, 165, 0.12) !important;
-  background-color: #FFFFFF !important;
+  box-shadow: 0 0 0 4px rgba(0, 85, 165, 0.15) !important;
 }
 
 /* Botões modernos, arredondados e com sombras suaves */
@@ -116,17 +110,8 @@ html, body, [class*="css"] {
   border-radius: 14px !important;
   font-weight: 700 !important;
   padding: 0.6rem 1.4rem !important;
-  border: 1.5px solid var(--cg-borda);
-  background-color: #FFFFFF;
-  color: var(--cg-azul-principal);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
   box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-}
-.stButton > button:hover, .stDownloadButton > button:hover {
-  border-color: var(--cg-azul-vibrante);
-  color: var(--cg-azul-vibrante);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 85, 165, 0.1);
 }
 
 .stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"], .stDownloadButton > button {
@@ -143,17 +128,16 @@ html, body, [class*="css"] {
 
 /* Sidebar moderna e limpa */
 [data-testid="stSidebar"] {
-  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
-  border-right: 1px solid var(--cg-borda);
+  border-right: 1px solid rgba(120, 140, 160, 0.2);
 }
 .cg-side-brand { 
   padding: 1rem 0.5rem 1.5rem 0.5rem; 
   margin-bottom: 1.2rem; 
-  border-bottom: 1px solid var(--cg-borda); 
+  border-bottom: 1px solid rgba(120, 140, 160, 0.2); 
   text-align: center;
 }
 .cg-side-logo { height: 45px; width: auto; display: inline-block; }
-.cg-side-name { margin-top: 0.8rem; font-size: 0.75rem; font-weight: 700; color: #64748B; letter-spacing: 0.08em; text-transform: uppercase; }
+.cg-side-name { margin-top: 0.8rem; font-size: 0.75rem; font-weight: 700; opacity: 0.7; letter-spacing: 0.08em; text-transform: uppercase; }
 
 [data-testid="stSidebar"] [role="radiogroup"] label {
   border-radius: 12px !important;
@@ -162,22 +146,17 @@ html, body, [class*="css"] {
   transition: all 0.2s ease;
   border: 1px solid transparent;
 }
-[data-testid="stSidebar"] [role="radiogroup"] label:hover {
-  background: rgba(0, 85, 165, 0.06);
-  border-color: rgba(0, 85, 165, 0.1);
-}
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-  background: linear-gradient(90deg, rgba(0, 85, 165, 0.12) 0%, rgba(0, 85, 165, 0.03) 100%);
+  background: linear-gradient(90deg, rgba(0, 85, 165, 0.15) 0%, rgba(0, 85, 165, 0.03) 100%);
   border-left: 4px solid var(--cg-laranja);
   box-shadow: 0 2px 8px rgba(0,85,165,0.06);
 }
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p {
-  color: var(--cg-azul-principal);
   font-weight: 800 !important;
 }
 
 /* Divisor elegante */
-hr { border-color: var(--cg-borda) !important; margin: 2rem 0 !important; opacity: 0.6; }
+hr { border-color: rgba(120, 140, 160, 0.2) !important; margin: 2rem 0 !important; }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
