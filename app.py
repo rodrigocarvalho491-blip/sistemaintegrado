@@ -259,7 +259,7 @@ if not st.session_state.autenticado:
     banco_usuarios = carregar_banco_usuarios()
 
     with st.form("form_login_sistema"):
-        usuario_input = st.text_input("Usuário", placeholder="Digite seu usuário (Ex: admin)").strip().lower()
+        usuario_input = st.text_input("Usuário").strip().lower()
         senha_input = st.text_input("Senha", type="password", placeholder="••••••••").strip()
         btn_entrar = st.form_submit_button("Entrar no Sistema", type="primary")
         
