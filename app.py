@@ -35,6 +35,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- SISTEMA ANTI-SLEEP (HEARTBEAT) ---
+# Mantém a aplicação ativa enviando um ping silencioso a cada 5 minutos
+components.html(
+    """
+    <script>
+    setInterval(function() {
+        fetch('/healthz').catch(() => {});
+    }, 300000);
+    </script>
+    """,
+    height=0, width=0
+)
+
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
@@ -230,7 +243,7 @@ if "e_admin" not in st.session_state:
     st.session_state.e_admin = False
 
 # =====================================================================
-# TELA DE AUTENTICAÇÃO (LOGIN COM VALIDAÇÃO REAL)
+# TELA DE AUTENTICAÇÃO
 # =====================================================================
 if not st.session_state.autenticado:
     side_logo_html = _logo_html("cg-side-logo", "cg-side-logo-wrapper")
@@ -241,12 +254,12 @@ if not st.session_state.autenticado:
     )
     
     st.title("🔐 Acesso ao Sistema Integrado | Consigaz")
-    st.markdown("Insira suas credenciais corporativas registradas pelo administrador para acessar a plataforma.")
+    st.markdown("Insira suas credenciais registradas pelo administrador para acessar a plataforma.")
     
     banco_usuarios = carregar_banco_usuarios()
 
     with st.form("form_login_sistema"):
-        usuario_input = st.text_input("Usuário ou E-mail corporativo", placeholder="seu.nome@consigaz.com.br ou admin").strip().lower()
+        usuario_input = st.text_input("Usuário", placeholder="Digite seu usuário (Ex: admin)").strip().lower()
         senha_input = st.text_input("Senha", type="password", placeholder="••••••••").strip()
         btn_entrar = st.form_submit_button("Entrar no Sistema", type="primary")
         
@@ -672,7 +685,7 @@ if aba_admin is not None:
         with col_adm1:
             st.subheader("1. Cadastrar Novo Usuário")
             with st.form("form_novo_usuario"):
-                novo_user = st.text_input("E-mail / Usuário corporativo", placeholder="novo.usuario@consigaz.com.br").strip().lower()
+                novo_user = st.text_input("Usuário", placeholder="novo.usuario").strip().lower()
                 nova_senha = st.text_input("Senha Inicial", type="password", placeholder="••••••••").strip()
                 btn_cadastrar = st.form_submit_button("➕ Cadastrar Usuário", type="primary")
                 
@@ -710,7 +723,7 @@ if aba_admin is not None:
         st.subheader("3. Usuários Cadastrados & Remoção")
         
         df_users = pd.DataFrame([
-            {"Usuário / E-mail": k, "Tipo": "Administrador Master" if k == "admin" else "Usuário Convencional"}
+            {"Usuário": k, "Tipo": "Administrador Master" if k == "admin" else "Usuário Convencional"}
             for k in banco_usuarios.keys()
         ])
         
