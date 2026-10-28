@@ -988,4 +988,454 @@ Tipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"""
             st.divider()
             if st.button("📝 Gerar Texto de Aprovação de Contrato", type="primary"):
                 if not is_cilindros and not projeto_num.strip():
-                    st.error("⚠️ O campo 'Projeto' é obrigatório,
+                    st.error("⚠️ O campo 'Projeto' é obrigatório, a menos que a opção 'Cilindros' esteja marcada.")
+                else:
+                    proj_final = "N/A" if is_cilindros else projeto_num
+                    neg_final = neg_tit_input.strip() if possui_titulos_aberto == "Sim" and neg_tit_input.strip() else "n/a"
+
+                    if qtd_entregas_ap == 1:
+                        eq_ap_texto = equipamentos_ap
+                    else:
+                        eq_ap_linhas = [f"[Entrega {i}] {eq_dict_ap[i].strip()}" for i in range(1, int(qtd_entregas_ap) + 1) if eq_dict_ap.get(i, "").strip()]
+                        eq_ap_texto = "\n" + "\n".join(eq_ap_linhas) if eq_ap_linhas else ""
+
+                    conta_sim_bloco = f"Implantação de conta sim: [ {'x' if implantacao_csim == 'Sim' else ' '} ] sim [ {'x' if implantacao_csim == 'Não' else ' '} ] não"
+                    if implantacao_csim == "Sim":
+                        conta_sim_bloco += f"""
+Foi enviado lista de peças? [ {'x' if env_pecas_ficha == 'Sim' else ' '} ] sim [ {'x' if env_pecas_ficha == 'Não' else ' '} ] não
+Foi enviado ficha de clientes? [ {'x' if env_ficha_cliente == 'Sim' else ' '} ] sim [ {'x' if env_ficha_cliente == 'Não' else ' '} ] não
+Tipo de portaria: {tp_portaria}
+Contato do responsável: {contato_resp_port}
+Particularidades do local: {part_local}
+Contato atualizado do síndico: {contato_sindico}"""
+
+                    texto_aprovacao = f"""Motivo da regularização: {motivo_reg}
+Contato: {contato_ap} Telefone: {telefone_ap} E-mail: {email_ap}
+Atualizar E-mail? {atualizar_email if atualizar_email else ''} Contrato / Aditamento: {contrato_adit if contrato_adit else ''} Vigência: {vigencia_ap}
+Equipamentos: {eq_ap_texto}
+Existe especificidade sobre a solicitação: {especificidade_ap}
+
+Redimensionamento: [ {'x' if redim == 'Sim' else ' '} ] sim [ {'x' if redim == 'Não' else ' '} ] não
+Projeto: {proj_final}
+Comodato passou de: {comodato_de} Para: {comodato_para}
+Inclusão de tanques? [ {'x' if inc_tanques == 'Sim' else ' '} ] sim [ {'x' if inc_tanques == 'Não' else ' '} ] não
+Necessário lista de peças? [ {'x' if env_pecas == 'Sim' else ' '} ] sim [ {'x' if env_pecas == 'Não' else ' '} ] não
+
+{conta_sim_bloco}
+
+Alteração de CNPJ ou razão social? [ {'x' if alt_cnpj == 'Sim' else ' '} ] sim [ {'x' if alt_cnpj == 'Não' else ' '} ] não
+Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'Sim' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'Não' else ' '} ) NÃO
+Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: {neg_final}
+
+Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red_vig == 'Não' else ' '} ] não
+Motivo da redução: {motivo_red_vig}"""
+
+                    st.success("✅ Texto de Aprovação gerado com sucesso! Copie abaixo:")
+                    st.code(texto_aprovacao, language="text")
+                    botao_copiar_customizado(texto_aprovacao, "copia_aprovacao")
+
+        elif menu_tratativa == "🎂 Aniversário de Contrato":
+            cabecalho_pagina("Aniversário de Contrato", "Tratativa de reajuste por IPCA acumulado de 12 meses.")
+            rca = st.session_state.reset_counter
+            
+            # Consulta do IPCA acumulado de 12M do IBGE
+            ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
+            
+            if ipca_api is not None:
+                ipca_vigente = ipca_api
+                st.success(f"📊 **IPCA Acumulado de 12 meses consultado no IBGE ({ipca_periodo}):** `{ipca_vigente:.2f}%`")
+            else:
+                st.warning("⚠️ Não foi possível consultar automaticamente o IPCA no IBGE. Informe o índice acumulado manualmente abaixo:")
+                ipca_vigente = st.number_input("IPCA Acumulado 12 Meses (%)", min_value=0.0, value=4.58, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
+
+            col_an1, col_an2 = st.columns(2)
+            with col_an1:
+                preco_anterior_input = st.text_input("Preço Anterior (R$)", placeholder="Ex: 6,9789", key=f"preco_ant_{rca}")
+            with col_an2:
+                st.write("")
+
+            clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=None, key=f"clausula_{rca}")
+
+            # Cálculo do valor do reajuste
+            p_aniv_str = "xx,xx"
+            try:
+                val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".").strip()
+                p_ant = float(val_limpo)
+                p_aniv = p_ant * (1 + (ipca_vigente / 100.0))
+                p_aniv_str = f"{p_aniv:.4f}".replace(".", ",")
+            except ValueError:
+                pass
+
+            st.divider()
+
+            if st.button("📝 Gerar Texto de Aniversário de Contrato", type="primary"):
+                if clausula_contrato == "Não":
+                    st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
+
+                texto_aniversario = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."
+                if clausula_contrato == "Sim":
+                    texto_aniversario += "\n\nCliente possui cláusula em contrato."
+
+                texto_aniversario += f"\n\nPreço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}\nPreço Aniversário: R$ {p_aniv_str}"
+
+                st.success("✅ Texto gerado com sucesso! Copie abaixo:")
+                st.code(texto_aniversario, language="text")
+                botao_copiar_customizado(texto_aniversario, "aniv_txt")
+
+            st.divider()
+            st.subheader("Tratativa com C.I.")
+            ci_input = st.text_input("Número da C.I.", placeholder="Ex: 588.386.687", key=f"ci_num_{rca}")
+
+            if st.button("📝 Gerar Texto com C.I.", type="primary"):
+                texto_ci = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."
+                if clausula_contrato == "Sim":
+                    texto_ci += "\n\nCliente possui cláusula em contrato."
+
+                texto_ci += f"\n\nPreço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}\nPreço Aniversário: R$ {p_aniv_str}\n\nCI.: {ci_input if ci_input else '000.000.000'} - Preço Aniversário"
+
+                st.success("✅ Texto com C.I. gerado com sucesso! Copie abaixo:")
+                st.code(texto_ci, language="text")
+                botao_copiar_customizado(texto_ci, "ci_txt")
+
+
+# =====================================================================
+# ABA 2: AGENDA DE OCORRÊNCIAS
+# =====================================================================
+with aba_agenda:
+    col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
+    
+    with col_menu_agenda:
+        st.markdown("### 📂 Base de Dados")
+        st.markdown("Faça o upload do relatório Excel (Pós-Vendas) para atualizar os dados da agenda nesta sessão.")
+        arquivo_excel = st.file_uploader("", type=["xlsx", "xls"], key="upload_dash")
+        
+        if arquivo_excel is not None:
+             st.session_state.df_excel_agenda = pd.read_excel(arquivo_excel, header=11)
+             
+        st.divider()
+        st.markdown("### 🔍 Módulos da Agenda")
+        opcao_visao_agenda = st.radio(
+            "Selecione a visualização:",
+            [
+                "📋 Agenda Geral",
+                "📦 Comodato Inativo",
+                "🏙️ Ocorrências por Cidade"
+            ],
+            key="radio_visao_agenda"
+        )
+
+    with col_conteudo_agenda:
+        cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização ordenado por prazo de atendimento.")
+
+        if st.session_state.df_excel_agenda is not None:
+            try:
+                df = st.session_state.df_excel_agenda.copy()
+                df = df.dropna(subset=[COL_OCORRENCIA])
+                df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
+                
+                df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
+                df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.tratadas_manualmente)]
+                
+                df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
+                df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
+                
+                df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
+                df_pendentes['Sub_Simplificada'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_subclassificacao)
+                
+                hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                df_pendentes['Dias para Vencer'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
+                df_pendentes['Status Geral'] = df_pendentes['Dias para Vencer'].apply(classificar_status_geral)
+                df_pendentes['Status Comodato'] = df_pendentes['Dias para Vencer'].apply(classificar_status_comodato_inativo)
+                df_pendentes['Data Atendimento'] = df_pendentes['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
+
+                # -------------------------------------------------------------
+                # VISÃO 1: AGENDA GERAL
+                # -------------------------------------------------------------
+                if opcao_visao_agenda == "📋 Agenda Geral":
+                    st.subheader("Agenda Geral de Visitas Pendentes")
+                    
+                    cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
+                    sub_class_unicas = sorted(list(df_pendentes['Sub_Simplificada'].unique()))
+                    
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1: cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[], key="f_cid")
+                    with col_f2: sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[], key="f_sub")
+                    
+                    df_filtrado = df_pendentes.copy()
+                    if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
+                    if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado['Sub_Simplificada'].isin(sub_class_selecionadas)]
+                    
+                    total_qt = len(df_filtrado)
+                    hoje_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"])
+                    amanha_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"])
+                    vencidas_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"])
+                    
+                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    with col_m1:
+                        st.metric("Total", total_qt)
+                        if st.button("🔍 Todos", use_container_width=True, key="f_btn_tot"): st.session_state.filtro_card_dashboard = "Todos"
+                    with col_m2:
+                        st.metric("Vence Hoje", hoje_qt)
+                        if st.button("🔍 Vence Hoje", use_container_width=True, key="f_btn_hoje"): st.session_state.filtro_card_dashboard = "Hoje"
+                    with col_m3:
+                        st.metric("Vence Amanhã", amanha_qt)
+                        if st.button("🔍 Vence Amanhã", use_container_width=True, key="f_btn_ama"): st.session_state.filtro_card_dashboard = "Amanhã"
+                    with col_m4:
+                        st.metric("Vencidas", vencidas_qt)
+                        if st.button("🔍 Vencidas", use_container_width=True, key="f_btn_venc"): st.session_state.filtro_card_dashboard = "Vencido"
+
+                    if st.session_state.filtro_card_dashboard == "Hoje":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]
+                    elif st.session_state.filtro_card_dashboard == "Amanhã":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]
+                    elif st.session_state.filtro_card_dashboard == "Vencido":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]
+
+                    st.write("---")
+                    if df_filtrado.empty:
+                        st.success("✅ Nenhuma ocorrência para os filtros selecionados.")
+                    else:
+                        df_exibicao = df_filtrado[['Status Geral', 'Dias para Vencer', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Sub_Simplificada', 'Data Atendimento']].copy()
+                        df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
+                        st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
+
+                # -------------------------------------------------------------
+                # VISÃO 2: COMODATO INATIVO
+                # -------------------------------------------------------------
+                elif opcao_visao_agenda == "📦 Comodato Inativo":
+                    st.subheader("Ocorrências Específicas de Comodato Inativo")
+                    
+                    df_comodato = df_pendentes[df_pendentes['Sub_Simplificada'].str.contains("Comodato Inativo", case=False, na=False)].copy()
+                    
+                    if df_comodato.empty:
+                        st.info("ℹ️ Nenhuma ocorrência de 'Comodato Inativo' pendente encontrada no relatório.")
+                    else:
+                        c1_qt = len(df_comodato[df_comodato['Status Comodato'] == "🟢 1ª Semana (Mais distante)"])
+                        c2_qt = len(df_comodato[df_comodato['Status Comodato'] == "🟡 2ª Semana (Intermediária)"])
+                        c3_qt = len(df_comodato[df_comodato['Status Comodato'] == "🔴 3ª Semana (Vencimento)"])
+                        cv_qt = len(df_comodato[df_comodato['Status Comodato'] == "🔴 Vencido"])
+                        
+                        col_cm1, col_cm2, col_cm3, col_cm4 = st.columns(4)
+                        with col_cm1: st.metric("🟢 1ª Semana (> 14 dias)", c1_qt)
+                        with col_cm2: st.metric("🟡 2ª Semana (8-14 dias)", c2_qt)
+                        with col_cm3: st.metric("🔴 3ª Semana (0-7 dias)", c3_qt)
+                        with col_cm4: st.metric("🔴 Vencidas", cv_qt)
+
+                        st.divider()
+                        df_com_exibicao = df_comodato[['Status Comodato', 'Dias para Vencer', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_ENDERECO, 'Data Atendimento']].copy()
+                        df_com_exibicao[COL_OCORRENCIA] = df_com_exibicao[COL_OCORRENCIA].astype(str)
+                        st.dataframe(df_com_exibicao, hide_index=True, use_container_width=True)
+
+                # -------------------------------------------------------------
+                # VISÃO 3: OCORRÊNCIAS POR CIDADE
+                # -------------------------------------------------------------
+                elif opcao_visao_agenda == "🏙️ Ocorrências por Cidade":
+                    st.subheader("Distribuição de Ocorrências por Cidade")
+                    
+                    df_cidades_resumo = df_pendentes.groupby('Cidade').agg(
+                        Total_Ocorrencias=(COL_OCORRENCIA, 'count'),
+                        Vencidas=('Status Geral', lambda x: (x == "🔴 Vencido").sum()),
+                        Hoje=('Status Geral', lambda x: (x == "🔵 Vence Hoje").sum()),
+                        No_Prazo=('Status Geral', lambda x: (x.str.contains("Prazo|Semana")).sum())
+                    ).reset_index().sort_values(by='Total_Ocorrencias', ascending=False)
+                    
+                    col_cid1, col_cid2 = st.columns([1, 1])
+                    with col_cid1:
+                        st.markdown("**Resumo por Município:**")
+                        st.dataframe(df_cidades_resumo, hide_index=True, use_container_width=True)
+                    with col_cid2:
+                        st.markdown("**Gráfico de Volume por Cidade:**")
+                        st.bar_chart(df_cidades_resumo.set_index('Cidade')['Total_Ocorrencias'])
+
+                    st.divider()
+                    st.markdown("**Filtrar Detalhes por Cidade:**")
+                    cidade_escolhida = st.selectbox("Selecione a cidade desejada:", ["Todas"] + list(df_cidades_resumo['Cidade'].unique()))
+                    
+                    if cidade_escolhida != "Todas":
+                        df_cid_detalhe = df_pendentes[df_pendentes['Cidade'] == cidade_escolhida]
+                    else:
+                        df_cid_detalhe = df_pendentes
+                        
+                    df_cid_exibicao = df_cid_detalhe[['Status Geral', 'Dias para Vencer', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Sub_Simplificada', 'Data Atendimento']].copy()
+                    df_cid_exibicao[COL_OCORRENCIA] = df_cid_exibicao[COL_OCORRENCIA].astype(str)
+                    st.dataframe(df_cid_exibicao, hide_index=True, use_container_width=True)
+
+            except Exception as e:
+                st.error(f"Erro ao processar dados do arquivo: {e}")
+        else:
+            st.info("👈 Utilize o menu lateral para carregar a planilha da base.")
+
+
+# =====================================================================
+# ABA 3: BLOCO DE NOTAS PESSOAL
+# =====================================================================
+with aba_notas:
+    col_menu_notas, col_conteudo_notas = st.columns([1, 4])
+    
+    usuario_atual = st.session_state.usuario_atual
+    banco_notas = carregar_banco_notas()
+    
+    if usuario_atual not in banco_notas:
+        banco_notas[usuario_atual] = {}
+        
+    notas_usuario = banco_notas[usuario_atual]
+
+    with col_menu_notas:
+        st.markdown("### 📓 Minhas Notas")
+        
+        if st.button("➕ Nova Nota", use_container_width=True):
+            st.session_state.nota_selecionada_id = None
+            st.rerun()
+            
+        st.divider()
+        st.markdown("**Lista de Notas Salvas**")
+        
+        if not notas_usuario:
+            st.caption("Nenhuma nota salva ainda.")
+        else:
+            for n_id, n_data in notas_usuario.items():
+                titulo_exibicao = n_data.get("titulo", "Sem Título")
+                cliente_exibicao = n_data.get("cliente", "")
+                lbl_btn = f"{titulo_exibicao}" + (f" ({cliente_exibicao})" if cliente_exibicao else "")
+                
+                if st.button(lbl_btn, key=f"btn_nota_{n_id}", use_container_width=True):
+                    st.session_state.nota_selecionada_id = n_id
+                    st.rerun()
+
+    with col_conteudo_notas:
+        cabecalho_pagina("Bloco de Notas Pessoal", "Gerencie anotações vinculadas aos seus clientes de forma isolada.")
+        st.markdown(f"👤 Usuário da Sessão: **{usuario_atual}**")
+        
+        id_atual = st.session_state.nota_selecionada_id
+        
+        if id_atual and id_atual in notas_usuario:
+            st.subheader("✏️ Editar Nota")
+            titulo_val = notas_usuario[id_atual].get("titulo", "")
+            cliente_val = notas_usuario[id_atual].get("cliente", "")
+            texto_val = notas_usuario[id_atual].get("texto", "")
+        else:
+            st.subheader("📄 Nova Nota")
+            titulo_val = ""
+            cliente_val = ""
+            texto_val = ""
+            
+        with st.form("form_bloco_notas"):
+            col_tn1, col_tn2 = st.columns(2)
+            with col_tn1: novo_titulo = st.text_input("Título da Nota", value=titulo_val, placeholder="Ex: Pendência Documentação")
+            with col_tn2: novo_cliente = st.text_input("Cliente Referente", value=cliente_val, placeholder="Ex: Condomínio Sol Nascente")
+            
+            novo_texto = st.text_area("Anotações", value=texto_val, height=250, placeholder="Escreva os detalhes aqui...")
+            
+            col_s1, col_s2, _ = st.columns([1, 1, 4])
+            with col_s1: btn_salvar_nota = st.form_submit_button("💾 Salvar Nota", type="primary")
+            with col_s2: 
+                if id_atual: btn_apagar = st.form_submit_button("🗑️ Apagar")
+                else: btn_apagar = False
+
+            if btn_salvar_nota:
+                if not novo_titulo:
+                    st.error("⚠️ O Título da nota é obrigatório.")
+                else:
+                    if not id_atual:
+                        id_atual = str(uuid.uuid4())
+                        
+                    banco_notas[usuario_atual][id_atual] = {
+                        "titulo": novo_titulo,
+                        "cliente": novo_cliente,
+                        "texto": novo_texto,
+                        "data_modificacao": datetime.now().strftime("%d/%m/%Y %H:%M")
+                    }
+                    salvar_banco_notas(banco_notas)
+                    st.session_state.nota_selecionada_id = id_atual
+                    st.success("✅ Nota salva com sucesso!")
+                    st.rerun()
+                    
+            if btn_apagar and id_atual:
+                del banco_notas[usuario_atual][id_atual]
+                salvar_banco_notas(banco_notas)
+                st.session_state.nota_selecionada_id = None
+                st.success("🗑️ Nota apagada.")
+                st.rerun()
+
+
+# =====================================================================
+# ABA 4: PAINEL DE GERENCIAMENTO DE USUÁRIOS (EXCLUSIVO ADMIN)
+# =====================================================================
+if aba_admin is not None:
+    with aba_admin:
+        cabecalho_pagina("Painel de Administração de Usuários", "Gerencie o acesso dos colaboradores, cadastre novas contas ou altere senhas.")
+        
+        banco_usuarios = carregar_banco_usuarios()
+        
+        col_adm1, col_adm2 = st.columns([1, 1])
+        
+        with col_adm1:
+            st.subheader("1. Cadastrar Novo Usuário")
+            with st.form("form_novo_usuario"):
+                novo_user = st.text_input("Usuário", placeholder="novo.usuario").strip().lower()
+                nova_senha = st.text_input("Senha Inicial", type="password", placeholder="••••••••").strip()
+                btn_cadastrar = st.form_submit_button("➕ Cadastrar Usuário", type="primary")
+                
+                if btn_cadastrar:
+                    if not novo_user or not nova_senha:
+                        st.error("⚠️ Preencha o nome do usuário e a senha inicial.")
+                    elif novo_user in banco_usuarios:
+                        st.warning(f"⚠️ O usuário '{novo_user}' já está cadastrado no sistema.")
+                    else:
+                        banco_usuarios[novo_user] = nova_senha
+                        salvar_banco_usuarios(banco_usuarios)
+                        st.success(f"✅ Usuário **{novo_user}** cadastrado com sucesso!")
+                        st.rerun()
+
+        with col_adm2:
+            st.subheader("2. Redefinir Senha de Usuário")
+            lista_usuarios = [u for u in banco_usuarios.keys() if u != "admin"]
+            
+            if lista_usuarios:
+                user_sel_senha = st.selectbox("Selecione o Usuário:", lista_usuarios, key="sel_user_mudar_senha")
+                nova_senha_admin = st.text_input("Nova Senha", type="password", key="txt_nova_senha_admin").strip()
+                
+                if st.button("🔑 Atualizar Senha", key="btn_mudar_senha"):
+                    if nova_senha_admin:
+                        banco_usuarios[user_sel_senha] = nova_senha_admin
+                        salvar_banco_usuarios(banco_usuarios)
+                        st.success(f"✅ Senha do usuário **{user_sel_senha}** atualizada com sucesso!")
+                    else:
+                        st.error("⚠️ Digite uma nova senha válida.")
+            else:
+                st.info("Nenhum usuário convencional cadastrado até o momento.")
+
+        st.divider()
+
+        st.subheader("3. Usuários Cadastrados & Remoção")
+        
+        df_users = pd.DataFrame([
+            {"Usuário": k, "Tipo": "Administrador Master" if k == "admin" else "Usuário Convencional"}
+            for k in banco_usuarios.keys()
+        ])
+        
+        st.dataframe(df_users, hide_index=True, use_container_width=True)
+
+        if lista_usuarios:
+            col_rem1, col_rem2 = st.columns([2, 1])
+            with col_rem1:
+                user_para_remover = st.selectbox("Selecione um usuário para remover do sistema:", lista_usuarios, key="sel_user_remove")
+            with col_rem2:
+                st.write("")
+                st.write("")
+                if st.button("🗑️ Remover Usuário", type="primary", key="btn_remover_user"):
+                    del banco_usuarios[user_para_remover]
+                    salvar_banco_usuarios(banco_usuarios)
+                    st.success(f"✅ Usuário **{user_para_remover}** removido com sucesso!")
+                    st.rerun()
+
+
+# --- BARRA LATERAL LOGOUT ---
+st.sidebar.divider()
+if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
+    st.session_state.autenticado = False
+    st.session_state.usuario_atual = ""
+    st.session_state.e_admin = False
+    st.session_state.df_excel_agenda = None  # Limpa os dados da agenda no logout
+    st.rerun()
