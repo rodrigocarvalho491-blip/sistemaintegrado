@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -10,7 +11,6 @@ from io import BytesIO
 from PIL import Image
 from fpdf import FPDF
 import requests
-from bs4 import BeautifulSoup
 
 # --- FORÇAR TEMA CLARO GLOBALMENTE NO STREAMLIT ---
 os.makedirs(".streamlit", exist_ok=True)
@@ -193,10 +193,7 @@ def obter_ipca_ibge():
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            texto_pagina = soup.get_text()
-            import re
-            match = re.search(r'acomet?ulado.*?(\d+[,]\d+)\s*%', texto_pagina, re.IGNORECASE)
+            match = re.search(r'acomet?ulado.*?(\d+[,]\d+)\s*%', response.text, re.IGNORECASE | re.DOTALL)
             if match:
                 return match.group(1)
     except Exception:
