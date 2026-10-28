@@ -36,7 +36,6 @@ st.set_page_config(
 )
 
 # --- SISTEMA ANTI-SLEEP (HEARTBEAT) ---
-# Mantém a aplicação ativa enviando um ping silencioso a cada 5 minutos
 components.html(
     """
     <script>
@@ -55,7 +54,7 @@ DB_NOTAS_PATH = "banco_notas_usuarios.json"
 DB_USUARIOS_PATH = "banco_usuarios.json"
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ
+# IDENTIDADE VISUAL CONSIGAZ E ESTILIZAÇÃO DOS CAMPOS
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -128,6 +127,22 @@ html, body, [class*="css"], .stApp {
   margin-bottom: 1rem !important;
 }
 
+/* Ajuste de Campos de Entrada - Fundo Branco e Borda Delicada */
+div[data-baseweb="input"] > div, 
+div[data-baseweb="select"] > div, 
+div[data-baseweb="textarea"] > div {
+  background-color: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 8px !important;
+  color: #1E293B !important;
+}
+
+div[data-baseweb="input"] input, 
+div[data-baseweb="textarea"] textarea {
+  color: #1E293B !important;
+  background-color: #FFFFFF !important;
+}
+
 /* Ajuste de Botões Padrão */
 div.stButton > button:first-child {
   background-color: #0055A5 !important; 
@@ -161,7 +176,7 @@ div.stButton > button:first-child {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- GERENCIAMENTO DO BANCO DE DADOS DE USUÁRIOS E NOTAS ---
+# --- GERENCIAMENTO BANCO DE DADOS ---
 def carregar_banco_usuarios():
     if os.path.exists(DB_USUARIOS_PATH):
         try:
@@ -179,15 +194,6 @@ def salvar_banco_usuarios(dados):
         json.dump(dados, f, ensure_ascii=False, indent=4)
 
 def carregar_banco_notas():
-    """
-    Estrutura do banco de notas:
-    {
-        "usuario1": {
-            "id_nota_1": {"titulo": "Nota X", "cliente": "Cliente Y", "texto": "...", "data": "..."},
-            "id_nota_2": {"titulo": "Nota Z", "cliente": "Cliente W", "texto": "...", "data": "..."}
-        }
-    }
-    """
     if os.path.exists(DB_NOTAS_PATH):
         try:
             with open(DB_NOTAS_PATH, "r", encoding="utf-8") as f:
@@ -200,7 +206,25 @@ def salvar_banco_notas(dados):
     with open(DB_NOTAS_PATH, "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=4)
 
-# --- FUNÇÕES AUXILIARES ---
+# --- CONSULTA CNPJ VIA API ---
+@st.cache_data(ttl=3600)
+def consultar_cnpj_api(cnpj):
+    try:
+        cnpj_limpo = "".join(filter(str.isdigit, str(cnpj)))
+        if len(cnpj_limpo) == 14:
+            url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                dados = resp.json()
+                return {
+                    "razao_social": dados.get("razao_social") or dados.get("nome_fantasia", ""),
+                    "situacao_cadastral": dados.get("descricao_situacao_cadastral", "ATIVA")
+                }
+    except Exception:
+        pass
+    return None
+
+# --- AUXILIARES E LOGO ---
 @st.cache_data(show_spinner=False)
 def _logo_base64(caminho):
     try:
@@ -332,7 +356,7 @@ st.sidebar.markdown(f"👤 **Usuário Ativo:** `{st.session_state.usuario_atual}
 if st.session_state.e_admin:
     st.sidebar.caption("⭐ Perfil: Administrador Master")
 
-# --- DEFINIÇÃO DINÂMICA DAS ABAS (NOVA ORDEM) ---
+# --- DEFINIÇÃO DINÂMICA DAS ABAS ---
 lista_abas = [
     "🛠️ Tratativa de Ocorrências",
     "📊 Agenda de Ocorrências", 
@@ -351,496 +375,4 @@ aba_admin = abas_sistema[3] if st.session_state.e_admin else None
 # Inicializações globais de estado
 if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
 if "filtro_card_dashboard" not in st.session_state: st.session_state.filtro_card_dashboard = "Todos"
-if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
-if "eq_key_counter" not in st.session_state: st.session_state.eq_key_counter = 0
-if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
-if "last_central" not in st.session_state: st.session_state.last_central = "Central"
-if "last_tipo_cad" not in st.session_state: st.session_state.last_tipo_cad = "Equipamentos"
-if "nota_selecionada_id" not in st.session_state: st.session_state.nota_selecionada_id = None
-if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None # Guarda o df do upload
-
-COL_OCORRENCIA = "Número da ocorrência"
-COL_CLIENTE = "Nome do cliente"
-COL_ENDERECO = "Endereço de Entrega"
-COL_ABERTURA = "Data/Hora de abertura"
-COL_PRAZO = "Prazo de Atendimento"
-COL_FECHAMENTO = "Data/Hora de fechamento"
-COL_SUB_CLASSIF = "Subclassificação Ocorrência"
-
-
-# =====================================================================
-# ABA 1: TRATATIVA DE OCORRÊNCIAS
-# =====================================================================
-with aba_tratativa:
-    # O menu de tratativa só aparece no sidebar se esta aba for o "foco"
-    # No Streamlit, a sidebar é global por script run, mas podemos injetar
-    # elementos condicionais. Para ter o menu lateral vinculado à aba ativada,
-    # verificamos uma variavel de controle de 'aba ativa', mas o st.tabs() renderiza todas simultaneamente.
-    # Uma abordagem comum é deixar o menu no topo ou dentro da aba. Como pedido no "menu lateral",
-    # criaremos um layout interno usando colunas que simula o menu lateral ou 
-    # adicionaremos na sidebar apenas na aba. (No streamlit padrão abas renderizam juntas, então
-    # o que for colocado na sidebar na aba 1, pode não sobrescrever a aba 2 perfeitamente. 
-    # Uma solução é criar um menu lateral DENTRO da aba usando colunas).
-    
-    col_menu, col_conteudo = st.columns([1, 4])
-    
-    with col_menu:
-        st.markdown("### 📌 Módulos de Tratativa")
-        menu_tratativa = st.radio(
-            "Selecione a operação:", 
-            [
-                "📷 Visita de Transferência",
-                "📝 Elaboração de Contrato",
-                "📋 Aprovação de Contrato",
-                "🎂 Aniversário de Contrato"
-            ],
-            label_visibility="collapsed"
-        )
-        st.divider()
-        if st.button("🔄 Resetar Sessão", use_container_width=True):
-            resetar_dados_cliente()
-            st.rerun()
-            
-    with col_conteudo:
-        if menu_tratativa == "📷 Visita de Transferência":
-            cabecalho_pagina("Visita de Transferência & Relatório Técnico", "Gerador automatizado de relatórios técnicos e inspeções.")
-            
-            rc = st.session_state.reset_counter
-            ekc = st.session_state.eq_key_counter
-
-            st.subheader("1. Identificação do Cliente")
-            s1_l1_c1, s1_l1_c2, s1_l1_c3 = st.columns(3)
-            with s1_l1_c1: cod_cliente = st.text_input("Código do Cliente *", placeholder="Ex: 87.653", key=f"input_cod_{rc}")
-            with s1_l1_c2: nome_cliente = st.text_input("Nome / Razão Social *", placeholder="Ex: SABOR DA TERRA", key=f"input_nome_{rc}")
-            with s1_l1_c3: telefone = st.text_input("Telefone *", placeholder="Ex: 12-992586760", key=f"input_tel_{rc}")
-
-            s1_l2_c1, s1_l2_c2, s1_l2_c3 = st.columns(3)
-            with s1_l2_c1: contato = st.text_input("Contato *", placeholder="Ex: Nilton", key=f"input_contato_{rc}")
-            with s1_l2_c2: departamento = st.text_input("Sobrenome ou Departamento *", placeholder="Ex: Gerente", key=f"input_depto_{rc}")
-            with s1_l2_c3: st.write("")
-
-            st.divider()
-
-            st.subheader("2. Informações Contratuais")
-            s2_l1_c1, s2_l1_c2, s2_l1_c3, s2_l1_c4 = st.columns(4)
-            with s2_l1_c1: eq_contrato = st.selectbox("Equipamentos de acordo com contrato? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"eq_contrato_{rc}")
-            with s2_l1_c2: desc_eq_contrato = st.text_input("Quais equipamentos disponíveis? *", placeholder="Ex: 01 B190...", key=f"desc_eq_contrato_{rc}")
-            with s2_l1_c3: tem_freq = st.selectbox("Possui programação cadastrada? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"tem_freq_{rc}")
-            with s2_l1_c4:
-                desc_freq = ""
-                if tem_freq == "Sim": desc_freq = st.text_input("Qual a programação? *", placeholder="Ex: QUINZENAL", key=f"freq_cad_sim_{rc}")
-                elif tem_freq == "Não": desc_freq = st.text_input("Nº OC de Cadastramento *", placeholder="Ex: SOL PROGRAMAÇÃO", key=f"freq_cad_nao_{rc}")
-
-            s2_l2_c1, s2_l2_c2 = st.columns(2)
-            with s2_l2_c1: consumo_previsto = st.text_input("Consumo Previsto (kg) *", placeholder="Ex: 250", key=f"cons_prev_{rc}")
-            with s2_l2_c2: consumo_real = st.text_input("Consumo Real/Médio (kg) *", placeholder="Ex: 137", key=f"cons_real_{rc}")
-
-            s2_l3_c1, s2_l3_c2 = st.columns(2)
-            with s2_l3_c1: possui_art = st.selectbox("Possui ART? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"possui_art_{rc}")
-            with s2_l3_c2:
-                desc_art = ""
-                if possui_art == "Sim": desc_art = st.text_input("Número da ART *", placeholder="Ex: 262026126...", key=f"art_sim_{rc}")
-                elif possui_art == "Não": desc_art = st.text_input("Nº OC de Solicitação de Laudo *", placeholder="Ex: INF LAUDO", key=f"art_nao_{rc}")
-
-            s2_l4_c1, s2_l4_c2 = st.columns(2)
-            with s2_l4_c1: possui_debitos = st.selectbox("Cliente possui débitos? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"possui_debitos_{rc}")
-            with s2_l4_c2: desc_debitos = st.text_input("Detalhes dos Débitos (se houver)", placeholder="Ex: Fatura vencida", key=f"desc_debitos_{rc}") if possui_debitos == "Sim" else ""
-
-            s2_l5_c1, s2_l5_c2 = st.columns(2)
-            with s2_l5_c1: central_norma = st.selectbox("Central dentro de norma? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"central_norma_{rc}")
-            with s2_l5_c2: desc_central_norma = st.text_input("Motivo da Central fora de norma", placeholder="Ex: Falta extintor", key=f"desc_central_norma_{rc}") if central_norma == "Não" else ""
-
-            s2_l6_c1, s2_l6_c2 = st.columns(2)
-            with s2_l6_c1: rep2_correto = st.selectbox("Representante 2 está correto? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"rep2_correto_{rc}")
-            with s2_l6_c2: desc_rep2 = st.text_input("Nº OC de Regularização", placeholder="Ex: ALT DIVERSAS", key=f"desc_rep2_{rc}") if rep2_correto == "Não" else ""
-
-            st.divider()
-
-            st.subheader("3. Cadastro de Instalação e Equipamentos")
-            col_cent1, col_cent2 = st.columns(2)
-            with col_cent1: qtd_centrais = st.number_input("Quantidade de Centrais no Cliente", min_value=1, value=1, step=1, key=f"qtd_centrais_{rc}")
-            with col_cent2:
-                if qtd_centrais > 1:
-                    opcoes_centrais = [f"Central {i:02d}" for i in range(1, int(qtd_centrais) + 1)]
-                    idx_central = 0
-                    if st.session_state.last_central in opcoes_centrais: idx_central = opcoes_centrais.index(st.session_state.last_central)
-                    central_selecionada = st.selectbox("Vincular item à qual Central?", opcoes_centrais, index=idx_central, key=f"sel_central_{rc}_{ekc}")
-                    st.session_state.last_central = central_selecionada
-                else: central_selecionada = "Central"
-
-            opcoes_tipo = ["Equipamentos", "Cilindros", "Condomínio"]
-            idx_tipo = 0
-            if st.session_state.last_tipo_cad in opcoes_tipo: idx_tipo = opcoes_tipo.index(st.session_state.last_tipo_cad)
-            tipo_cadastro = st.radio("Selecione o tipo que deseja adicionar:", opcoes_tipo, index=idx_tipo, horizontal=True, key=f"tipo_cad_{rc}_{ekc}")
-            st.session_state.last_tipo_cad = tipo_cadastro
-
-            if tipo_cadastro == "Equipamentos":
-                col_qtd, col_eq, col_vaz, col_btn = st.columns([1, 2, 2, 1])
-                with col_qtd: qtd_input = st.number_input("Quantidade", min_value=1, value=1, step=1, key=f"eq_qtd_{rc}_{ekc}")
-                with col_eq: nome_eq_input = st.text_input("Equipamento", placeholder="Ex: Forno", key=f"eq_nome_{rc}_{ekc}")
-                with col_vaz: vazao_input = st.text_input("Vazão (kg/h)", placeholder="Ex: 1 ou 1,6", key=f"eq_vazao_{rc}_{ekc}")
-                with col_btn:
-                    st.write(" "); st.write(" ")
-                    if st.button("➕ Adicionar", key=f"btn_add_eq_{rc}_{ekc}"):
-                        if nome_eq_input.strip() and vazao_input.strip():
-                            try:
-                                vazao_unit = float(vazao_input.replace(",", ".").lower().replace("kg/h", "").strip())
-                                qtd = int(qtd_input)
-                                vazao_total_item = vazao_unit * qtd
-                                vazao_formatada = f"{vazao_total_item:.2f}".replace(".", ",").rstrip("0").rstrip(",")
-                                item_dict = {
-                                    "central": central_selecionada, "tipo": "equipamento", "qtd": qtd,
-                                    "nome": nome_eq_input.strip().title(), "vazao_total_item": vazao_total_item,
-                                    "texto": f"{qtd:02d} - {nome_eq_input.strip().title()} - {vazao_formatada} kg/h"
-                                }
-                                st.session_state.equipamentos.append(item_dict)
-                                st.session_state.eq_key_counter += 1
-                                st.success("Item adicionado!")
-                                st.rerun()
-                            except ValueError: st.error("Informe um número válido para a vazão.")
-
-            if st.session_state.equipamentos:
-                st.write("**Itens Cadastrados:**")
-                def get_c_name(item, q): return "Central" if q == 1 else item.get("central", "Central")
-                centrais_presentes = sorted(list(set([get_c_name(item, qtd_centrais) for item in st.session_state.equipamentos])))
-                for c_nome in centrais_presentes:
-                    st.markdown(f"**{c_nome.upper()}**")
-                    vazao_c = 0.0
-                    for idx, item in enumerate(st.session_state.equipamentos):
-                        if get_c_name(item, qtd_centrais) == c_nome:
-                            vazao_c += item["vazao_total_item"]
-                            c_txt, c_del = st.columns([5, 1])
-                            c_txt.text(item["texto"])
-                            if c_del.button("❌", key=f"del_{idx}_{rc}"):
-                                st.session_state.equipamentos.pop(idx)
-                                st.rerun()
-                    v_str = f"{vazao_c:.2f}".replace(".", ",").rstrip("0").rstrip(",") if vazao_c > 0 else "0"
-                    st.markdown(f"*Vazão Total {c_nome}: {v_str} kg/h*")
-
-            st.divider()
-
-            st.subheader("4. Satisfação & Observações")
-            s4_l1_c1, s4_l1_c2 = st.columns(2)
-            with s4_l1_c1: indica_negocios = st.selectbox("Indicou novos negócios? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"ind_neg_{rc}")
-            with s4_l1_c2: cliente_satisfeito = st.selectbox("Cliente satisfeito com a Consigaz? *", ["Sim", "Não"], index=None, placeholder="Selecione", key=f"cli_sat_{rc}")
-
-            observacoes = st.text_area("Observações Gerais", placeholder="Detalhes da visita...", key=f"obs_{rc}")
-
-            st.divider()
-            if st.button("📝 Gerar Texto para Sistema", type="primary"):
-                lista_eq_txt = ""
-                if st.session_state.equipamentos:
-                    def get_c_txt(eq): return "Central" if qtd_centrais == 1 else eq.get("central", "Central")
-                    cps = sorted(list(set([get_c_txt(eq) for eq in st.session_state.equipamentos])))
-                    for c_n in cps:
-                        lista_eq_txt += f"Equipamentos {c_n}\n"
-                        v_c = 0.0
-                        for eq in st.session_state.equipamentos:
-                            if get_c_txt(eq) == c_n:
-                                lista_eq_txt += f"{eq['texto']}\n"
-                                v_c += eq["vazao_total_item"]
-                        lista_eq_txt += f"\nTotal Vazão {c_n}: {f'{v_c:.2f}'.replace('.', ',')} kg/h\n\n"
-                else: lista_eq_txt = "Nenhum item cadastrado.\n\n"
-
-                texto_final = f"""Contato: {contato}
-Sobrenome ou departamento: {departamento}
-Telefone: {telefone}
-
-Equipamentos de acordo com o contrato vigente? {eq_contrato} - {desc_eq_contrato}
-Representante 2 está correto? {rep2_correto}
-Possui programação cadastrada? {tem_freq} - {desc_freq}
-Consumo mensal atual de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg
-Laudo ART emitido? {possui_art} - {desc_art}
-Central atende as normas? {central_norma} - {desc_central_norma}
-
-Quais equipamentos disponíveis no cliente?
-
-{lista_eq_txt}Indicação de novos negócios do cliente: {indica_negocios}
-Cliente possui débitos? {possui_debitos} - {desc_debitos}
-Cliente está satisfeito com o atendimento da Consigaz? {cliente_satisfeito}
-
-Obs.: {observacoes}
-"""
-                st.success("✅ Texto gerado com sucesso! Copie abaixo:")
-                st.code(texto_final, language="text")
-
-        elif menu_tratativa == "📝 Elaboração de Contrato":
-            cabecalho_pagina("Elaboração de Contrato", "Formulário de preenchimento e geração do padrão de solicitação.")
-            motivo_solicitacao = st.text_input("Motivo da solicitação", placeholder="Ex: Alteração de CNPJ")
-            st.info("Preencha os campos para gerar o relatório de elaboração de contrato.")
-
-        elif menu_tratativa == "📋 Aprovação de Contrato":
-            cabecalho_pagina("Aprovação de Contrato", "Formulário de aprovação de condições comerciais.")
-            st.info("Módulo de Aprovação de Contrato ativo.")
-
-        elif menu_tratativa == "🎂 Aniversário de Contrato":
-            cabecalho_pagina("Aniversário de Contrato", "Reajuste por IPCA e geração de solicitação.")
-            ipca_vigente = obter_ipca_ibge()
-            st.markdown(f"📈 **IPCA Acumulado 12 meses (IBGE):** `{ipca_vigente}%`")
-
-
-# =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS
-# =====================================================================
-with aba_agenda:
-    # Mesmo padrão da Aba Tratativa para menu lateral dentro da aba
-    col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
-    
-    with col_menu_agenda:
-        st.markdown("### 📂 Atualização")
-        st.markdown("Faça o upload do relatório Excel (Pós-Vendas) para atualizar os dados da agenda.")
-        arquivo_excel = st.file_uploader("", type=["xlsx", "xls"], key="upload_dash")
-        
-        if arquivo_excel is not None:
-             st.session_state.df_excel_agenda = pd.read_excel(arquivo_excel, header=11)
-             
-        st.divider()
-        st.markdown("### 🔍 Filtros Rápidos")
-        if st.button("Todos", use_container_width=True): st.session_state.filtro_card_dashboard = "Todos"
-        if st.button("Hoje", use_container_width=True): st.session_state.filtro_card_dashboard = "Hoje"
-        if st.button("Amanhã", use_container_width=True): st.session_state.filtro_card_dashboard = "Amanhã"
-        if st.button("Vencido", use_container_width=True): st.session_state.filtro_card_dashboard = "Vencido"
-        
-    with col_conteudo_agenda:
-        cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização ordenado por prazo de atendimento (Dias Úteis).")
-
-        if st.session_state.df_excel_agenda is not None:
-            try:
-                df = st.session_state.df_excel_agenda.copy()
-                df = df.dropna(subset=[COL_OCORRENCIA])
-                df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
-                
-                df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
-                df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.tratadas_manualmente)]
-                
-                df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
-                df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
-                
-                df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
-                df_pendentes['Sub_Simplificada'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_subclassificacao)
-                
-                hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
-                df_pendentes['Status Geral'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_geral)
-                df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
-
-                st.subheader("Visitas Pendentes")
-                cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
-                sub_class_unicas = sorted(list(df_pendentes['Sub_Simplificada'].unique()))
-                
-                col_f1, col_f2 = st.columns(2)
-                with col_f1: cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[], key="f_cid")
-                with col_f2: sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[], key="f_sub")
-                
-                df_filtrado = df_pendentes.copy()
-                if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
-                if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado['Sub_Simplificada'].isin(sub_class_selecionadas)]
-                
-                df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
-                
-                total_qt = len(df_filtrado)
-                hoje_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"])
-                amanha_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"])
-                vencidas_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"])
-                
-                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                with col_m1: st.metric("Total", total_qt)
-                with col_m2: st.metric("Vence Hoje", hoje_qt)
-                with col_m3: st.metric("Vence Amanhã", amanha_qt)
-                with col_m4: st.metric("Vencidas", vencidas_qt)
-
-                if st.session_state.filtro_card_dashboard == "Hoje":
-                    df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]
-                elif st.session_state.filtro_card_dashboard == "Amanhã":
-                    df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]
-                elif st.session_state.filtro_card_dashboard == "Vencido":
-                    df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]
-
-                st.write(f"**Exibindo:** {st.session_state.filtro_card_dashboard}")
-                
-                if df_filtrado.empty:
-                    st.success("✅ Nenhuma ocorrência para os filtros selecionados.")
-                else:
-                    df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Sub_Simplificada', 'Data Atendimento']].copy()
-                    df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
-                    st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
-            except Exception as e:
-                st.error(f"Erro ao processar dados do arquivo: {e}")
-        else:
-            st.info("👈 Utilize o menu lateral para carregar a planilha da base.")
-
-
-# =====================================================================
-# ABA 3: BLOCO DE NOTAS PESSOAL
-# =====================================================================
-with aba_notas:
-    # Estrutura com menu lateral integrado para listar e criar notas
-    col_menu_notas, col_conteudo_notas = st.columns([1, 4])
-    
-    usuario_atual = st.session_state.usuario_atual
-    banco_notas = carregar_banco_notas()
-    
-    if usuario_atual not in banco_notas:
-        banco_notas[usuario_atual] = {}
-        
-    notas_usuario = banco_notas[usuario_atual]
-
-    with col_menu_notas:
-        st.markdown("### 📓 Minhas Notas")
-        
-        if st.button("➕ Nova Nota", use_container_width=True):
-            st.session_state.nota_selecionada_id = None
-            st.rerun()
-            
-        st.divider()
-        st.markdown("**Lista de Notas Salvas**")
-        
-        if not notas_usuario:
-            st.caption("Nenhuma nota salva ainda.")
-        else:
-            for n_id, n_data in notas_usuario.items():
-                titulo_exibicao = n_data.get("titulo", "Sem Título")
-                cliente_exibicao = n_data.get("cliente", "")
-                lbl_btn = f"{titulo_exibicao}" + (f" ({cliente_exibicao})" if cliente_exibicao else "")
-                
-                if st.button(lbl_btn, key=f"btn_nota_{n_id}", use_container_width=True):
-                    st.session_state.nota_selecionada_id = n_id
-                    st.rerun()
-
-    with col_conteudo_notas:
-        cabecalho_pagina("Bloco de Notas Pessoal", "Gerencie anotações vinculadas aos seus clientes de forma isolada.")
-        st.markdown(f"👤 Usuário da Sessão: **{usuario_atual}**")
-        
-        # Modo Criação / Edição
-        id_atual = st.session_state.nota_selecionada_id
-        
-        if id_atual and id_atual in notas_usuario:
-            st.subheader("✏️ Editar Nota")
-            titulo_val = notas_usuario[id_atual].get("titulo", "")
-            cliente_val = notas_usuario[id_atual].get("cliente", "")
-            texto_val = notas_usuario[id_atual].get("texto", "")
-        else:
-            st.subheader("📄 Nova Nota")
-            titulo_val = ""
-            cliente_val = ""
-            texto_val = ""
-            
-        with st.form("form_bloco_notas"):
-            col_tn1, col_tn2 = st.columns(2)
-            with col_tn1: novo_titulo = st.text_input("Título da Nota", value=titulo_val, placeholder="Ex: Pendência Documentação")
-            with col_tn2: novo_cliente = st.text_input("Cliente Referente", value=cliente_val, placeholder="Ex: Condomínio Sol Nascente")
-            
-            novo_texto = st.text_area("Anotações", value=texto_val, height=250, placeholder="Escreva os detalhes aqui...")
-            
-            col_s1, col_s2, _ = st.columns([1, 1, 4])
-            with col_s1: btn_salvar_nota = st.form_submit_button("💾 Salvar Nota", type="primary")
-            with col_s2: 
-                # Se estiver editando, mostra o botão de apagar
-                if id_atual: btn_apagar = st.form_submit_button("🗑️ Apagar")
-                else: btn_apagar = False
-
-            if btn_salvar_nota:
-                if not novo_titulo:
-                    st.error("⚠️ O Título da nota é obrigatório.")
-                else:
-                    if not id_atual:
-                        id_atual = str(uuid.uuid4())
-                        
-                    banco_notas[usuario_atual][id_atual] = {
-                        "titulo": novo_titulo,
-                        "cliente": novo_cliente,
-                        "texto": novo_texto,
-                        "data_modificacao": datetime.now().strftime("%d/%m/%Y %H:%M")
-                    }
-                    salvar_banco_notas(banco_notas)
-                    st.session_state.nota_selecionada_id = id_atual
-                    st.success("✅ Nota salva com sucesso!")
-                    st.rerun()
-                    
-            if btn_apagar and id_atual:
-                del banco_notas[usuario_atual][id_atual]
-                salvar_banco_notas(banco_notas)
-                st.session_state.nota_selecionada_id = None
-                st.success("🗑️ Nota apagada.")
-                st.rerun()
-
-
-# =====================================================================
-# ABA 4: PAINEL DE GERENCIAMENTO DE USUÁRIOS (EXCLUSIVO ADMIN)
-# =====================================================================
-if aba_admin is not None:
-    with aba_admin:
-        cabecalho_pagina("Painel de Administração de Usuários", "Gerencie o acesso dos colaboradores, cadastre novas contas ou altere senhas.")
-        
-        banco_usuarios = carregar_banco_usuarios()
-        
-        col_adm1, col_adm2 = st.columns([1, 1])
-        
-        with col_adm1:
-            st.subheader("1. Cadastrar Novo Usuário")
-            with st.form("form_novo_usuario"):
-                novo_user = st.text_input("Usuário", placeholder="novo.usuario").strip().lower()
-                nova_senha = st.text_input("Senha Inicial", type="password", placeholder="••••••••").strip()
-                btn_cadastrar = st.form_submit_button("➕ Cadastrar Usuário", type="primary")
-                
-                if btn_cadastrar:
-                    if not novo_user or not nova_senha:
-                        st.error("⚠️ Preencha o nome do usuário e a senha inicial.")
-                    elif novo_user in banco_usuarios:
-                        st.warning(f"⚠️ O usuário '{novo_user}' já está cadastrado no sistema.")
-                    else:
-                        banco_usuarios[novo_user] = nova_senha
-                        salvar_banco_usuarios(banco_usuarios)
-                        st.success(f"✅ Usuário **{novo_user}** cadastrado com sucesso!")
-                        st.rerun()
-
-        with col_adm2:
-            st.subheader("2. Redefinir Senha de Usuário")
-            lista_usuarios = [u for u in banco_usuarios.keys() if u != "admin"]
-            
-            if lista_usuarios:
-                user_sel_senha = st.selectbox("Selecione o Usuário:", lista_usuarios, key="sel_user_mudar_senha")
-                nova_senha_admin = st.text_input("Nova Senha", type="password", key="txt_nova_senha_admin").strip()
-                
-                if st.button("🔑 Atualizar Senha", key="btn_mudar_senha"):
-                    if nova_senha_admin:
-                        banco_usuarios[user_sel_senha] = nova_senha_admin
-                        salvar_banco_usuarios(banco_usuarios)
-                        st.success(f"✅ Senha do usuário **{user_sel_senha}** atualizada com sucesso!")
-                    else:
-                        st.error("⚠️ Digite uma nova senha válida.")
-            else:
-                st.info("Nenhum usuário convencional cadastrado até o momento.")
-
-        st.divider()
-
-        st.subheader("3. Usuários Cadastrados & Remoção")
-        
-        df_users = pd.DataFrame([
-            {"Usuário": k, "Tipo": "Administrador Master" if k == "admin" else "Usuário Convencional"}
-            for k in banco_usuarios.keys()
-        ])
-        
-        st.dataframe(df_users, hide_index=True, use_container_width=True)
-
-        if lista_usuarios:
-            col_rem1, col_rem2 = st.columns([2, 1])
-            with col_rem1:
-                user_para_remover = st.selectbox("Selecione um usuário para remover do sistema:", lista_usuarios, key="sel_user_remove")
-            with col_rem2:
-                st.write("")
-                st.write("")
-                if st.button("🗑️ Remover Usuário", type="primary", key="btn_remover_user"):
-                    del banco_usuarios[user_para_remover]
-                    salvar_banco_usuarios(banco_usuarios)
-                    st.success(f"✅ Usuário **{user_para_remover}** removido com sucesso!")
-                    st.rerun()
-
-
-# --- BARRA LATERAL LOGOUT ---
-st.sidebar.divider()
-if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
-    st.session_state.autenticado = False
-    st.session_state.usuario_atual = ""
-    st.session_state.e_admin = False
-    st.rerun()
+if "reset_counter"
