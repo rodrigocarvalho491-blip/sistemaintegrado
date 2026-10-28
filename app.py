@@ -54,7 +54,7 @@ DB_NOTAS_PATH = "banco_notas_usuarios.json"
 DB_USUARIOS_PATH = "banco_usuarios.json"
 
 # =====================================================================
-# IDENTIDADE VISUAL CONSIGAZ E ESTILIZAÇÃO DOS CAMPOS
+# IDENTIDADE VISUAL CONSIGAZ E ESTILIZAÇÃO
 # =====================================================================
 CUSTOM_CSS = """
 <style>
@@ -127,7 +127,7 @@ html, body, [class*="css"], .stApp {
   margin-bottom: 1rem !important;
 }
 
-/* Ajuste de Campos de Entrada - Fundo Branco e Borda Delicada */
+/* Ajuste de Campos de Entrada */
 div[data-baseweb="input"] > div, 
 div[data-baseweb="select"] > div, 
 div[data-baseweb="textarea"] > div {
@@ -176,7 +176,7 @@ div.stButton > button:first-child {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- GERENCIAMENTO BANCO DE DADOS ---
+# --- GERENCIAMENTO DE BANCO DE DADOS LOCAL ---
 def carregar_banco_usuarios():
     if os.path.exists(DB_USUARIOS_PATH):
         try:
@@ -206,6 +206,46 @@ def salvar_banco_notas(dados):
     with open(DB_NOTAS_PATH, "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=4)
 
+# --- BOTÃO CUSTOMIZADO DE CÓPIA ---
+def botao_copiar_customizado(texto_para_copiar, chave_unica):
+    texto_seguro = texto_para_copiar.replace('`', '\\`').replace('$', '\\$').replace('\n', '\\n').replace('"', '\\"')
+    component_html = f"""
+    <div style="margin-top: 5px; margin-bottom: 10px;">
+        <button id="btn_{chave_unica}" onclick="copiarTexto_{chave_unica}()" style="
+            background-color: #0055A5;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+            📄 Copiar Texto Completo
+        </button>
+        <span id="msg_{chave_unica}" style="margin-left: 10px; color: green; font-weight: bold; font-size: 13px; display: none;">Copiado com sucesso!</span>
+    </div>
+    <script>
+    function copiarTexto_{chave_unica}() {{
+        const texto = `{texto_seguro}`;
+        navigator.clipboard.writeText(texto).then(function() {{
+            const msg = document.getElementById("msg_{chave_unica}");
+            msg.style.display = "inline";
+            setTimeout(function() {{
+                msg.style.display = "none";
+            }}, 2500);
+        }}, function(err) {{
+            alert("Erro ao copiar texto: ", err);
+        }});
+    }}
+    </script>
+    """
+    components.html(component_html, height=50)
+
 # --- CONSULTA CNPJ VIA API ---
 @st.cache_data(ttl=3600)
 def consultar_cnpj_api(cnpj):
@@ -223,6 +263,42 @@ def consultar_cnpj_api(cnpj):
     except Exception:
         pass
     return None
+
+# --- CONSULTA DO IPCA ACUMULADO DE 12 MESES (IBGE) ---
+@st.cache_data(ttl=1800, show_spinner=False)
+def obter_ipca_acumulado_12m():
+    # 1. Consulta API oficial do IBGE Agregados (Tabela 1737, Variável 2265: IPCA - Variação acumulada em 12 meses)
+    try:
+        url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
+        resp = requests.get(url, timeout=6)
+        if resp.status_code == 200:
+            data = resp.json()
+            resultado = data[0]["resultados"][0]
+            series = resultado.get("series") or resultado.get("séries")
+            serie = series[0].get("serie") or series[0].get("série")
+            ultimo_periodo = sorted(serie.keys())[-1]
+            val_str = serie[ultimo_periodo]
+            if val_str and str(val_str).strip() not in ("-", "..", "...", "X"):
+                val_float = float(str(val_str).replace(",", "."))
+                periodo_fmt = f"{ultimo_periodo[4:6]}/{ultimo_periodo[0:4]}" if len(ultimo_periodo) == 6 else ultimo_periodo
+                return val_float, periodo_fmt
+    except Exception:
+        pass
+
+    # 2. Scraping direto da página oficial de inflação do IBGE
+    try:
+        url = "https://www.ibge.gov.br/explica/inflacao.php"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        resp = requests.get(url, headers=headers, timeout=6)
+        if resp.status_code == 200:
+            match = re.search(r'acumulad[oa][^0-9]*(\d+[,.]\d+)\s*%', resp.text, re.IGNORECASE)
+            if match:
+                val_float = float(match.group(1).replace(",", "."))
+                return val_float, "Mês Vigente"
+    except Exception:
+        pass
+
+    return None, None
 
 # --- AUXILIARES E LOGO ---
 @st.cache_data(show_spinner=False)
@@ -253,20 +329,6 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
-@st.cache_data(ttl=3600)
-def obter_ipca_ibge():
-    try:
-        url = "https://www.ibge.gov.br/explica/inflacao.php"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200:
-            match = re.search(r'acomet?ulado.*?(\d+[,]\d+)\s*%', response.text, re.IGNORECASE | re.DOTALL)
-            if match:
-                return match.group(1)
-    except Exception:
-        pass
-    return "4,22"
-
 def extrair_cidade(endereco):
     if pd.isna(endereco): return "-"
     s = str(endereco).strip().replace(';', ',').replace('|', ',')
@@ -280,7 +342,7 @@ def extrair_cidade(endereco):
 def limpar_subclassificacao(sub):
     if pd.isna(sub): return "-"
     s = str(sub).strip()
-    if "]" in s: s = s.split("]")[-1].strip()
+    if "]" in s: s = s.split("]" )[-1].strip()
     return s
 
 def calcular_dias_uteis(data_inicio, data_fim):
@@ -296,6 +358,12 @@ def classificar_status_geral(dias_uteis):
     elif dias_uteis == 1: return "🟠 Vence Amanhã"
     elif 2 <= dias_uteis <= 5: return "🟡 Vence na Semana"
     return "🟢 No Prazo"
+
+def classificar_status_comodato_inativo(dias_uteis):
+    if dias_uteis < 0: return "🔴 Vencido"
+    elif dias_uteis <= 7: return "🔴 3ª Semana (Vencimento)"
+    elif dias_uteis <= 14: return "🟡 2ª Semana (Intermediária)"
+    return "🟢 1ª Semana (Mais distante)"
 
 def resetar_dados_cliente():
     st.session_state.reset_counter += 1
@@ -356,7 +424,6 @@ st.sidebar.markdown(f"👤 **Usuário Ativo:** `{st.session_state.usuario_atual}
 if st.session_state.e_admin:
     st.sidebar.caption("⭐ Perfil: Administrador Master")
 
-# --- DEFINIÇÃO DINÂMICA DAS ABAS ---
 lista_abas = [
     "🛠️ Tratativa de Ocorrências",
     "📊 Agenda de Ocorrências", 
@@ -372,7 +439,7 @@ aba_agenda = abas_sistema[1]
 aba_notas = abas_sistema[2]
 aba_admin = abas_sistema[3] if st.session_state.e_admin else None
 
-# Inicializações globais de estado
+# Inicializações globais
 if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
 if "filtro_card_dashboard" not in st.session_state: st.session_state.filtro_card_dashboard = "Todos"
 if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
@@ -577,44 +644,30 @@ Obs.: {observacoes}
 """
                 st.success("✅ Texto gerado com sucesso! Copie abaixo:")
                 st.code(texto_final, language="text")
+                botao_copiar_customizado(texto_final, "copia_visita")
 
         elif menu_tratativa == "📝 Elaboração de Contrato":
             cabecalho_pagina("Elaboração de Contrato", "Formulário de preenchimento e geração do padrão de solicitação.")
-            
             rcc = st.session_state.reset_counter
             
-            tipo_fluxo = st.radio(
-                "Selecione o objetivo da solicitação:", 
-                ["Gerar Minuta", "Enviar para Assinatura"], 
-                horizontal=True, 
-                index=None, 
-                key=f"fluxo_c_{rcc}"
-            )
-                
+            tipo_fluxo = st.radio("Selecione o objetivo da solicitação:", ["Gerar Minuta", "Enviar para Assinatura"], horizontal=True, index=None, key=f"fluxo_c_{rcc}")
             st.divider()
             
-            # 1. MOTIVO
             st.subheader("1. Motivo")
             motivo_solicitacao = st.text_input("Motivo da solicitação *", key=f"motivo_{rcc}")
-            
             st.divider()
             
-            # 2. DADOS DO CLIENTE
             st.subheader("2. Dados do Cliente")
             col_cli1, col_cli2, col_cli3 = st.columns(3)
             with col_cli1: contato_contrato = st.text_input("Contato *", key=f"contato_c_{rcc}")
             with col_cli2: telefone_contrato = st.text_input("Telefone *", key=f"tel_c_{rcc}")
             with col_cli3: email_contrato = st.text_input("E-mail *", key=f"email_c_{rcc}")
-            
             st.divider()
             
-            # 3. SOLICITAÇÃO
             st.subheader("3. Solicitação")
             tipo_contrato = st.radio("Contrato / Aditamento / Distrato *", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
-            
             st.divider()
             
-            # 4. DADOS DO CONTRATO
             st.subheader("4. Dados do Contrato")
             col_con1, col_con2 = st.columns(2)
             cnpj_campo_val, ie_campo_val = "", ""
@@ -662,7 +715,6 @@ Obs.: {observacoes}
 
             st.divider()
             
-            # 5. COMODATO / FORNECIMENTO
             st.subheader("5. Comodato / Fornecimento")
             tipo_fornecimento = st.radio("Tipo de Fornecimento *", ["Granel", "Cilindro"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
             
@@ -689,7 +741,6 @@ Obs.: {observacoes}
 
             st.divider()
             
-            # 6. FINANCEIRO
             st.subheader("6. Financeiro")
             col_fin1, col_fin2 = st.columns(2)
             with col_fin1:
@@ -698,7 +749,6 @@ Obs.: {observacoes}
                 if possui_debito_fin == "Sim":
                     resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes? *", key=f"resp_pend_{rcc}")
                     
-            # ASSINATURA E TESTEMUNHAS
             responsaveis_dados = []
             nome_testemunha, email_testemunha = "", ""
             if tipo_fluxo == "Enviar para Assinatura":
@@ -718,7 +768,6 @@ Obs.: {observacoes}
 
             st.divider()
             
-            # 7. CONDOMÍNIO CONTA SIM
             st.subheader("7. Condomínio CONTA SIM")
             conta_sim = st.radio("Condomínio CONTA SIM? *", ["Sim", "Não"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
             num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
@@ -808,6 +857,7 @@ Tipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"""
                     
                 st.success("✅ Texto do Contrato gerado com sucesso! Copie abaixo:")
                 st.code(texto_padrao_contrato, language="text")
+                botao_copiar_customizado(texto_padrao_contrato, "copia_elaboracao")
 
         elif menu_tratativa == "📋 Aprovação de Contrato":
             cabecalho_pagina("Aprovação de Contrato", "Formulário de preenchimento para solicitação de aprovação.")
@@ -944,11 +994,70 @@ Motivo da redução: {motivo_red_vig}"""
 
                     st.success("✅ Texto de Aprovação gerado com sucesso! Copie abaixo:")
                     st.code(texto_aprovacao, language="text")
+                    botao_copiar_customizado(texto_aprovacao, "copia_aprovacao")
 
         elif menu_tratativa == "🎂 Aniversário de Contrato":
-            cabecalho_pagina("Aniversário de Contrato", "Reajuste por IPCA e geração de solicitação.")
-            ipca_vigente = obter_ipca_ibge()
-            st.markdown(f"📈 **IPCA Acumulado 12 meses (IBGE):** `{ipca_vigente}%`")
+            cabecalho_pagina("Aniversário de Contrato", "Tratativa de reajuste por IPCA acumulado de 12 meses.")
+            rca = st.session_state.reset_counter
+            
+            # Consulta do IPCA acumulado de 12M do IBGE
+            ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
+            
+            if ipca_api is not None:
+                ipca_vigente = ipca_api
+                st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE, referência {ipca_periodo}):** `{ipca_vigente:.2f}%`")
+            else:
+                st.warning("⚠️ Não foi possível consultar automaticamente o IPCA no IBGE. Informe o índice acumulado manualmente abaixo:")
+                ipca_vigente = st.number_input("IPCA Acumulado 12 Meses (%)", min_value=0.0, value=4.58, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
+
+            col_an1, col_an2 = st.columns(2)
+            with col_an1:
+                preco_anterior_input = st.text_input("Preço Anterior (R$)", placeholder="Ex: 6,9789", key=f"preco_ant_{rca}")
+            with col_an2:
+                st.write("")
+
+            clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=None, key=f"clausula_{rca}")
+
+            # Cálculo do valor do reajuste
+            p_aniv_str = "xx,xx"
+            try:
+                val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".").strip()
+                p_ant = float(val_limpo)
+                p_aniv = p_ant * (1 + (ipca_vigente / 100.0))
+                p_aniv_str = f"{p_aniv:.4f}".replace(".", ",")
+            except ValueError:
+                pass
+
+            st.divider()
+
+            if st.button("📝 Gerar Texto de Aniversário de Contrato", type="primary"):
+                if clausula_contrato == "Não":
+                    st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
+
+                texto_aniversario = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."
+                if clausula_contrato == "Sim":
+                    texto_aniversario += "\n\nCliente possui cláusula em contrato."
+
+                texto_aniversario += f"\n\nPreço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}\nPreço Aniversário: R$ {p_aniv_str}"
+
+                st.success("✅ Texto gerado com sucesso! Copie abaixo:")
+                st.code(texto_aniversario, language="text")
+                botao_copiar_customizado(texto_aniversario, "aniv_txt")
+
+            st.divider()
+            st.subheader("Tratativa com C.I.")
+            ci_input = st.text_input("Número da C.I.", placeholder="Ex: 588.386.687", key=f"ci_num_{rca}")
+
+            if st.button("📝 Gerar Texto com C.I.", type="primary"):
+                texto_ci = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."
+                if clausula_contrato == "Sim":
+                    texto_ci += "\n\nCliente possui cláusula em contrato."
+
+                texto_ci += f"\n\nPreço anterior: R$ {preco_anterior_input if preco_anterior_input else 'xx,xx'}\nPreço Aniversário: R$ {p_aniv_str}\n\nCI.: {ci_input if ci_input else '000.000.000'} - Preço Aniversário"
+
+                st.success("✅ Texto com C.I. gerado com sucesso! Copie abaixo:")
+                st.code(texto_ci, language="text")
+                botao_copiar_customizado(texto_ci, "ci_txt")
 
 
 # =====================================================================
@@ -958,7 +1067,7 @@ with aba_agenda:
     col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
     
     with col_menu_agenda:
-        st.markdown("### 📂 Atualização")
+        st.markdown("### 📂 Base de Dados")
         st.markdown("Faça o upload do relatório Excel (Pós-Vendas) para atualizar os dados da agenda.")
         arquivo_excel = st.file_uploader("", type=["xlsx", "xls"], key="upload_dash")
         
@@ -966,14 +1075,19 @@ with aba_agenda:
              st.session_state.df_excel_agenda = pd.read_excel(arquivo_excel, header=11)
              
         st.divider()
-        st.markdown("### 🔍 Filtros Rápidos")
-        if st.button("Todos", use_container_width=True): st.session_state.filtro_card_dashboard = "Todos"
-        if st.button("Hoje", use_container_width=True): st.session_state.filtro_card_dashboard = "Hoje"
-        if st.button("Amanhã", use_container_width=True): st.session_state.filtro_card_dashboard = "Amanhã"
-        if st.button("Vencido", use_container_width=True): st.session_state.filtro_card_dashboard = "Vencido"
-        
+        st.markdown("### 🔍 Módulos da Agenda")
+        opcao_visao_agenda = st.radio(
+            "Selecione a visualização:",
+            [
+                "📋 Agenda Geral",
+                "📦 Comodato Inativo",
+                "🏙️ Ocorrências por Cidade"
+            ],
+            key="radio_visao_agenda"
+        )
+
     with col_conteudo_agenda:
-        cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização ordenado por prazo de atendimento (Dias Úteis).")
+        cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização ordenado por prazo de atendimento.")
 
         if st.session_state.df_excel_agenda is not None:
             try:
@@ -991,50 +1105,124 @@ with aba_agenda:
                 df_pendentes['Sub_Simplificada'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_subclassificacao)
                 
                 hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
-                df_pendentes['Status Geral'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_geral)
+                df_pendentes['Dias para Vencer'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
+                df_pendentes['Status Geral'] = df_pendentes['Dias para Vencer'].apply(classificar_status_geral)
+                df_pendentes['Status Comodato'] = df_pendentes['Dias para Vencer'].apply(classificar_status_comodato_inativo)
+                df_pendentes['Data Atendimento'] = df_pendentes['Prazo_DT'].dt.strftime('%d/%m/%Y')
                 df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
 
-                st.subheader("Visitas Pendentes")
-                cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
-                sub_class_unicas = sorted(list(df_pendentes['Sub_Simplificada'].unique()))
-                
-                col_f1, col_f2 = st.columns(2)
-                with col_f1: cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[], key="f_cid")
-                with col_f2: sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[], key="f_sub")
-                
-                df_filtrado = df_pendentes.copy()
-                if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
-                if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado['Sub_Simplificada'].isin(sub_class_selecionadas)]
-                
-                df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
-                
-                total_qt = len(df_filtrado)
-                hoje_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"])
-                amanha_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"])
-                vencidas_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"])
-                
-                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                with col_m1: st.metric("Total", total_qt)
-                with col_m2: st.metric("Vence Hoje", hoje_qt)
-                with col_m3: st.metric("Vence Amanhã", amanha_qt)
-                with col_m4: st.metric("Vencidas", vencidas_qt)
+                # -------------------------------------------------------------
+                # VISÃO 1: AGENDA GERAL
+                # -------------------------------------------------------------
+                if opcao_visao_agenda == "📋 Agenda Geral":
+                    st.subheader("Agenda Geral de Visitas Pendentes")
+                    
+                    cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
+                    sub_class_unicas = sorted(list(df_pendentes['Sub_Simplificada'].unique()))
+                    
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1: cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[], key="f_cid")
+                    with col_f2: sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[], key="f_sub")
+                    
+                    df_filtrado = df_pendentes.copy()
+                    if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
+                    if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado['Sub_Simplificada'].isin(sub_class_selecionadas)]
+                    
+                    total_qt = len(df_filtrado)
+                    hoje_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"])
+                    amanha_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"])
+                    vencidas_qt = len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"])
+                    
+                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    with col_m1:
+                        st.metric("Total", total_qt)
+                        if st.button("🔍 Todos", use_container_width=True, key="f_btn_tot"): st.session_state.filtro_card_dashboard = "Todos"
+                    with col_m2:
+                        st.metric("Vence Hoje", hoje_qt)
+                        if st.button("🔍 Vence Hoje", use_container_width=True, key="f_btn_hoje"): st.session_state.filtro_card_dashboard = "Hoje"
+                    with col_m3:
+                        st.metric("Vence Amanhã", amanha_qt)
+                        if st.button("🔍 Vence Amanhã", use_container_width=True, key="f_btn_ama"): st.session_state.filtro_card_dashboard = "Amanhã"
+                    with col_m4:
+                        st.metric("Vencidas", vencidas_qt)
+                        if st.button("🔍 Vencidas", use_container_width=True, key="f_btn_venc"): st.session_state.filtro_card_dashboard = "Vencido"
 
-                if st.session_state.filtro_card_dashboard == "Hoje":
-                    df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]
-                elif st.session_state.filtro_card_dashboard == "Amanhã":
-                    df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]
-                elif st.session_state.filtro_card_dashboard == "Vencido":
-                    df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]
+                    if st.session_state.filtro_card_dashboard == "Hoje":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]
+                    elif st.session_state.filtro_card_dashboard == "Amanhã":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]
+                    elif st.session_state.filtro_card_dashboard == "Vencido":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]
 
-                st.write(f"**Exibindo:** {st.session_state.filtro_card_dashboard}")
-                
-                if df_filtrado.empty:
-                    st.success("✅ Nenhuma ocorrência para os filtros selecionados.")
-                else:
-                    df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Sub_Simplificada', 'Data Atendimento']].copy()
-                    df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
-                    st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
+                    st.write("---")
+                    if df_filtrado.empty:
+                        st.success("✅ Nenhuma ocorrência para os filtros selecionados.")
+                    else:
+                        df_exibicao = df_filtrado[['Status Geral', 'Dias para Vencer', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Sub_Simplificada', 'Data Atendimento']].copy()
+                        df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
+                        st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
+
+                # -------------------------------------------------------------
+                # VISÃO 2: COMODATO INATIVO
+                # -------------------------------------------------------------
+                elif opcao_visao_agenda == "📦 Comodato Inativo":
+                    st.subheader("Ocorrências Específicas de Comodato Inativo")
+                    
+                    df_comodato = df_pendentes[df_pendentes['Sub_Simplificada'].str.contains("Comodato Inativo", case=False, na=False)].copy()
+                    
+                    if df_comodato.empty:
+                        st.info("ℹ️ Nenhuma ocorrência de 'Comodato Inativo' pendente encontrada no relatório.")
+                    else:
+                        c1_qt = len(df_comodato[df_comodato['Status Comodato'] == "🟢 1ª Semana (Mais distante)"])
+                        c2_qt = len(df_comodato[df_comodato['Status Comodato'] == "🟡 2ª Semana (Intermediária)"])
+                        c3_qt = len(df_comodato[df_comodato['Status Comodato'] == "🔴 3ª Semana (Vencimento)"])
+                        cv_qt = len(df_comodato[df_comodato['Status Comodato'] == "🔴 Vencido"])
+                        
+                        col_cm1, col_cm2, col_cm3, col_cm4 = st.columns(4)
+                        with col_cm1: st.metric("🟢 1ª Semana (> 14 dias)", c1_qt)
+                        with col_cm2: st.metric("🟡 2ª Semana (8-14 dias)", c2_qt)
+                        with col_cm3: st.metric("🔴 3ª Semana (0-7 dias)", c3_qt)
+                        with col_cm4: st.metric("🔴 Vencidas", cv_qt)
+
+                        st.divider()
+                        df_com_exibicao = df_comodato[['Status Comodato', 'Dias para Vencer', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_ENDERECO, 'Data Atendimento']].copy()
+                        df_com_exibicao[COL_OCORRENCIA] = df_com_exibicao[COL_OCORRENCIA].astype(str)
+                        st.dataframe(df_com_exibicao, hide_index=True, use_container_width=True)
+
+                # -------------------------------------------------------------
+                # VISÃO 3: OCORRÊNCIAS POR CIDADE
+                # -------------------------------------------------------------
+                elif opcao_visao_agenda == "🏙️ Ocorrências por Cidade":
+                    st.subheader("Distribuição de Ocorrências por Cidade")
+                    
+                    df_cidades_resumo = df_pendentes.groupby('Cidade').agg(
+                        Total_Ocorrencias=(COL_OCORRENCIA, 'count'),
+                        Vencidas=('Status Geral', lambda x: (x == "🔴 Vencido").sum()),
+                        Hoje=('Status Geral', lambda x: (x == "🔵 Vence Hoje").sum()),
+                        No_Prazo=('Status Geral', lambda x: (x.str.contains("Prazo|Semana")).sum())
+                    ).reset_index().sort_values(by='Total_Ocorrencias', ascending=False)
+                    
+                    col_cid1, col_cid2 = st.columns([1, 1])
+                    with col_cid1:
+                        st.markdown("**Resumo por Município:**")
+                        st.dataframe(df_cidades_resumo, hide_index=True, use_container_width=True)
+                    with col_cid2:
+                        st.markdown("**Gráfico de Volume por Cidade:**")
+                        st.bar_chart(df_cidades_resumo.set_index('Cidade')['Total_Ocorrencias'])
+
+                    st.divider()
+                    st.markdown("**Filtrar Detalhes por Cidade:**")
+                    cidade_escolhida = st.selectbox("Selecione a cidade desejada:", ["Todas"] + list(df_cidades_resumo['Cidade'].unique()))
+                    
+                    if cidade_escolhida != "Todas":
+                        df_cid_detalhe = df_pendentes[df_pendentes['Cidade'] == cidade_escolhida]
+                    else:
+                        df_cid_detalhe = df_pendentes
+                        
+                    df_cid_exibicao = df_cid_detalhe[['Status Geral', 'Dias para Vencer', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Sub_Simplificada', 'Data Atendimento']].copy()
+                    df_cid_exibicao[COL_OCORRENCIA] = df_cid_exibicao[COL_OCORRENCIA].astype(str)
+                    st.dataframe(df_cid_exibicao, hide_index=True, use_container_width=True)
+
             except Exception as e:
                 st.error(f"Erro ao processar dados do arquivo: {e}")
         else:
