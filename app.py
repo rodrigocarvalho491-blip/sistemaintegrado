@@ -176,18 +176,29 @@ div.stButton > button:first-child {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- GERENCIAMENTO DE BANCO DE DADOS LOCAL ---
+# --- GERENCIAMENTO DE BANCO DE DADOS LOCAL DE USUÁRIOS ---
 def carregar_banco_usuarios():
     if os.path.exists(DB_USUARIOS_PATH):
         try:
             with open(DB_USUARIOS_PATH, "r", encoding="utf-8") as f:
                 dados = json.load(f)
-                if "admin" not in dados:
-                    dados["admin"] = "admin"
-                return dados
+                
+            dados_normalizados = {}
+            for u, val in dados.items():
+                if isinstance(val, str):
+                    dados_normalizados[u] = {"senha": val, "trocar_senha": (val == "123456")}
+                elif isinstance(val, dict):
+                    dados_normalizados[u] = {
+                        "senha": val.get("senha", "123456"),
+                        "trocar_senha": val.get("trocar_senha", False)
+                    }
+            
+            if "admin" not in dados_normalizados:
+                dados_normalizados["admin"] = {"senha": "admin", "trocar_senha": False}
+            return dados_normalizados
         except Exception:
             pass
-    return {"admin": "admin"}
+    return {"admin": {"senha": "admin", "trocar_senha": False}}
 
 def salvar_banco_usuarios(dados):
     with open(DB_USUARIOS_PATH, "w", encoding="utf-8") as f:
@@ -271,7 +282,7 @@ def obter_ipca_acumulado_12m():
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 
-    # 1. API SIDRA do IBGE (Tabela 1737, Variável 2265 - IPCA Variação acumulada em 12 meses)
+    # 1. API SIDRA do IBGE (Tabela 1737, Variável 2265)
     try:
         url_sidra = "https://api.sidra.ibge.gov.br/values/t/1737/v/2265/p/last%201"
         resp = requests.get(url_sidra, headers=headers, timeout=5)
@@ -319,7 +330,7 @@ def obter_ipca_acumulado_12m():
     except Exception:
         pass
 
-    # 4. Fallback API Banco Central (SGS 433 - IPCA Mensal dos últimos 12 meses)
+    # 4. Fallback API Banco Central (SGS 433)
     try:
         url_bcb = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/12?formato=json"
         resp = requests.get(url_bcb, headers=headers, timeout=5)
@@ -414,7 +425,54 @@ def resetar_dados_cliente():
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
+if "trocar_senha_obrigatoria" not in st.session_state: st.session_state.trocar_senha_obrigatoria = False
+if "usuario_temp" not in st.session_state: st.session_state.usuario_temp = ""
 if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None
+
+# =====================================================================
+# TELA DE ALTERAÇÃO OBRIGATÓRIA DE SENHA
+# =====================================================================
+if st.session_state.trocar_senha_obrigatoria:
+    side_logo_html = _logo_html("cg-side-logo", "cg-side-logo-wrapper")
+    st.sidebar.markdown(
+        f'<div class="cg-side-brand">{side_logo_html}'
+        f'<div class="cg-side-name">Segurança da Conta</div></div>',
+        unsafe_allow_html=True,
+    )
+    
+    st.title("🔑 Alteração Obrigatória de Senha")
+    st.info(f"Olá, **{st.session_state.usuario_temp}**! Por motivos de segurança, você precisa registrar uma nova senha pessoal antes de acessar o sistema.")
+    
+    with st.form("form_trocar_senha_obrigatoria"):
+        nova_senha_input = st.text_input("Nova Senha Pessoal *", type="password", placeholder="••••••••").strip()
+        confirma_senha_input = st.text_input("Confirme a Nova Senha *", type="password", placeholder="••••••••").strip()
+        btn_confirmar_troca = st.form_submit_button("💾 Salvar Nova Senha", type="primary")
+        
+        if btn_confirmar_troca:
+            if not nova_senha_input or not confirma_senha_input:
+                st.error("⚠️ Preencha e confirme a nova senha.")
+            elif nova_senha_input == "123456":
+                st.error("❌ A sua nova senha não pode ser '123456'. Escolha uma senha pessoal segura.")
+            elif nova_senha_input != confirma_senha_input:
+                st.error("❌ A confirmação da senha não confere.")
+            else:
+                banco_usuarios = carregar_banco_usuarios()
+                user_mudar = st.session_state.usuario_temp
+                banco_usuarios[user_mudar] = {
+                    "senha": nova_senha_input,
+                    "trocar_senha": False
+                }
+                salvar_banco_usuarios(banco_usuarios)
+                
+                st.session_state.autenticado = True
+                st.session_state.usuario_atual = user_mudar
+                st.session_state.e_admin = (user_mudar == "admin")
+                st.session_state.trocar_senha_obrigatoria = False
+                st.session_state.usuario_temp = ""
+                st.session_state.df_excel_agenda = None
+                st.success("✅ Senha alterada com sucesso! Acessando a plataforma...")
+                st.rerun()
+    st.stop()
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO
@@ -428,7 +486,7 @@ if not st.session_state.autenticado:
     )
     
     st.title("🔐 Acesso ao Sistema Integrado | Consigaz")
-    st.markdown("Insira suas credenciais registradas pelo administrador para acessar a plataforma.")
+    st.markdown("Insira suas credenciais para acessar a plataforma.")
     
     banco_usuarios = carregar_banco_usuarios()
 
@@ -438,13 +496,20 @@ if not st.session_state.autenticado:
         btn_entrar = st.form_submit_button("Entrar no Sistema", type="primary")
         
         if btn_entrar:
-            if usuario_input in banco_usuarios and banco_usuarios[usuario_input] == senha_input:
-                st.session_state.autenticado = True
-                st.session_state.usuario_atual = usuario_input
-                st.session_state.e_admin = (usuario_input == "admin")
-                st.session_state.df_excel_agenda = None  # Agenda vem zerada a cada login
-                st.success("✅ Login realizado com sucesso!")
-                st.rerun()
+            if usuario_input in banco_usuarios and banco_usuarios[usuario_input]["senha"] == senha_input:
+                dados_user = banco_usuarios[usuario_input]
+                
+                if dados_user.get("trocar_senha", False) or senha_input == "123456":
+                    st.session_state.trocar_senha_obrigatoria = True
+                    st.session_state.usuario_temp = usuario_input
+                    st.rerun()
+                else:
+                    st.session_state.autenticado = True
+                    st.session_state.usuario_atual = usuario_input
+                    st.session_state.e_admin = (usuario_input == "admin")
+                    st.session_state.df_excel_agenda = None  # Agenda vem zerada a cada login
+                    st.success("✅ Login realizado com sucesso!")
+                    st.rerun()
             else:
                 st.error("❌ Usuário ou senha incorretos! Verifique suas credenciais ou solicite ao administrador.")
                 
@@ -1364,7 +1429,7 @@ with aba_notas:
 # =====================================================================
 if aba_admin is not None:
     with aba_admin:
-        cabecalho_pagina("Painel de Administração de Usuários", "Gerencie o acesso dos colaboradores, cadastre novas contas ou altere senhas.")
+        cabecalho_pagina("Painel de Administração de Usuários", "Gerencie o acesso dos colaboradores, cadastre novas contas e resete senhas.")
         
         banco_usuarios = carregar_banco_usuarios()
         
@@ -1372,37 +1437,41 @@ if aba_admin is not None:
         
         with col_adm1:
             st.subheader("1. Cadastrar Novo Usuário")
+            st.caption("A senha inicial padrão será `123456`. O usuário será obrigado a alterá-la no primeiro login.")
             with st.form("form_novo_usuario"):
-                novo_user = st.text_input("Usuário", placeholder="novo.usuario").strip().lower()
-                nova_senha = st.text_input("Senha Inicial", type="password", placeholder="••••••••").strip()
+                novo_user = st.text_input("Usuário (Login)", placeholder="ex: rodrigo.carvalho").strip().lower()
                 btn_cadastrar = st.form_submit_button("➕ Cadastrar Usuário", type="primary")
                 
                 if btn_cadastrar:
-                    if not novo_user or not nova_senha:
-                        st.error("⚠️ Preencha o nome do usuário e a senha inicial.")
+                    if not novo_user:
+                        st.error("⚠️ Preencha o nome do usuário.")
                     elif novo_user in banco_usuarios:
                         st.warning(f"⚠️ O usuário '{novo_user}' já está cadastrado no sistema.")
                     else:
-                        banco_usuarios[novo_user] = nova_senha
+                        banco_usuarios[novo_user] = {
+                            "senha": "123456",
+                            "trocar_senha": True
+                        }
                         salvar_banco_usuarios(banco_usuarios)
-                        st.success(f"✅ Usuário **{novo_user}** cadastrado com sucesso!")
+                        st.success(f"✅ Usuário **{novo_user}** cadastrado com sucesso com a senha inicial `123456`!")
                         st.rerun()
 
         with col_adm2:
-            st.subheader("2. Redefinir Senha de Usuário")
+            st.subheader("2. Resetar Senha para Padrão (`123456`)")
+            st.caption("Reseta a senha do usuário para `123456` e exige a troca pessoal no próximo login dele.")
             lista_usuarios = [u for u in banco_usuarios.keys() if u != "admin"]
             
             if lista_usuarios:
-                user_sel_senha = st.selectbox("Selecione o Usuário:", lista_usuarios, key="sel_user_mudar_senha")
-                nova_senha_admin = st.text_input("Nova Senha", type="password", key="txt_nova_senha_admin").strip()
+                user_sel_reset = st.selectbox("Selecione o Usuário:", lista_usuarios, key="sel_user_reset_padrao")
                 
-                if st.button("🔑 Atualizar Senha", key="btn_mudar_senha"):
-                    if nova_senha_admin:
-                        banco_usuarios[user_sel_senha] = nova_senha_admin
-                        salvar_banco_usuarios(banco_usuarios)
-                        st.success(f"✅ Senha do usuário **{user_sel_senha}** atualizada com sucesso!")
-                    else:
-                        st.error("⚠️ Digite uma nova senha válida.")
+                if st.button("🔄 Resetar Senha para Inicial (`123456`)", key="btn_reset_padrao"):
+                    banco_usuarios[user_sel_reset] = {
+                        "senha": "123456",
+                        "trocar_senha": True
+                    }
+                    salvar_banco_usuarios(banco_usuarios)
+                    st.success(f"✅ Senha do usuário **{user_sel_reset}** resetada para `123456`. O usuário deverá alterá-la no próximo login!")
+                    st.rerun()
             else:
                 st.info("Nenhum usuário convencional cadastrado até o momento.")
 
@@ -1411,8 +1480,12 @@ if aba_admin is not None:
         st.subheader("3. Usuários Cadastrados & Remoção")
         
         df_users = pd.DataFrame([
-            {"Usuário": k, "Tipo": "Administrador Master" if k == "admin" else "Usuário Convencional"}
-            for k in banco_usuarios.keys()
+            {
+                "Usuário": k, 
+                "Tipo": "Administrador Master" if k == "admin" else "Usuário Convencional",
+                "Status Senha": "Troca Pendente (123456)" if v.get("trocar_senha", False) else "Senha Pessoal Definida"
+            }
+            for k, v in banco_usuarios.items()
         ])
         
         st.dataframe(df_users, hide_index=True, use_container_width=True)
@@ -1437,5 +1510,7 @@ if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
     st.session_state.autenticado = False
     st.session_state.usuario_atual = ""
     st.session_state.e_admin = False
+    st.session_state.trocar_senha_obrigatoria = False
+    st.session_state.usuario_temp = ""
     st.session_state.df_excel_agenda = None  # Limpa os dados da agenda no logout
     st.rerun()
