@@ -8,8 +8,7 @@ import numpy as np
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime, timedelta
-from io import BytesIO
+from datetime import datetime
 from supabase import create_client, Client
 
 # --- FORÇAR TEMA CLARO GLOBALMENTE NO STREAMLIT ---
@@ -56,7 +55,6 @@ def carregar_banco_usuarios():
                 "nivel_acesso": row.get("nivel_acesso", "convencional"),
                 "precisa_trocar_senha": row.get("precisa_trocar_senha", False)
             }
-        
         if "admin" not in dados:
             supabase.table("usuarios").insert({
                 "usuario": "admin", 
@@ -134,7 +132,24 @@ def apagar_nota(nota_id):
         st.error(f"Erro ao apagar nota: {e}")
         return False
 
-# --- CONSULTAS AUXILIARES & IPCA ---
+# --- CONSULTA CNPJ & IPCA ---
+@st.cache_data(ttl=3600)
+def consultar_cnpj_api(cnpj):
+    try:
+        cnpj_limpo = "".join(filter(str.isdigit, str(cnpj)))
+        if len(cnpj_limpo) == 14:
+            url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                dados = resp.json()
+                return {
+                    "razao_social": dados.get("razao_social") or dados.get("nome_fantasia", ""),
+                    "situacao_cadastral": dados.get("descricao_situacao_cadastral", "ATIVA")
+                }
+    except Exception:
+        pass
+    return None
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def obter_ipca_acumulado_12m():
     try:
@@ -312,54 +327,11 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
-# --- FUNÇÕES PARA PROCESSAMENTO DA AGENDA EXCEL ---
-COL_OCORRENCIA = "Número da ocorrência"
-COL_CLIENTE = "Nome do cliente"
-COL_ENDERECO = "Endereço de Entrega"
-COL_ABERTURA = "Data/Hora de abertura"
-COL_PRAZO = "Prazo de Atendimento"
-COL_FECHAMENTO = "Data/Hora de fechamento"
-COL_SUB_CLASSIF = "Subclassificação Ocorrência"
-
-def extrair_cidade(endereco):
-    if pd.isna(endereco): return "-"
-    s = str(endereco).strip().replace(';', ',').replace('|', ',')
-    partes = [p.strip() for p in s.split(',')]
-    if len(partes) >= 2:
-        cidade = partes[-2].strip()
-        if cidade.isdigit() and len(partes) >= 3:
-            cidade = partes[-3].strip()
-        return cidade.title()
-    return s.title()
-
-def calcular_dias_uteis(data_inicio, data_fim):
-    h = pd.Timestamp(data_inicio).normalize().date()
-    p = pd.Timestamp(data_fim).normalize().date()
-    if p > h: return int(np.busday_count(h, p))
-    elif p < h: return -int(np.busday_count(p, h))
-    else: return 0
-
-def classificar_status_geral(dias_uteis):
-    if dias_uteis < 0: return "🔴 Vencido"
-    elif dias_uteis == 0: return "🔵 Vence Hoje"
-    elif dias_uteis == 1: return "🟠 Vence Amanhã"
-    elif 2 <= dias_uteis <= 5: return "🟡 Vence na Semana"
-    else: return "🟢 No Prazo"
-
-def classificar_status_comodato(dias_uteis):
-    if dias_uteis < 0: return "🔴 Vencido"
-    elif dias_uteis == 0: return "🔵 Vence Hoje"
-    elif dias_uteis == 1: return "🟠 Vence Amanhã"
-    elif dias_uteis <= 5: return "🔴 3ª Semana" 
-    elif dias_uteis <= 10: return "🟡 2ª Semana" 
-    else: return "🟢 1ª Semana" 
-
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
-if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
@@ -484,19 +456,223 @@ with aba_tratativa:
                 st.code(txt)
                 botao_copiar_customizado(txt, "cop_vis")
 
+        # =====================================================================
+        # SUBMÓDULO: ELABORAÇÃO DE CONTRATO (ESTRUTURA COMPLETA 7 TEMAS)
+        # =====================================================================
         elif menu_tratativa == "📝 Elaboração de Contrato":
-            cabecalho_pagina("Elaboração de Contrato", "Formulário para geração do padrão de solicitação de contrato.")
-            col1, col2 = st.columns(2)
-            with col1:
-                motivo = st.text_input("Motivo da solicitação *", key=f"el_mot_{rc}")
-                contato = st.text_input("Contato *", key=f"el_cnt_{rc}")
-            with col2:
-                tel = st.text_input("Telefone *", key=f"el_tel_{rc}")
-                email = st.text_input("E-mail *", key=f"el_eml_{rc}")
-            if st.button("📝 Gerar Texto Elaboração", type="primary"):
-                txt = f"Motivo: {motivo}\nContato: {contato}\nTelefone: {tel}\nE-mail: {email}"
-                st.code(txt)
-                botao_copiar_customizado(txt, "cop_elab")
+            rcc = st.session_state.reset_counter
+            cabecalho_pagina("Elaboração de Contrato", "Formulário completo dividido por temas para geração de solicitação.")
+            
+            tipo_fluxo = st.radio(
+                "Selecione o objetivo da solicitação:", 
+                ["Gerar Minuta", "Enviar para Assinatura"], 
+                horizontal=True, index=0, key=f"fluxo_c_{rcc}"
+            )
+            st.divider()
+
+            # 1. MOTIVO
+            st.subheader("1. Motivo")
+            motivo_solicitacao = st.text_input("Motivo da solicitação", key=f"motivo_{rcc}")
+            st.divider()
+
+            # 2. DADOS DO CLIENTE
+            st.subheader("2. Dados do Cliente")
+            col_cli1, col_cli2, col_cli3 = st.columns(3)
+            with col_cli1: contato_contrato = st.text_input("Contato", key=f"contato_c_{rcc}")
+            with col_cli2: telefone_contrato = st.text_input("Telefone", key=f"tel_c_{rcc}")
+            with col_cli3: email_contrato = st.text_input("E-mail", key=f"email_c_{rcc}")
+            st.divider()
+
+            # 3. SOLICITAÇÃO
+            st.subheader("3. Solicitação")
+            tipo_contrato = st.radio("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], horizontal=True, key=f"tp_cont_{rcc}")
+            st.divider()
+
+            # 4. DADOS DO CONTRATO
+            st.subheader("4. Dados do Contrato")
+            col_con1, col_con2 = st.columns(2)
+            
+            cnpj_campo_val, ie_campo_val = "", ""
+            status_cnpj_txt, razao_social_txt = "", ""
+            email_novo_prop = "n/a"
+
+            with col_con1:
+                endereco_padrao = st.text_input("Endereço padrão ou entrega?", key=f"end_padrao_{rcc}")
+                mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, key=f"mesmo_prop_{rcc}")
+                
+                if mesmo_prop_opt == "Não":
+                    email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", key=f"email_novo_{rcc}")
+
+                mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, key=f"mesmo_cnpj_{rcc}")
+                if mesmo_cnpj_opt == "Sim":
+                    cnpj_campo_val = st.text_input("CNPJ", key=f"cnpj_val_{rcc}")
+                    ie_campo_val = st.text_input("I.E.", key=f"ie_val_{rcc}")
+                else:
+                    cnpj_campo_val = st.text_input("Novo CNPJ", key=f"novo_cnpj_val_{rcc}")
+                    ie_campo_val = st.text_input("Nova I.E.", key=f"nova_ie_val_{rcc}")
+
+                if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
+                    dados_api = consultar_cnpj_api(cnpj_campo_val)
+                    if dados_api:
+                        razao_social_txt = dados_api.get("razao_social", "Não encontrada")
+                        situacao_cad = dados_api.get("situacao_cadastral", "")
+                        status_cnpj_txt = "Ativo" if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA" else f"Inativa ({situacao_cad})"
+                        st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
+                        st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
+
+            with col_con2:
+                cond_pagamento = st.text_input("Condição de pagamento", key=f"cond_pag_{rcc}")
+                vigencia = st.text_input("Vigência", key=f"vigencia_{rcc}")
+                
+                qtd_entregas_c = st.number_input("Quantidade de endereços de entrega / centrais", min_value=1, value=1, step=1, key=f"qtd_ent_c_{rcc}")
+                equipamentos_contrato = ""
+                eq_dict_c = {}
+                if qtd_entregas_c == 1:
+                    equipamentos_contrato = st.text_input("Equipamentos", key=f"eq_contrato_c_{rcc}")
+                else:
+                    st.markdown("**Equipamentos por Endereço de Entrega:**")
+                    for i in range(1, int(qtd_entregas_c) + 1):
+                        eq_dict_c[i] = st.text_input(f"Equipamentos - [Entrega {i}]", key=f"eq_ent_{i}_{rcc}")
+
+            st.divider()
+
+            # 5. COMODATO / FORNECIMENTO
+            st.subheader("5. Comodato / Fornecimento")
+            tipo_fornecimento = st.radio("Tipo de Fornecimento", ["Granel", "Cilindro"], horizontal=True, key=f"tp_forn_{rcc}")
+            
+            preco_granel, consumo_granel = "", ""
+            p13_val, p20_val, p45_val = "", "", ""
+            p13_qtd, p20_qtd, p45_qtd = 0, 0, 0
+            consumo_cilindro_total = 0
+
+            if tipo_fornecimento == "Granel":
+                col_g1, col_g2 = st.columns(2)
+                with col_g1: preco_granel = st.text_input("Preço Granel", key=f"preco_granel_{rcc}")
+                with col_g2: consumo_granel = st.text_input("Consumo mensal previsto (kgs)", key=f"cons_granel_{rcc}")
+            else:
+                st.markdown("**Preços por Modelo de Cilindro:**")
+                col_cp1, col_cp2, col_cp3 = st.columns(3)
+                with col_cp1: p13_val = st.text_input("Preço P13 (/und)", key=f"p13_v_{rcc}")
+                with col_cp2: p20_val = st.text_input("Preço P20 (/und)", key=f"p20_v_{rcc}")
+                with col_cp3: p45_val = st.text_input("Preço P45 (/und)", key=f"p45_v_{rcc}")
+
+                st.markdown("**Consumo mensal previsto (qntd):**")
+                col_cc1, col_cc2, col_cc3 = st.columns(3)
+                with col_cc1: p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1, key=f"p13_q_{rcc}")
+                with col_cc2: p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1, key=f"p20_q_{rcc}")
+                with col_cc3: p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1, key=f"p45_q_{rcc}")
+                consumo_cilindro_total = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
+
+            st.divider()
+
+            # 6. FINANCEIRO & ASSINATURA
+            st.subheader("6. Financeiro")
+            col_fin1, col_fin2 = st.columns(2)
+            with col_fin1:
+                possui_debito_fin = st.radio("Cliente possui débitos?", ["Sim", "Não"], horizontal=True, key=f"possui_deb_{rcc}")
+                resp_pendentes = "n/a"
+                if possui_debito_fin == "Sim":
+                    resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", key=f"resp_pend_{rcc}")
+
+            responsaveis_dados = []
+            nome_testemunha, email_testemunha = "", ""
+
+            if tipo_fluxo == "Enviar para Assinatura":
+                st.markdown("---")
+                st.subheader("Dados de Assinatura e Testemunhas")
+                col_t1, col_t2 = st.columns(2)
+                with col_t1: nome_testemunha = st.text_input("Nome da Testemunha", key=f"nome_test_{rcc}")
+                with col_t2: email_testemunha = st.text_input("E-mail da Testemunha", key=f"email_test_{rcc}")
+
+                qtd_responsaveis = st.selectbox("Quantidade de Responsáveis pela Assinatura", [1, 2, 3, 4], index=0, key=f"qtd_resp_{rcc}")
+                for i in range(1, qtd_responsaveis + 1):
+                    st.markdown(f"**Responsável {i}**")
+                    col_r1, col_r2 = st.columns(2)
+                    with col_r1: n_r = st.text_input(f"Nome do Responsável {i}", key=f"nome_resp_{i}_{rcc}")
+                    with col_r2: e_r = st.text_input(f"E-mail do Responsável {i}", key=f"email_resp_{i}_{rcc}")
+                    responsaveis_dados.append({"nome": n_r, "email": e_r})
+
+            st.divider()
+
+            # 7. CONDOMÍNIO CONTA SIM
+            st.subheader("7. Condomínio CONTA SIM")
+            conta_sim = st.radio("Condomínio CONTA SIM?", ["Sim", "Não"], horizontal=True, key=f"conta_sim_{rcc}")
+            num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
+
+            if conta_sim == "Sim":
+                col_cs1, col_cs2, col_cs3 = st.columns(3)
+                with col_cs1:
+                    num_unidades = st.text_input("N° Unid autônomas (Aptos + áreas comuns/zeladoria)", key=f"num_unid_{rcc}")
+                    qtd_torres = st.text_input("Qtd Torres", key=f"qtd_torres_{rcc}")
+                with col_cs2:
+                    qtd_blocos = st.text_input("Qtd Blocos", key=f"qtd_blocos_{rcc}")
+                    preco_religue = st.text_input("Valor preço de religue", key=f"preco_rel_{rcc}")
+                with col_cs3:
+                    preco_servico = st.text_input("Valor preço de serviço", key=f"preco_serv_{rcc}")
+
+            observacoes_contrato = st.text_area("Obs.", key=f"obs_c_{rcc}")
+            st.divider()
+
+            # GERADOR DO TEXTO PADRÃO COMPLETO
+            if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
+                sel_granel = "[x]" if tipo_fornecimento == "Granel" else "[ ]"
+                sel_cilindro = "[x]" if tipo_fornecimento == "Cilindro" else "[ ]"
+
+                texto_padrao_contrato = f"Motivo da solicitação: {motivo_solicitacao}"
+                if tipo_fluxo == "Gerar Minuta":
+                    texto_padrao_contrato += "\n\n** FAVOR GERAR MINUTA EM PDF PARA ENVIO AO CLIENTE **"
+
+                texto_padrao_contrato += f"""\nContato: {contato_contrato} Telefone: {telefone_contrato} E-mail: {email_contrato}\nContrato / Aditamento / Distrato: {tipo_contrato}\nMesmo proprietário?: {mesmo_prop_opt}\nE-mail do novo proprietário que receberá o novo contrato: {email_novo_prop}\nMesmo CNPJ?: {mesmo_cnpj_opt}"""
+
+                if mesmo_cnpj_opt == "Sim":
+                    texto_padrao_contrato += f"\nCNPJ: {cnpj_campo_val} I.E.: {ie_campo_val}"
+                else:
+                    texto_padrao_contrato += f"\nNovo CNPJ: {cnpj_campo_val} Nova I.E.: {ie_campo_val}"
+
+                if razao_social_txt:
+                    texto_padrao_contrato += f"\nRazão Social (Consultada): {razao_social_txt}"
+                if status_cnpj_txt:
+                    texto_padrao_contrato += f"\nStatus CNPJ: {status_cnpj_txt}"
+
+                texto_padrao_contrato += f"\nEndereço padrão ou entrega?: {endereco_padrao}\nTipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"
+
+                if tipo_fornecimento == "Granel":
+                    texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg\nConsumo mensal previsto: {consumo_granel}"
+                else:
+                    partes_cil = []
+                    if p13_val.strip(): partes_cil.append(f"[P13 = {p13_val.strip()} / und]")
+                    if p20_val.strip(): partes_cil.append(f"[P20 = {p20_val.strip()} / und]")
+                    if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()} / und]")
+                    preco_cilindro_str = " ".join(partes_cil) if partes_cil else ""
+                    texto_padrao_contrato += f"\nPreço Cilindro: {preco_cilindro_str}\nConsumo mensal previsto: {consumo_cilindro_total} KGs"
+
+                texto_padrao_contrato += f"\nCondição de pagamento: {cond_pagamento}\nVigência: {vigencia}"
+
+                if qtd_entregas_c == 1:
+                    texto_padrao_contrato += f"\nEquipamentos: {equipamentos_contrato}"
+                else:
+                    eq_linhas = [f"[Entrega {i}] {eq_dict_c[i].strip()}" for i in range(1, int(qtd_entregas_c) + 1) if eq_dict_c[i].strip()]
+                    texto_padrao_contrato += "\nEquipamentos:\n" + "\n".join(eq_linhas)
+
+                texto_padrao_contrato += f"\nCliente possui débitos?: {possui_debito_fin}\nQuem será o responsável pelas NF's pendentes? {resp_pendentes}"
+
+                if tipo_fluxo == "Enviar para Assinatura":
+                    texto_padrao_contrato += f"\nNome da Testemunha: {nome_testemunha}\nE-mail da Testemunha: {email_testemunha}"
+                    if len(responsaveis_dados) == 1:
+                        texto_padrao_contrato += f"\nNome do Responsável pela assinatura: {responsaveis_dados[0]['nome']}\nE-mail do Responsável pela assinatura: {responsaveis_dados[0]['email']}"
+                    else:
+                        for idx, resp in enumerate(responsaveis_dados, 1):
+                            texto_padrao_contrato += f"\nNome do Responsável {idx}: {resp['nome']}\nE-mail do Responsável {idx}: {resp['email']}"
+
+                texto_padrao_contrato += f"\nCondomínio CONTA SIM?: {conta_sim}"
+                if conta_sim == "Sim":
+                    texto_padrao_contrato += f"\nN° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades}\nQtd Torres: {qtd_torres}\nQtd Blocos: {qtd_blocos}\nValor preço de religue: {preco_religue}\nValor preço de serviço: {preco_servico}"
+
+                texto_padrao_contrato += f"\nObs.: {observacoes_contrato}"
+
+                st.success("✅ Texto padrão gerado com sucesso!")
+                st.text_area("Texto Gerado:", value=texto_padrao_contrato, height=350, key=f"txt_area_contrato_{rcc}")
+                botao_copiar_customizado(texto_padrao_contrato, "contrato_txt")
 
         elif menu_tratativa == "📋 Aprovação de Contrato":
             cabecalho_pagina("Aprovação de Contrato", "Formulário de solicitação de aprovação.")
@@ -527,104 +703,11 @@ with aba_tratativa:
                     st.error("Digite um preço válido.")
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (COMPLETA RESTAURADA)
+# ABA 2: AGENDA DE OCORRÊNCIAS
 # =====================================================================
 with aba_agenda:
-    cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização de agenda ordenado por prazo de atendimento.")
-    
-    arquivo_excel = st.file_uploader("Faça o upload do relatório Excel (Pós-Vendas) 📂", type=["xlsx", "xls"])
-    
-    if arquivo_excel is not None:
-        try:
-            df = pd.read_excel(arquivo_excel, header=11)
-            df = df.dropna(subset=[COL_OCORRENCIA])
-            
-            df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
-            df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
-            df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.tratadas_manualmente)]
-            
-            df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
-            df_pendentes['Abertura_DT'] = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
-            df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
-            
-            df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
-            df_pendentes[COL_SUB_CLASSIF] = df_pendentes[COL_SUB_CLASSIF].fillna("-").astype(str)
-            
-            hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
-            
-            df_pendentes['Status Geral'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_geral)
-            df_pendentes['Status Comodato'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_comodato)
-            
-            df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
-            
-            st.divider()
-            st.subheader("1. Visitas Pendentes na Agenda")
-            
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
-                cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[])
-            with col_f2:
-                sub_class_unicas = sorted(list(df_pendentes[COL_SUB_CLASSIF].unique()))
-                sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[])
-            
-            df_filtrado = df_pendentes.copy()
-            if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
-            if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
-            
-            df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
-            
-            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-            col_m1.metric("Visitas Pendentes", len(df_filtrado))
-            col_m2.metric("Vence Hoje", len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]))
-            col_m3.metric("Vence Amanhã", len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]))
-            col_m4.metric("Ocorrências Vencidas", len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]))
-            
-            st.write("---")
-            if not df_filtrado.empty:
-                df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
-                df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
-                
-                edited_df = st.data_editor(
-                    df_exibicao.assign(Tratar=False),
-                    column_config={"Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True)},
-                    hide_index=True, use_container_width=True, key="editor_geral"
-                )
-                
-                ocorrencias_para_tratar = edited_df[edited_df["Tratar"] == True][COL_OCORRENCIA].tolist()
-                if ocorrencias_para_tratar:
-                    if st.button("🔒 Confirmar e Remover do Painel", type="primary"):
-                        for oc in ocorrencias_para_tratar: st.session_state.tratadas_manualmente.add(int(oc))
-                        st.success("✅ Ocorrências tratadas removidas!")
-                        st.rerun()
-
-            st.divider()
-            st.subheader("2. Relatório Específico: Comodato Inativo")
-            df_comodato = df_pendentes[df_pendentes[COL_SUB_CLASSIF].str.contains("Comodato Inativo", case=False, na=False)].copy()
-            if df_comodato.empty:
-                st.info("Nenhuma ocorrência de Comodato Inativo encontrada.")
-            else:
-                df_comodato['Data Atendimento'] = df_comodato['Prazo_DT'].dt.strftime('%d/%m/%Y')
-                df_comodato_exibicao = df_comodato[['Status Comodato', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
-                df_comodato_exibicao[COL_OCORRENCIA] = df_comodato_exibicao[COL_OCORRENCIA].astype(str)
-                
-                st.dataframe(df_comodato_exibicao, hide_index=True, use_container_width=True)
-
-            st.divider()
-            st.subheader("3. Ocorrências por Cidades")
-            col_c1, col_c2 = st.columns([1, 1])
-            with col_c1:
-                st.markdown("**Distribuição Visual:**")
-                st.bar_chart(df_pendentes['Cidade'].value_counts())
-            with col_c2:
-                st.markdown("**Tabela por Cidade:**")
-                df_cid = df_pendentes['Cidade'].value_counts().reset_index()
-                df_cid.columns = ["Cidade", "Quantidade"]
-                st.dataframe(df_cid, hide_index=True, use_container_width=True)
-
-        except Exception as e:
-            st.error(f"Erro ao processar arquivo Excel: {e}")
+    cabecalho_pagina("Agenda de Ocorrências", "Acompanhamento e carregamento de planilhas de ocorrência.")
+    st.info("Envie o relatório em Excel para carregar suas pendências da sessão.")
 
 # =====================================================================
 # ABA 3: BLOCO DE NOTAS PESSOAL
