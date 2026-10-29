@@ -45,7 +45,7 @@ def init_supabase() -> Client:
 
 supabase = init_supabase()
 
-# --- CAMADA DE PERSISTÊNCIA (SUPABASE) ---
+# --- CAMADA DE PERSISTÊNCIA NA NUVEM (SUPABASE) ---
 def carregar_banco_usuarios():
     try:
         res = supabase.table("usuarios").select("*").execute()
@@ -56,6 +56,8 @@ def carregar_banco_usuarios():
                 "nivel_acesso": row.get("nivel_acesso", "convencional"),
                 "precisa_trocar_senha": row.get("precisa_trocar_senha", False)
             }
+        
+        # Garante a existência do admin master
         if "admin" not in dados:
             supabase.table("usuarios").insert({
                 "usuario": "admin", 
@@ -198,6 +200,48 @@ class RelatorioPDF(FPDF):
         self.set_y(-15)
         self.set_font("Arial", "I", 8)
         self.cell(0, 10, f"Página {self.page_no()}", align="C")
+
+# --- FUNÇÕES PARA PROCESSAMENTO DA AGENDA EXCEL ---
+COL_OCORRENCIA = "Número da ocorrência"
+COL_CLIENTE = "Nome do cliente"
+COL_ENDERECO = "Endereço de Entrega"
+COL_ABERTURA = "Data/Hora de abertura"
+COL_PRAZO = "Prazo de Atendimento"
+COL_FECHAMENTO = "Data/Hora de fechamento"
+COL_SUB_CLASSIF = "Subclassificação Ocorrência"
+
+def extrair_cidade(endereco):
+    if pd.isna(endereco): return "-"
+    s = str(endereco).strip().replace(';', ',').replace('|', ',')
+    partes = [p.strip() for p in s.split(',')]
+    if len(partes) >= 2:
+        cidade = partes[-2].strip()
+        if cidade.isdigit() and len(partes) >= 3:
+            cidade = partes[-3].strip()
+        return cidade.title()
+    return s.title()
+
+def calcular_dias_uteis(data_inicio, data_fim):
+    h = pd.Timestamp(data_inicio).normalize().date()
+    p = pd.Timestamp(data_fim).normalize().date()
+    if p > h: return int(np.busday_count(h, p))
+    elif p < h: return -int(np.busday_count(p, h))
+    else: return 0
+
+def classificar_status_geral(dias_uteis):
+    if dias_uteis < 0: return "🔴 Vencido"
+    elif dias_uteis == 0: return "🔵 Vence Hoje"
+    elif dias_uteis == 1: return "🟠 Vence Amanhã"
+    elif 2 <= dias_uteis <= 5: return "🟡 Vence na Semana"
+    else: return "🟢 No Prazo"
+
+def classificar_status_comodato(dias_uteis):
+    if dias_uteis < 0: return "🔴 Vencido"
+    elif dias_uteis == 0: return "🔵 Vence Hoje"
+    elif dias_uteis == 1: return "🟠 Vence Amanhã"
+    elif dias_uteis <= 5: return "🔴 3ª Semana" 
+    elif dias_uteis <= 10: return "🟡 2ª Semana" 
+    else: return "🟢 1ª Semana" 
 
 # --- AUXILIARES E VISUAL ---
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
@@ -361,6 +405,7 @@ if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
+if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
@@ -544,7 +589,6 @@ with aba_tratativa:
                     pdf.cell(0, 10, f"Contato: {contato} | Telefone: {telefone}", ln=True)
                     pdf.cell(0, 10, f"Departamento: {departamento}", ln=True)
                     
-                    # Nome oficial padronizado: relatorio_codigo_dd-mm-aa.pdf
                     cod_limpo = re.sub(r'\D', '', str(cod_cliente))
                     data_str = datetime.now().strftime("%d-%m-%y")
                     nome_arquivo_pdf = f"relatorio_{cod_limpo}_{data_str}.pdf"
@@ -930,11 +974,104 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 # ABA 2: AGENDA DE OCORRÊNCIAS
 # =====================================================================
 with aba_agenda:
-    cabecalho_pagina("Agenda de Ocorrências", "Acompanhamento e carregamento de planilhas de ocorrência.")
-    st.info("Envie o relatório em Excel para carregar suas pendências da sessão.")
+    cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização de agenda ordenado por prazo de atendimento.")
+    
+    arquivo_excel = st.file_uploader("Faça o upload do relatório Excel (Pós-Vendas) 📂", type=["xlsx", "xls"])
+    
+    if arquivo_excel is not None:
+        try:
+            df = pd.read_excel(arquivo_excel, header=11)
+            df = df.dropna(subset=[COL_OCORRENCIA])
+            
+            df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
+            df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
+            df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.tratadas_manualmente)]
+            
+            df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
+            df_pendentes['Abertura_DT'] = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+            df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
+            
+            df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
+            df_pendentes[COL_SUB_CLASSIF] = df_pendentes[COL_SUB_CLASSIF].fillna("-").astype(str)
+            
+            hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
+            
+            df_pendentes['Status Geral'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_geral)
+            df_pendentes['Status Comodato'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_comodato)
+            
+            df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
+            
+            st.divider()
+            st.subheader("1. Visitas Pendentes na Agenda")
+            
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
+                cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[])
+            with col_f2:
+                sub_class_unicas = sorted(list(df_pendentes[COL_SUB_CLASSIF].unique()))
+                sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[])
+            
+            df_filtrado = df_pendentes.copy()
+            if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
+            if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
+            
+            df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
+            
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            col_m1.metric("Visitas Pendentes", len(df_filtrado))
+            col_m2.metric("Vence Hoje", len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]))
+            col_m3.metric("Vence Amanhã", len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]))
+            col_m4.metric("Ocorrências Vencidas", len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]))
+            
+            st.write("---")
+            if not df_filtrado.empty:
+                df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
+                df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
+                
+                edited_df = st.data_editor(
+                    df_exibicao.assign(Tratar=False),
+                    column_config={"Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True)},
+                    hide_index=True, use_container_width=True, key="editor_geral"
+                )
+                
+                ocorrencias_para_tratar = edited_df[edited_df["Tratar"] == True][COL_OCORRENCIA].tolist()
+                if ocorrencias_para_tratar:
+                    if st.button("🔒 Confirmar e Remover do Painel", type="primary"):
+                        for oc in ocorrencias_para_tratar: st.session_state.tratadas_manualmente.add(int(oc))
+                        st.success("✅ Ocorrências tratadas removidas!")
+                        st.rerun()
+
+            st.divider()
+            st.subheader("2. Relatório Específico: Comodato Inativo")
+            df_comodato = df_pendentes[df_pendentes[COL_SUB_CLASSIF].str.contains("Comodato Inativo", case=False, na=False)].copy()
+            if df_comodato.empty:
+                st.info("Nenhuma ocorrência de Comodato Inativo encontrada.")
+            else:
+                df_comodato['Data Atendimento'] = df_comodato['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                df_comodato_exibicao = df_comodato[['Status Comodato', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
+                df_comodato_exibicao[COL_OCORRENCIA] = df_comodato_exibicao[COL_OCORRENCIA].astype(str)
+                
+                st.dataframe(df_comodato_exibicao, hide_index=True, use_container_width=True)
+
+            st.divider()
+            st.subheader("3. Ocorrências por Cidades")
+            col_c1, col_c2 = st.columns([1, 1])
+            with col_c1:
+                st.markdown("**Distribuição Visual:**")
+                st.bar_chart(df_pendentes['Cidade'].value_counts())
+            with col_c2:
+                st.markdown("**Tabela por Cidade:**")
+                df_cid = df_pendentes['Cidade'].value_counts().reset_index()
+                df_cid.columns = ["Cidade", "Quantidade"]
+                st.dataframe(df_cid, hide_index=True, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Erro ao processar arquivo Excel: {e}")
 
 # =====================================================================
-# ABA 3: BLOCO DE NOTAS PESSOAL
+# ABA 3: BLOCO DE NOTAS PESSOAL (PERSISTÊNCIA SUPABASE)
 # =====================================================================
 with aba_notas:
     col_menu_notas, col_conteudo_notas = st.columns([1, 4])
@@ -957,7 +1094,7 @@ with aba_notas:
                     st.rerun()
 
     with col_conteudo_notas:
-        cabecalho_pagina("Bloco de Notas Pessoal", "Suas anotações salvas na nuvem.")
+        cabecalho_pagina("Bloco de Notas Pessoal", "Anotações vinculadas à sua conta e salvas na nuvem.")
         id_atual = st.session_state.nota_selecionada_id
         
         t_val = notas_usuario[id_atual]["titulo"] if id_atual in notas_usuario else ""
@@ -971,14 +1108,14 @@ with aba_notas:
             txt = st.text_area("Anotação", value=txt_val, height=200)
             
             b1, b2, _ = st.columns([1, 1, 4])
-            with b1: btn_s = st.form_submit_button("💾 Salvar", type="primary")
+            with b1: btn_s = st.form_submit_button("💾 Salvar na Nuvem", type="primary")
             with b2: btn_d = st.form_submit_button("🗑️ Apagar") if id_atual else False
 
             if btn_s and tit:
                 target_id = id_atual if id_atual else str(uuid.uuid4())
                 if salvar_nota(target_id, usuario_atual, tit, cli, txt):
                     st.session_state.nota_selecionada_id = target_id
-                    st.success("Salvo!")
+                    st.success("✅ Salvo com sucesso no banco de dados!")
                     st.rerun()
             if btn_d and id_atual:
                 if apagar_nota(id_atual):
@@ -986,11 +1123,11 @@ with aba_notas:
                     st.rerun()
 
 # =====================================================================
-# ABA 4: PAINEL ADMIN
+# ABA 4: PAINEL ADMIN (PERSISTÊNCIA SUPABASE)
 # =====================================================================
 if aba_admin is not None:
     with aba_admin:
-        cabecalho_pagina("Painel de Administração de Usuários", "Cadastro de colaboradores, níveis de permissão e redefinição de senhas.")
+        cabecalho_pagina("Painel de Administração de Usuários", "Cadastro de colaboradores, níveis de permissão e redefinição de senhas gravadas na nuvem.")
         
         banco_usuarios = carregar_banco_usuarios()
         col_adm1, col_adm2 = st.columns([1, 1])
@@ -1011,7 +1148,7 @@ if aba_admin is not None:
                         st.warning(f"⚠️ O usuário '{novo_user}' já existe.")
                     else:
                         if salvar_usuario(novo_user, "123456", nivel_acesso=nivel_acesso, precisa_trocar=True):
-                            st.success(f"✅ Usuário **{novo_user}** criado com sucesso!")
+                            st.success(f"✅ Usuário **{novo_user}** criado com sucesso no banco de dados!")
                             st.rerun()
 
         with col_adm2:
@@ -1048,7 +1185,7 @@ if aba_admin is not None:
                 st.write(""); st.write("")
                 if st.button("🗑️ Remover Usuário do Banco", key="btn_rem_u"):
                     if remover_usuario(user_para_remover):
-                        st.success(f"✅ Usuário **{user_para_remover}** excluído!")
+                        st.success(f"✅ Usuário **{user_para_remover}** excluído do banco de dados!")
                         st.rerun()
 
 # --- BARRA LATERAL LOGOUT ---
