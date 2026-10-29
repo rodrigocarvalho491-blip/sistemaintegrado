@@ -12,8 +12,7 @@ import altair as alt
 from datetime import datetime, timedelta
 from io import BytesIO
 from PIL import Image
-from fpdf import FPDF
-from supabase import create_client, Client
+from pydantic import ValidationError
 
 # --- FORÇAR TEMA CLARO GLOBALMENTE NO STREAMLIT ---
 os.makedirs(".streamlit", exist_ok=True)
@@ -36,6 +35,8 @@ st.set_page_config(
 )
 
 # --- CONEXÃO COM O SUPABASE ---
+from supabase import create_client, Client
+
 @st.cache_resource
 def init_supabase() -> Client:
     try:
@@ -157,45 +158,15 @@ def consultar_cnpj_api(cnpj):
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def obter_ipca_acumulado_12m():
-    # Fontes encadeadas oficiais IBGE/Bacen
     try:
-        url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
+        url = "https://www.ibge.gov.br/explica/inflacao.php"
         resp = requests.get(url, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            resultado = data[0]["resultados"][0]
-            series = resultado.get("series") or resultado.get("séries")
-            serie = series[0].get("serie") or series[0].get("série")
-            ultimo_periodo = sorted(serie.keys())[-1]
-            val_str = serie[ultimo_periodo]
-            if val_str and str(val_str).strip() not in ("-", "..", "...", "X"):
-                val_float = float(str(val_str).replace(",", "."))
-                periodo_fmt = f"{ultimo_periodo[4:6]}/{ultimo_periodo[0:4]}" if len(ultimo_periodo) == 6 else ultimo_periodo
-                return val_float, periodo_fmt
-    except Exception:
-        pass
-
-    try:
-        url_bacen = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json"
-        resp = requests.get(url_bacen, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data and "valor" in data[0]:
-                return float(str(data[0]["valor"]).replace(",", ".")), "Último 12M (Bacen)"
-    except Exception:
-        pass
-
-    try:
-        url_ibge_page = "https://www.ibge.gov.br/explica/inflacao.php"
-        resp = requests.get(url_ibge_page, timeout=5)
         if resp.status_code == 200:
             match = re.search(r'([0-9]+,[0-9]+)\s*%', resp.text)
             if match:
-                val_float = float(match.group(1).replace(",", "."))
-                return val_float, "IBGE (Web)"
+                return float(match.group(1).replace(",", ".")), "IBGE (Web)"
     except Exception:
         pass
-
     return 4.58, "Set/2026 (Referência Oficial)"
 
 def formatar_ci_num(ci_str):
@@ -209,6 +180,8 @@ def formatar_ci_num(ci_str):
     return "000.000.000"
 
 # --- GERADOR DE PDF DE RELATÓRIO FOTOGRÁFICO ---
+from fpdf import FPDF
+
 class RelatorioPDF(FPDF):
     def __init__(self, cod_cliente="", nome_cliente="", logo_path=""):
         super().__init__()
@@ -263,13 +236,12 @@ def calcular_dias_uteis(data_inicio, data_fim):
     elif p < h: return -int(np.busday_count(p, h))
     else: return 0
 
-def classificar_status_geral(row, hoje):
+def classificar_status_geral(row, hoje_ts):
     dias_uteis = row['Dias Úteis Restantes']
     p = row['Prazo_DT']
     if pd.isna(p): return "🟢 No Prazo"
     
-    h = pd.Timestamp(hoje).normalize()
-    sexta = h + pd.Timedelta(days=(4 - h.weekday()))
+    sexta = hoje_ts + pd.Timedelta(days=(4 - hoje_ts.weekday()))
     
     if dias_uteis < 0: return "🔴 Vencido"
     if dias_uteis == 0: return "🔵 Vence Hoje"
@@ -352,36 +324,29 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
   border: 1px solid #E2E8F0;
 }
 .cg-logo { height: 55px; width: auto; display: block; }
-
 .cg-header-sep { width: 2px; align-self: stretch; background: #E2E8F0; }
 .cg-title { font-size: 1.65rem; font-weight: 800; line-height: 1.2; color: #003366 !important; }
 .cg-subtitle { font-size: 0.95rem; margin-top: 0.2rem; color: #64748B !important; font-weight: 500; }
-
-div[data-baseweb="input"] > div, 
-div[data-baseweb="select"] > div, 
-div[data-baseweb="textarea"] > div {
-  background-color: #FFFFFF !important;
-  border: 1px solid #CBD5E1 !important;
-  border-radius: 8px !important;
-  color: #1E293B !important;
-}
 
 div.stButton > button {
   border-radius: 8px !important; 
   font-weight: 600 !important;
   transition: all 0.2s ease-in-out;
 }
-
 div.stButton > button[data-testid="baseButton-primary"] {
   background-color: #0055A5 !important; 
   color: #ffffff !important;
   border: 1px solid #0055A5 !important; 
 }
-
 div.stButton > button[data-testid="baseButton-secondary"] {
   background-color: #F8FAFC !important;
   color: #475569 !important;
   border: 1px solid #CBD5E1 !important;
+}
+div.stButton > button[data-testid="baseButton-secondary"]:hover {
+  background-color: #E2E8F0 !important;
+  color: #1E293B !important;
+  border-color: #94A3B8 !important;
 }
 
 [data-testid="stSidebar"] {
@@ -463,8 +428,6 @@ if "e_admin" not in st.session_state: st.session_state.e_admin = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
 if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
 if "filtro_btn_status" not in st.session_state: st.session_state.filtro_btn_status = "Todas"
-
-# --- ZERAR AGENDA AO TROCAR DE SESSÃO / LOGIN ---
 if "ultimo_usuario_logado" not in st.session_state: st.session_state.ultimo_usuario_logado = ""
 if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None
 
@@ -497,7 +460,6 @@ if not st.session_state.autenticado:
                 st.session_state.e_admin = (usr_data["nivel_acesso"] == "admin")
                 st.session_state.troca_obrigatoria = usr_data["precisa_trocar_senha"] or (senha_input == "123456")
                 
-                # Zera agenda se usuário mudou
                 if st.session_state.ultimo_usuario_logado != usuario_input:
                     st.session_state.df_excel_agenda = None
                     st.session_state.ultimo_usuario_logado = usuario_input
@@ -718,7 +680,7 @@ Obs.: {observacoes}"""
                         pdf_output = pdf.output(dest='S').encode('latin-1', errors='replace')
                         st.download_button(
                             label="💾 Baixar PDF Gerado",
-                            data=pdf_output,
+                            data=bytes(pdf_output),
                             file_name=nome_arquivo_pdf,
                             mime="application/pdf"
                         )
@@ -993,7 +955,7 @@ Obs.: {observacoes}"""
             motivo_red_vig = st.text_input("Motivo da redução de vigência:", key=f"ap_mot_red_{rcap}") if red_vig == "Sim" else ""
 
             col_proj1, col_proj2 = st.columns([3, 1])
-            with col_proj1: projeto_num = st.text_input("Projeto (Número completo) *", key=f"ap_proj_{rcap}")
+            with col_proj1: projeto_num = st.text_input("Projeto (Número completo)", key=f"ap_proj_{rcap}")
             with col_proj2:
                 st.write(""); st.write("")
                 is_cilindros = st.checkbox("Cilindros", key=f"ap_cil_{rcap}")
@@ -1033,7 +995,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
                     botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
 
         # -------------------------------------------------------------
-        # 4. ANIVERSÁRIO DE CONTRATO (COM IPCA AUTOMÁTICO ROBUSTO)
+        # 4. ANIVERSÁRIO DE CONTRATO
         # -------------------------------------------------------------
         elif menu_tratativa == "🎂 Aniversário de Contrato":
             rca = st.session_state.reset_counter
@@ -1175,7 +1137,7 @@ with aba_agenda:
                 df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
                 df_pendentes[COL_SUB_CLASSIF] = df_pendentes[COL_SUB_CLASSIF].fillna("-").astype(str)
                 
-                hoje_ts = pd.Timestamp(datetime.now().normalize())
+                hoje_ts = pd.Timestamp(pd.Timestamp(datetime.now()).normalize())
                 
                 df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje_ts.date(), x))
                 df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, hoje_ts), axis=1)
@@ -1211,6 +1173,7 @@ with aba_agenda:
                     
                     st.write("---")
                     
+                    # FILTROS EM FORMATO DE BOTÕES (LIMPOS E PROFISSIONAIS)
                     st.markdown("**🔍 Filtrar Tabela por Categoria:**")
                     
                     def estilo_btn(f_val):
