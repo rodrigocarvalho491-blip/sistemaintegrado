@@ -330,14 +330,16 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 
 div.stButton > button {
   border-radius: 12px !important; 
-  font-weight: 700 !important;
   transition: all 0.2s ease-in-out;
-  padding: 14px 10px !important;
+  padding: 12px 10px !important;
   min-height: 95px !important;
-  font-size: 0.88rem !important;
   line-height: 1.35 !important;
   white-space: normal !important;
   box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 div.stButton > button[data-testid="baseButton-primary"] {
   background-color: #004080 !important; 
@@ -1189,27 +1191,27 @@ with aba_agenda:
                     st.write("")
                     st.markdown("**📊 Painel de Filtros Rápidos (Clique no cartão desejado):**")
                     
-                    # PAINEL DE BOTÕES SUPERIORES MAIORES, NOME COMPLETO E QUANTIDADE EM DESTAQUE (SEM BOLINHAS)
+                    # PAINEL DE BOTÕES SUPERIORES: NÚMERO EM CIMA (MAIOR E NEGRITO), TEXTO EMBAIXO
                     col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
                     
                     with col_m1:
-                        if st.button(f"**{total_qtd}**\n\nTotal (Filtros)", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
+                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{total_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Total</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
                             st.session_state.filtro_btn_status = "Todas"
                             st.rerun()
                     with col_m2:
-                        if st.button(f"**{vencidas_qtd}**\n\nVencidas", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
+                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vencidas_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vencidas</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
                             st.session_state.filtro_btn_status = "Vencidas"
                             st.rerun()
                     with col_m3:
-                        if st.button(f"**{vence_hoje_qtd}**\n\nVence Hoje", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
+                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vence_hoje_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vence Hoje</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
                             st.session_state.filtro_btn_status = "Vence Hoje"
                             st.rerun()
                     with col_m4:
-                        if st.button(f"**{vence_amanha_qtd}**\n\nVence Amanhã", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
+                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vence_amanha_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vence Amanhã</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
                             st.session_state.filtro_btn_status = "Vence Amanhã"
                             st.rerun()
                     with col_m5:
-                        if st.button(f"**{vencem_semana_qtd}**\n\nVencem na Semana", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
+                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vencem_semana_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vencem na Semana</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
                             st.session_state.filtro_btn_status = "Vencem na Semana"
                             st.rerun()
 
