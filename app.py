@@ -519,10 +519,10 @@ with aba_tratativa:
         rc = st.session_state.reset_counter
 
         # -------------------------------------------------------------
-        # 1. VISITA DE TRANSFERÊNCIA (RELATÓRIO FOTOGRÁFICO)
+        # 1. VISITA DE TRANSFERÊNCIA (RELATÓRIO FOTOGRÁFICO & TEXTO)
         # -------------------------------------------------------------
         if menu_tratativa == "📷 Visita de Transferência":
-            cabecalho_pagina("Visita de Transferência & Relatório Fotográfico", "Gerador automatizado de relatórios técnicos e inspeções fotográficas.")
+            cabecalho_pagina("Visita de Transferência & Relatório Técnico", "Gerador automatizado de relatórios técnicos, formulários e inspeções fotográficas.")
             
             if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_novo_vis_{rc}"):
                 st.session_state.reset_counter += 1
@@ -540,11 +540,44 @@ with aba_tratativa:
             with s1_l2_c2: departamento = st.text_input("Sobrenome ou Departamento *", key=f"vis_dep_{rc}")
 
             st.divider()
-            st.subheader("2. Quantidade de Centrais")
+            st.subheader("2. Informações Contratuais")
+            s2_c1, s2_c2 = st.columns(2)
+            with s2_c1:
+                eq_contrato = st.radio("Equipamentos de acordo com contrato vigente? *", ["Sim", "Não"], horizontal=True, key=f"eq_cont_{rc}")
+                desc_eq_contrato = st.text_input("Detalhes dos Equipamentos *", key=f"desc_eq_{rc}")
+                rep2_correto = st.radio("Representante 2 está correto? *", ["Sim", "Não"], horizontal=True, key=f"rep2_{rc}")
+                desc_rep2 = st.text_input("Nº OC de Regularização Rep. 2", key=f"desc_rep2_{rc}") if rep2_correto == "Não" else ""
+                tem_freq = st.radio("Possui programação cadastrada? *", ["Sim", "Não"], horizontal=True, key=f"tem_freq_{rc}")
+                desc_freq = st.text_input("Qual a programação / Nº OC *", key=f"desc_freq_{rc}")
+            
+            with s2_c2:
+                consumo_previsto = st.text_input("Consumo Previsto (kg) *", key=f"cons_prev_{rc}")
+                consumo_real = st.text_input("Consumo Médio (kg) *", key=f"cons_real_{rc}")
+                possui_art = st.radio("Laudo ART emitido? *", ["Sim", "Não"], horizontal=True, key=f"possui_art_{rc}")
+                desc_art = st.text_input("Número da ART / Nº OC *", key=f"desc_art_{rc}")
+                central_norma = st.radio("Central atende as normas? *", ["Sim", "Não"], horizontal=True, key=f"central_norma_{rc}")
+                desc_central_norma = st.text_input("Motivo Central fora de norma", key=f"desc_norma_{rc}") if central_norma == "Não" else ""
+
+            st.divider()
+            st.subheader("3. Novos Negócios & Satisfação")
+            s3_c1, s3_c2 = st.columns(2)
+            with s3_c1:
+                indica_negocios = st.radio("Indicação de novos negócios? *", ["Sim", "Não"], horizontal=True, key=f"ind_neg_{rc}")
+                desc_negocios = st.text_input("Detalhes da indicação", key=f"desc_neg_{rc}") if indica_negocios == "Sim" else ""
+                possui_debitos = st.radio("Cliente possui débitos? *", ["Sim", "Não"], horizontal=True, key=f"possui_deb_{rc}")
+                desc_debitos = st.text_input("Detalhes dos débitos", key=f"desc_deb_{rc}") if possui_debitos == "Sim" else ""
+            with s3_c2:
+                cliente_satisfeito = st.radio("Cliente satisfeito com a Consigaz? *", ["Sim", "Não"], horizontal=True, key=f"cli_sat_{rc}")
+                desc_satisfacao = st.text_input("Observação sobre satisfação", key=f"desc_sat_{rc}")
+
+            observacoes = st.text_area("Observações Gerais", key=f"obs_transf_{rc}")
+
+            st.divider()
+            st.subheader("4. Quantidade de Centrais")
             qtd_centrais = st.number_input("Quantidade de Centrais de Gás", min_value=1, max_value=10, value=1, step=1, key=f"vis_qtd_cent_{rc}")
 
             st.divider()
-            st.subheader("3. Relatório Fotográfico - Upload de Imagens")
+            st.subheader("5. Relatório Fotográfico - Upload de Imagens")
             
             def carregar_fotos(label, max_arquivos=None):
                 fotos = st.file_uploader(label, type=["png", "jpg", "jpeg"], accept_multiple_files=True, key=f"up_{label}_{rc}")
@@ -579,27 +612,49 @@ with aba_tratativa:
                         dic_fotos_final[nome_equip] = carregar_fotos(f"📸 {nome_equip}", max_arquivos=None)
 
             st.divider()
-            if st.button("📄 Gerar PDF do Relatório Fotográfico", type="primary"):
-                if not cod_cliente or not nome_cliente:
-                    st.error("⚠️ Preencha o Código do Cliente e Nome/Razão Social.")
-                else:
-                    pdf = RelatorioPDF(cod_cliente=cod_cliente, nome_cliente=nome_cliente, logo_path=LOGO_PATH)
-                    pdf.add_page()
-                    pdf.set_font("Arial", "", 12)
-                    pdf.cell(0, 10, f"Contato: {contato} | Telefone: {telefone}", ln=True)
-                    pdf.cell(0, 10, f"Departamento: {departamento}", ln=True)
-                    
-                    cod_limpo = re.sub(r'\D', '', str(cod_cliente))
-                    data_str = datetime.now().strftime("%d-%m-%y")
-                    nome_arquivo_pdf = f"relatorio_{cod_limpo}_{data_str}.pdf"
-                    
-                    pdf_output = pdf.output(dest='S').encode('latin-1', errors='replace')
-                    st.download_button(
-                        label="💾 Baixar PDF Gerado",
-                        data=pdf_output,
-                        file_name=nome_arquivo_pdf,
-                        mime="application/pdf"
-                    )
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("📝 Gerar Texto para Sistema", type="primary"):
+                    linha_art = f"(x) Sim ( ) Não {desc_art.strip()}" if possui_art == "Sim" else f"( ) Sim (x) Não - {desc_art.strip()}"
+                    texto_eq_contrato = f"{eq_contrato}. {desc_eq_contrato.strip()}".strip()
+                    texto_rep2 = rep2_correto + (f" - {desc_rep2.strip()}" if rep2_correto == "Não" and desc_rep2.strip() else "")
+                    texto_freq = tem_freq + (f" - {desc_freq.strip()}" if desc_freq.strip() else "")
+                    texto_debitos = possui_debitos + (f" - {desc_debitos.strip()}" if possui_debitos == "Sim" and desc_debitos.strip() else "")
+                    texto_central_norma = central_norma + (f" - {desc_central_norma.strip()}" if central_norma == "Não" and desc_central_norma.strip() else "")
+                    texto_negocios = indica_negocios + (f" - {desc_negocios.strip()}" if indica_negocios == "Sim" and desc_negocios.strip() else "")
+                    texto_satisfacao = cliente_satisfeito + (f", {desc_satisfacao.strip()}" if desc_satisfacao.strip() else "")
+
+                    texto_final = f"""Contato: {contato} Sobrenome ou departamento: {departamento} Telefone: {telefone}
+Equipamentos de acordo com o contrato vigente? {texto_eq_contrato} Representante 2 está correto? {texto_rep2} Possui programação cadastrada? {texto_freq} Consumo mensal atual de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg Laudo ART emitido? {linha_art} Central atende as normas? {texto_central_norma}
+Indicação de novos negócios do cliente: {texto_negocios} Cliente possui débitos? {texto_debitos} Cliente está satisfeito com o atendimento da Consigaz? {texto_satisfacao}
+Obs.: {observacoes}"""
+
+                    st.success("✅ Texto para o Sistema gerado com sucesso!")
+                    st.text_area("Texto Gerado:", value=texto_final, height=250, key=f"txt_area_transf_{rc}")
+                    botao_copiar_customizado(texto_final, "transf_txt")
+
+            with col_b2:
+                if st.button("📄 Gerar PDF do Relatório Fotográfico"):
+                    if not cod_cliente or not nome_cliente:
+                        st.error("⚠️ Preencha o Código do Cliente e Nome/Razão Social.")
+                    else:
+                        pdf = RelatorioPDF(cod_cliente=cod_cliente, nome_cliente=nome_cliente, logo_path=LOGO_PATH)
+                        pdf.add_page()
+                        pdf.set_font("Arial", "", 12)
+                        pdf.cell(0, 10, f"Contato: {contato} | Telefone: {telefone}", ln=True)
+                        pdf.cell(0, 10, f"Departamento: {departamento}", ln=True)
+                        
+                        cod_limpo = re.sub(r'\D', '', str(cod_cliente))
+                        data_str = datetime.now().strftime("%d-%m-%y")
+                        nome_arquivo_pdf = f"relatorio_{cod_limpo}_{data_str}.pdf"
+                        
+                        pdf_output = pdf.output(dest='S').encode('latin-1', errors='replace')
+                        st.download_button(
+                            label="💾 Baixar PDF Gerado",
+                            data=pdf_output,
+                            file_name=nome_arquivo_pdf,
+                            mime="application/pdf"
+                        )
 
         # -------------------------------------------------------------
         # 2. ELABORAÇÃO DE CONTRATO
