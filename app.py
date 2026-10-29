@@ -332,10 +332,12 @@ div.stButton > button {
   border-radius: 12px !important; 
   font-weight: 700 !important;
   transition: all 0.2s ease-in-out;
-  padding: 14px 12px !important;
-  min-height: 85px !important;
-  font-size: 0.95rem !important;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+  padding: 14px 10px !important;
+  min-height: 95px !important;
+  font-size: 0.88rem !important;
+  line-height: 1.35 !important;
+  white-space: normal !important;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.05);
 }
 div.stButton > button[data-testid="baseButton-primary"] {
   background-color: #004080 !important; 
@@ -1187,27 +1189,27 @@ with aba_agenda:
                     st.write("")
                     st.markdown("**📊 Painel de Filtros Rápidos (Clique no cartão desejado):**")
                     
-                    # PAINEL DE BOTÕES SUPERIORES MAIORES E MAIS ELABORADOS
+                    # PAINEL DE BOTÕES SUPERIORES MAIORES, NOME COMPLETO E QUANTIDADE EM DESTAQUE (SEM BOLINHAS)
                     col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
                     
                     with col_m1:
-                        if st.button(f"📋 Total (Filtros)\n\n**{total_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
+                        if st.button(f"**{total_qtd}**\n\nTotal (Filtros)", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
                             st.session_state.filtro_btn_status = "Todas"
                             st.rerun()
                     with col_m2:
-                        if st.button(f"🔴 Vencidas\n\n**{vencidas_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
+                        if st.button(f"**{vencidas_qtd}**\n\nVencidas", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
                             st.session_state.filtro_btn_status = "Vencidas"
                             st.rerun()
                     with col_m3:
-                        if st.button(f"🔵 Vence Hoje\n\n**{vence_hoje_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
+                        if st.button(f"**{vence_hoje_qtd}**\n\nVence Hoje", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
                             st.session_state.filtro_btn_status = "Vence Hoje"
                             st.rerun()
                     with col_m4:
-                        if st.button(f"🟠 Vence Amanhã\n\n**{vence_amanha_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
+                        if st.button(f"**{vence_amanha_qtd}**\n\nVence Amanhã", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
                             st.session_state.filtro_btn_status = "Vence Amanhã"
                             st.rerun()
                     with col_m5:
-                        if st.button(f"📅 Vencem na Semana\n\n**{vencem_semana_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
+                        if st.button(f"**{vencem_semana_qtd}**\n\nVencem na Semana", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
                             st.session_state.filtro_btn_status = "Vencem na Semana"
                             st.rerun()
 
@@ -1242,7 +1244,7 @@ with aba_agenda:
                         ]].copy()
                         df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
                         
-                        # Exibição otimizada com colunas ajustadas e sem cortes
+                        # Exibição otimizada com colunas ajustadas e sem cortes (largura otimizada por título)
                         st.dataframe(
                             df_exibicao,
                             column_config={
