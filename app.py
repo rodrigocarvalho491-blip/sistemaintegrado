@@ -235,15 +235,12 @@ def calcular_dias_uteis(data_inicio, data_fim):
     elif p < h: return -int(np.busday_count(p, h))
     else: return 0
 
-def classificar_status_geral(row, segunda_feira_ts, sexta_feira_ts):
+def classificar_status_geral(row):
     dias_uteis = row['Dias Úteis Restantes']
-    p = row['Prazo_DT']
-    if pd.isna(p): return "🟢 No Prazo"
-    
+    if pd.isna(row['Prazo_DT']): return "🟢 No Prazo"
     if dias_uteis < 0: return "🔴 Vencido"
     if dias_uteis == 0: return "🔵 Vence Hoje"
     if dias_uteis == 1: return "🟠 Vence Amanhã"
-    if segunda_feira_ts <= p <= sexta_feira_ts: return "🟡 Vence na Semana"
     return "🟢 No Prazo"
 
 def classificar_status_comodato(dias_uteis):
@@ -1141,7 +1138,7 @@ with aba_agenda:
                 sexta_feira_semana = segunda_feira_semana + pd.Timedelta(days=4)
                 
                 df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje_ts.date(), x))
-                df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, segunda_feira_semana, sexta_feira_semana), axis=1)
+                df_pendentes['Status Geral'] = df_pendentes.apply(classificar_status_geral, axis=1)
                 df_pendentes['Status Comodato'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_comodato)
                 
                 df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
@@ -1161,34 +1158,46 @@ with aba_agenda:
                     if cidades_selecionadas: df_base_filtrado = df_base_filtrado[df_base_filtrado['Cidade'].isin(cidades_selecionadas)]
                     if sub_class_selecionadas: df_base_filtrado = df_base_filtrado[df_base_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
                     
-                    # MÉTRICAS
-                    st.write("")
-                    col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-                    col_m1.metric("Total (Filtros)", len(df_base_filtrado))
-                    col_m2.metric("Vencidas", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] < 0]))
-                    col_m3.metric("Vence Hoje", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0]))
-                    col_m4.metric("Vence Amanhã", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1]))
-                    col_m5.metric("Vencem na Semana", len(df_base_filtrado[(df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana)]))
+                    # CÁLCULOS DAS MÉTRICAS
+                    total_qtd = len(df_base_filtrado)
+                    vencidas_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] < 0])
+                    vence_hoje_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0])
+                    vence_amanha_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1])
                     
-                    st.write("---")
-                    
-                    # FILTROS EM FORMATO DE BOTÕES (LIMPOS E PROFISSIONAIS)
-                    st.markdown("**🔍 Filtrar Tabela por Categoria:**")
-                    
-                    def estilo_btn(f_val):
-                        return "primary" if st.session_state.filtro_btn_status == f_val else "secondary"
+                    # Regra solicitada: "Vencem na Semana" = Ocorrências vencidas + Ocorrências com prazo de atendimento dentro da semana vigente
+                    df_vencem_semana = df_base_filtrado[
+                        (df_base_filtrado['Dias Úteis Restantes'] < 0) | 
+                        ((df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana))
+                    ]
+                    vencem_semana_qtd = len(df_vencem_semana)
 
-                    c_btn1, c_btn2, c_btn3, c_btn4, c_btn5 = st.columns(5)
-                    if c_btn1.button("Todas", type=estilo_btn("Todas"), use_container_width=True): 
-                        st.session_state.filtro_btn_status = "Todas"; st.rerun()
-                    if c_btn2.button("Vencidas", type=estilo_btn("Vencidas"), use_container_width=True): 
-                        st.session_state.filtro_btn_status = "Vencidas"; st.rerun()
-                    if c_btn3.button("Vence Hoje", type=estilo_btn("Vence Hoje"), use_container_width=True): 
-                        st.session_state.filtro_btn_status = "Vence Hoje"; st.rerun()
-                    if c_btn4.button("Vence Amanhã", type=estilo_btn("Vence Amanhã"), use_container_width=True): 
-                        st.session_state.filtro_btn_status = "Vence Amanhã"; st.rerun()
-                    if c_btn5.button("Vencem na Semana", type=estilo_btn("Vencem na Semana"), use_container_width=True): 
-                        st.session_state.filtro_btn_status = "Vencem na Semana"; st.rerun()
+                    st.write("")
+                    
+                    # MÉTRICAS INTERATIVAS (O próprio card é o botão de filtro)
+                    col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
+                    
+                    with col_m1:
+                        if st.button(f"Total (Filtros)\n\n**{total_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
+                            st.session_state.filtro_btn_status = "Todas"
+                            st.rerun()
+                    with col_m2:
+                        if st.button(f"Vencidas\n\n**{vencidas_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
+                            st.session_state.filtro_btn_status = "Vencidas"
+                            st.rerun()
+                    with col_m3:
+                        if st.button(f"Vence Hoje\n\n**{vence_hoje_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
+                            st.session_state.filtro_btn_status = "Vence Hoje"
+                            st.rerun()
+                    with col_m4:
+                        if st.button(f"Vence Amanhã\n\n**{vence_amanha_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
+                            st.session_state.filtro_btn_status = "Vence Amanhã"
+                            st.rerun()
+                    with col_m5:
+                        if st.button(f"Vencem na Semana\n\n**{vencem_semana_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
+                            st.session_state.filtro_btn_status = "Vencem na Semana"
+                            st.rerun()
+
+                    st.write("---")
 
                     df_filtrado = df_base_filtrado.copy()
                     fs = st.session_state.filtro_btn_status
@@ -1200,14 +1209,14 @@ with aba_agenda:
                     elif fs == "Vence Amanhã":
                         df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
                     elif fs == "Vencem na Semana":
-                        # Exclusivamente os prazos entre Segunda e Sexta da semana atual (sem misturar com as vencidas antigas)
-                        df_filtrado = df_filtrado[(df_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_filtrado['Prazo_DT'] <= sexta_feira_semana)]
+                        # Regra solicitada: Vencidas + Prazo entre Seg e Sex da semana atual
+                        df_filtrado = df_vencem_semana.copy()
 
                     df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
                     
                     st.write("")
                     if df_filtrado.empty:
-                        st.success(f"✅ Nenhuma ocorrência na categoria '{fs}' com os filtros atuais.")
+                        st.success(f"✅ Nenhuma ocorrência na categoria selecionada com os filtros atuais.")
                     else:
                         df_exibicao = df_filtrado[[
                             'Status Geral',
