@@ -173,6 +173,16 @@ def obter_ipca_acumulado_12m():
         pass
     return None, None
 
+def formatar_ci_num(ci_str):
+    digits = re.sub(r'\D', '', str(ci_str))
+    if len(digits) == 9:
+        return f"{digits[:3]}.{digits[3:6]}.{digits[6:]}"
+    elif len(digits) == 11:
+        return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}"
+    elif digits:
+        return ci_str.strip()
+    return "000.000.000"
+
 # --- GERADOR DE PDF DE RELATÓRIO FOTOGRÁFICO ---
 class RelatorioPDF(FPDF):
     def __init__(self, cod_cliente="", nome_cliente="", logo_path=""):
@@ -351,7 +361,7 @@ div.stButton > button:first-child {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-def botao_copiar_customizado(texto_para_copiar, chave_unica):
+def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Copiar Texto Completo"):
     texto_seguro = texto_para_copiar.replace('`', '\\`').replace('$', '\\$').replace('\n', '\\n').replace('"', '\\"')
     component_html = f"""
     <div style="margin-top: 5px; margin-bottom: 10px;">
@@ -359,7 +369,7 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
             background-color: #0055A5; color: white; padding: 8px 16px; border: none;
             border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer;
             display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        ">📄 Copiar Texto Completo</button>
+        ">{label_btn}</button>
         <span id="msg_{chave_unica}" style="margin-left: 10px; color: green; font-weight: bold; font-size: 13px; display: none;">Copiado com sucesso!</span>
     </div>
     <script>
@@ -519,7 +529,7 @@ with aba_tratativa:
         rc = st.session_state.reset_counter
 
         # -------------------------------------------------------------
-        # 1. VISITA DE TRANSFERÊNCIA (RELATÓRIO FOTOGRÁFICO & TEXTO)
+        # 1. VISITA DE TRANSFERÊNCIA
         # -------------------------------------------------------------
         if menu_tratativa == "📷 Visita de Transferência":
             cabecalho_pagina("Visita de Transferência & Relatório Técnico", "Gerador automatizado de relatórios técnicos, formulários e inspeções fotográficas.")
@@ -982,14 +992,14 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
                 ipca_vigente = ipca_api
                 st.success(f"📊 **IPCA Acumulado de 12 meses (IBGE, referência {ipca_periodo}):** `{ipca_vigente:.2f}%`")
             else:
-                ipca_vigente = st.number_input("IPCA acumulado de 12 meses (%) - informado manualmente", min_value=0.0, value=4.50, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
+                ipca_vigente = st.number_input("IPCA acumulado de 12 meses (%) - informado manualmente", min_value=0.0, value=4.58, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
 
             col_an1, col_an2 = st.columns(2)
-            with col_an1: preco_anterior_input = st.text_input("Preço Anterior (R$)", value="6,50", key=f"preco_ant_{rca}")
+            with col_an1: preco_anterior_input = st.text_input("Preço Anterior (R$)", value="7,7400", key=f"preco_ant_{rca}")
             with col_an2: clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, key=f"clausula_{rca}")
 
             st.divider()
-            p_aniv_str = "xx,xx"
+            p_aniv_str = "0,0000"
             try:
                 val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
                 p_ant = float(val_limpo)
@@ -1002,27 +1012,55 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
                 if clausula_contrato == "Não":
                     st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
 
-                texto_aniversario = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."
-                if clausula_contrato == "Sim":
-                    texto_aniversario += "\n\nCliente possui cláusula em contrato."
-                texto_aniversario += f"\nPreço anterior: R$ {preco_anterior_input}\nPreço Aniversário: R$ {p_aniv_str}"
+                clausula_txt = "\n\nCliente possui cláusula em contrato." if clausula_contrato == "Sim" else ""
+                
+                p_ant_fmt = preco_anterior_input.strip()
+                if not p_ant_fmt.startswith("R$"):
+                    p_ant_fmt = f"R$ {p_ant_fmt}"
+
+                texto_aniversario = (
+                    f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.{clausula_txt}\n\n"
+                    f"Preço anterior: {p_ant_fmt}\n"
+                    f"Preço Aniversário: R$ {p_aniv_str}"
+                )
 
                 st.success("✅ Texto gerado com sucesso!")
+                
+                # ADVERTÊNCIA E CAMPO PARA COPIAR APENAS O VALOR NOVO
+                st.warning("⚠️ **ATENÇÃO:** Utilize o preço novo abaixo para a abertura da CI!")
+                col_v1, col_v2 = st.columns([1, 2])
+                with col_v1:
+                    st.text_input("Preço Novo para Abertura da CI:", value=f"R$ {p_aniv_str}", disabled=True, key=f"valor_novo_ci_{rca}")
+                with col_v2:
+                    st.write("")
+                    st.write("")
+                    botao_copiar_customizado(f"R$ {p_aniv_str}", "btn_copy_val_novo", label_btn="💵 Copiar Valor Novo")
+
                 st.text_area("Texto Gerado:", value=texto_aniversario, height=180, key=f"txt_area_aniv_{rca}")
                 botao_copiar_customizado(texto_aniversario, "aniversario_txt")
 
             st.divider()
             st.subheader("Tratativa com C.I.")
-            ci_input = st.text_input("Número da C.I.", placeholder="Ex: 588.386.687", key=f"ci_num_{rca}")
+            ci_input = st.text_input("Número da C.I. (9 ou 11 dígitos)", placeholder="Ex: 588358982 ou 588.358.982", key=f"ci_num_{rca}")
 
             if st.button("📝 Gerar Texto Final com C.I.", type="primary"):
-                texto_ci = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%."
-                if clausula_contrato == "Sim":
-                    texto_ci += "\n\nCliente possui cláusula em contrato."
-                texto_ci += f"\nPreço anterior: R$ {preco_anterior_input}\nPreço Aniversário: R$ {p_aniv_str}\nCI.: {ci_input if ci_input else '000.000.000'} - Preço Aniversário"
+                clausula_txt = "\n\nCliente possui cláusula em contrato." if clausula_contrato == "Sim" else ""
+                
+                p_ant_fmt = preco_anterior_input.strip()
+                if not p_ant_fmt.startswith("R$"):
+                    p_ant_fmt = f"R$ {p_ant_fmt}"
+
+                ci_fmt = formatar_ci_num(ci_input)
+
+                texto_ci = (
+                    f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.{clausula_txt}\n\n"
+                    f"Preço anterior: {p_ant_fmt}\n"
+                    f"Preço Aniversário: R$ {p_aniv_str}\n\n"
+                    f"CI.: {ci_fmt} Preço Comercial"
+                )
 
                 st.success("✅ Texto com C.I. gerado com sucesso!")
-                st.text_area("Texto com C.I.:", value=texto_ci, height=200, key=f"txt_area_ci_{rca}")
+                st.text_area("Texto com C.I.:", value=texto_ci, height=220, key=f"txt_area_ci_{rca}")
                 botao_copiar_customizado(texto_ci, "ci_txt")
 
 # =====================================================================
