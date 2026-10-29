@@ -847,7 +847,7 @@ Obs.: {observacoes}"""
                     if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()} / und]")
                     texto_padrao_contrato += f"\nPreço Cilindro: {' '.join(partes_cil)}\nConsumo mensal previsto: {consumo_cilindro_total} KGs"
 
-                texto_padrao_contrato += f"\nCondição de paymento: {cond_pagamento}\nVigência: {vigencia}"
+                texto_padrao_contrato += f"\nCondição de pagamento: {cond_pagamento}\nVigência: {vigencia}"
 
                 if qtd_entregas_c == 1:
                     texto_padrao_contrato += f"\nEquipamentos: {equipamentos_contrato}"
@@ -1112,7 +1112,7 @@ with aba_agenda:
             col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
             
             with col_menu_agenda:
-                st.markdown("### 📌 Visões da Agenda")
+                st.markdown("### 📌 Filtros")
                 menu_agenda = st.radio(
                     "Selecione a visão:", 
                     [
@@ -1137,19 +1137,42 @@ with aba_agenda:
                         sub_class_unicas = sorted(list(df_pendentes[COL_SUB_CLASSIF].unique()))
                         sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[])
                     
-                    df_filtrado = df_pendentes.copy()
-                    if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
-                    if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
+                    df_base_filtrado = df_pendentes.copy()
+                    if cidades_selecionadas: df_base_filtrado = df_base_filtrado[df_base_filtrado['Cidade'].isin(cidades_selecionadas)]
+                    if sub_class_selecionadas: df_base_filtrado = df_base_filtrado[df_base_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
                     
-                    df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
-                    
-                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                    col_m1.metric("Visitas Pendentes", len(df_filtrado))
-                    col_m2.metric("Vence Hoje", len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]))
-                    col_m3.metric("Vence Amanhã", len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]))
-                    col_m4.metric("Ocorrências Vencidas", len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]))
+                    # MÉTRICAS
+                    col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
+                    col_m1.metric("Total (Filtros)", len(df_base_filtrado))
+                    col_m2.metric("Vencidas", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] < 0]))
+                    col_m3.metric("Vence Hoje", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0]))
+                    col_m4.metric("Vence Amanhã", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1]))
+                    col_m5.metric("Na Semana", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] <= 5]))
                     
                     st.write("---")
+                    
+                    # FILTRO RÁPIDO (BOTÕES HORIZONTAIS)
+                    st.markdown("**🔍 Filtrar Tabela por Categoria:**")
+                    filtro_status = st.radio(
+                        "Filtro Status:",
+                        ["Todas", "Vencidas", "Vence Hoje", "Vence Amanhã", "Vencem na Semana"],
+                        horizontal=True,
+                        label_visibility="collapsed"
+                    )
+                    
+                    df_filtrado = df_base_filtrado.copy()
+                    if filtro_status == "Vencidas":
+                        df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] < 0]
+                    elif filtro_status == "Vence Hoje":
+                        df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 0]
+                    elif filtro_status == "Vence Amanhã":
+                        df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
+                    elif filtro_status == "Vencem na Semana":
+                        df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] <= 5]
+
+                    df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                    
+                    st.write("")
                     if not df_filtrado.empty:
                         df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
                         df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
@@ -1166,6 +1189,8 @@ with aba_agenda:
                                 for oc in ocorrencias_para_tratar: st.session_state.tratadas_manualmente.add(int(oc))
                                 st.success("✅ Ocorrências tratadas removidas!")
                                 st.rerun()
+                    else:
+                        st.success("✅ Nenhuma ocorrência para este filtro no momento.")
 
                 # ----- 2. COMODATO INATIVO -----
                 elif menu_agenda == "Comodato Inativo":
