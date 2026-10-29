@@ -285,7 +285,7 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 }
 
 .block-container, [data-testid="stMainBlockContainer"] {
-  max-width: 1180px !important;
+  max-width: 1280px !important;
   margin: 1.2rem auto 2rem auto !important;
   padding: 1.8rem 2.4rem 2.4rem 2.4rem !important;
   background: #FFFFFF !important;
@@ -327,36 +327,6 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 .cg-header-sep { width: 2px; align-self: stretch; background: #E2E8F0; }
 .cg-title { font-size: 1.65rem; font-weight: 800; line-height: 1.2; color: #003366 !important; }
 .cg-subtitle { font-size: 0.95rem; margin-top: 0.2rem; color: #64748B !important; font-weight: 500; }
-
-div.stButton > button {
-  border-radius: 12px !important; 
-  transition: all 0.2s ease-in-out;
-  padding: 12px 10px !important;
-  min-height: 95px !important;
-  line-height: 1.35 !important;
-  white-space: normal !important;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.05);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-div.stButton > button[data-testid="baseButton-primary"] {
-  background-color: #004080 !important; 
-  color: #ffffff !important;
-  border: 2px solid #F28C28 !important; 
-  box-shadow: 0 6px 16px rgba(0,85,165,0.3) !important;
-}
-div.stButton > button[data-testid="baseButton-secondary"] {
-  background-color: #F8FAFC !important;
-  color: #1E293B !important;
-  border: 1px solid #CBD5E1 !important;
-}
-div.stButton > button[data-testid="baseButton-secondary"]:hover {
-  background-color: #E2E8F0 !important;
-  color: #003366 !important;
-  border-color: #0055A5 !important;
-}
 
 [data-testid="stSidebar"] {
   background-color: #FFFFFF !important;
@@ -1181,7 +1151,6 @@ with aba_agenda:
                     vence_hoje_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0])
                     vence_amanha_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1])
                     
-                    # Regra solicitada: "Vencem na Semana" = Ocorrências vencidas + Ocorrências que vencem até a sexta-feira da semana atual
                     df_vencem_semana = df_base_filtrado[
                         (df_base_filtrado['Dias Úteis Restantes'] < 0) | 
                         (df_base_filtrado['Prazo_DT'].dt.normalize() <= sexta_feira_semana)
@@ -1191,35 +1160,59 @@ with aba_agenda:
                     st.write("")
                     st.markdown("**📊 Painel de Filtros Rápidos (Clique no cartão desejado):**")
                     
-                    # PAINEL DE BOTÕES SUPERIORES: NÚMERO EM CIMA (MAIOR E NEGRITO), TEXTO EMBAIXO
+                    # PAINEL DE BOTÕES INTERATIVOS HTML PURO (COM ESTADO SELECIONADO/NÃO SELECIONADO)
+                    fs = st.session_state.filtro_btn_status
+                    
+                    def render_card_btn(label_txt, count_val, key_status):
+                        is_active = (fs == key_status)
+                        bg_color = "#004080" if is_active else "#F8FAFC"
+                        text_color = "#FFFFFF" if is_active else "#1E293B"
+                        border_color = "2px solid #F28C28" if is_active else "1px solid #CBD5E1"
+                        
+                        html_card = f"""
+                        <div onclick="const btn = document.getElementById('hidden_btn_{key_status}'); if(btn) btn.click();" style="
+                            background-color: {bg_color}; color: {text_color}; border: {border_color};
+                            border-radius: 12px; padding: 12px 8px; text-align: center; cursor: pointer;
+                            box-shadow: 0 3px 8px rgba(0,0,0,0.05); min-height: 90px; display: flex; flex-direction: column;
+                            align-items: center; justify-content: center; transition: all 0.2s ease-in-out;
+                        ">
+                            <div style="font-size: 22px; font-weight: 800; line-height: 1.1;">{count_val}</div>
+                            <div style="font-size: 13px; font-weight: 600; margin-top: 4px; line-height: 1.2;">{label_txt}</div>
+                        </div>
+                        """
+                        return html_card
+
                     col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
                     
                     with col_m1:
-                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{total_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Total</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
+                        components.html(render_card_btn("Total", total_qtd, "Todas"), height=105)
+                        if st.button("Filtrar Total", key="hidden_btn_Todas", use_container_width=True):
                             st.session_state.filtro_btn_status = "Todas"
                             st.rerun()
                     with col_m2:
-                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vencidas_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vencidas</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
+                        components.html(render_card_btn("Vencidas", vencidas_qtd, "Vencidas"), height=105)
+                        if st.button("Filtrar Vencidas", key="hidden_btn_Vencidas", use_container_width=True):
                             st.session_state.filtro_btn_status = "Vencidas"
                             st.rerun()
                     with col_m3:
-                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vence_hoje_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vence Hoje</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
+                        components.html(render_card_btn("Vence Hoje", vence_hoje_qtd, "Vence Hoje"), height=105)
+                        if st.button("Filtrar Vence Hoje", key="hidden_btn_Vence Hoje", use_container_width=True):
                             st.session_state.filtro_btn_status = "Vence Hoje"
                             st.rerun()
                     with col_m4:
-                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vence_amanha_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vence Amanhã</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
+                        components.html(render_card_btn("Vence Amanhã", vence_amanha_qtd, "Vence Amanhã"), height=105)
+                        if st.button("Filtrar Vence Amanhã", key="hidden_btn_Vence Amanhã", use_container_width=True):
                             st.session_state.filtro_btn_status = "Vence Amanhã"
                             st.rerun()
                     with col_m5:
-                        if st.button(f"<span style='font-size: 22px; font-weight: 800;'>{vencem_semana_qtd}</span><br><span style='font-size: 13px; font-weight: 600;'>Vencem na Semana</span>", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
+                        components.html(render_card_btn("Vencem na Semana", vencem_semana_qtd, "Vencem na Semana"), height=105)
+                        if st.button("Filtrar Vencem na Semana", key="hidden_btn_Vencem na Semana", use_container_width=True):
                             st.session_state.filtro_btn_status = "Vencem na Semana"
                             st.rerun()
 
                     st.write("---")
 
                     df_filtrado = df_base_filtrado.copy()
-                    fs = st.session_state.filtro_btn_status
-
                     if fs == "Vencidas":
                         df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] < 0]
                     elif fs == "Vence Hoje":
@@ -1246,17 +1239,17 @@ with aba_agenda:
                         ]].copy()
                         df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
                         
-                        # Exibição otimizada com colunas ajustadas e sem cortes (largura otimizada por título)
+                        # Tabela com larguras generosas garantidas e sem corte de texto
                         st.dataframe(
                             df_exibicao,
                             column_config={
-                                'Status Geral': st.column_config.TextColumn("Status", width="small"),
-                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Restantes", width="small"),
-                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width="small"),
-                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width="large"),
-                                'Cidade': st.column_config.TextColumn("Cidade", width="medium"),
-                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width="medium"),
-                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width="medium"),
+                                'Status Geral': st.column_config.TextColumn("Status", width=130),
+                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Restantes", width=120),
+                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width=140),
+                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width=380),
+                                'Cidade': st.column_config.TextColumn("Cidade", width=180),
+                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width=220),
+                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width=160),
                             },
                             hide_index=True,
                             use_container_width=True
@@ -1287,13 +1280,13 @@ with aba_agenda:
                         st.dataframe(
                             df_comodato_exibicao,
                             column_config={
-                                'Status Comodato': st.column_config.TextColumn("Status Semanal", width="small"),
-                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Restantes", width="small"),
-                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width="small"),
-                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width="large"),
-                                'Cidade': st.column_config.TextColumn("Cidade", width="medium"),
-                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width="medium"),
-                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width="medium"),
+                                'Status Comodato': st.column_config.TextColumn("Status Semanal", width=140),
+                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Restantes", width=120),
+                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width=140),
+                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width=380),
+                                'Cidade': st.column_config.TextColumn("Cidade", width=180),
+                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width=220),
+                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width=160),
                             },
                             hide_index=True,
                             use_container_width=True
