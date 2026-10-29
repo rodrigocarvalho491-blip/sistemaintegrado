@@ -1168,7 +1168,7 @@ with aba_agenda:
                     col_m2.metric("Vencidas", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] < 0]))
                     col_m3.metric("Vence Hoje", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0]))
                     col_m4.metric("Vence Amanhã", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1]))
-                    col_m5.metric("Vencem na Semana", len(df_base_filtrado[(df_base_filtrado['Dias Úteis Restantes'] < 0) | ((df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana))]))
+                    col_m5.metric("Vencem na Semana", len(df_base_filtrado[(df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana)]))
                     
                     st.write("---")
                     
@@ -1200,8 +1200,8 @@ with aba_agenda:
                     elif fs == "Vence Amanhã":
                         df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
                     elif fs == "Vencem na Semana":
-                        # Regra solicitada: Vencidas + Prazo entre Seg e Sex da semana atual
-                        df_filtrado = df_filtrado[(df_filtrado['Dias Úteis Restantes'] < 0) | ((df_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_filtrado['Prazo_DT'] <= sexta_feira_semana))]
+                        # Exclusivamente os prazos entre Segunda e Sexta da semana atual (sem misturar com as vencidas antigas)
+                        df_filtrado = df_filtrado[(df_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_filtrado['Prazo_DT'] <= sexta_feira_semana)]
 
                     df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
                     
