@@ -1136,7 +1136,7 @@ with aba_agenda:
                 
                 hoje_ts = pd.Timestamp(pd.Timestamp(datetime.now()).normalize())
                 
-                # Intervalo da semana corrente (Segunda a Sexta) com base no dia de acesso
+                # Intervalo exato da semana corrente (Segunda a Sexta) com base no dia de acesso
                 segunda_feira_semana = hoje_ts - pd.Timedelta(days=hoje_ts.weekday())
                 sexta_feira_semana = segunda_feira_semana + pd.Timedelta(days=4)
                 
@@ -1168,7 +1168,7 @@ with aba_agenda:
                     col_m2.metric("Vencidas", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] < 0]))
                     col_m3.metric("Vence Hoje", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0]))
                     col_m4.metric("Vence Amanhã", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1]))
-                    col_m5.metric("Vencem na Semana", len(df_base_filtrado[(df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana)]))
+                    col_m5.metric("Vencem na Semana", len(df_base_filtrado[(df_base_filtrado['Dias Úteis Restantes'] < 0) | ((df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana))]))
                     
                     st.write("---")
                     
@@ -1200,7 +1200,8 @@ with aba_agenda:
                     elif fs == "Vence Amanhã":
                         df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
                     elif fs == "Vencem na Semana":
-                        df_filtrado = df_filtrado[(df_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_filtrado['Prazo_DT'] <= sexta_feira_semana)]
+                        # Regra solicitada: Vencidas + Prazo entre Seg e Sex da semana atual
+                        df_filtrado = df_filtrado[(df_filtrado['Dias Úteis Restantes'] < 0) | ((df_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_filtrado['Prazo_DT'] <= sexta_feira_semana))]
 
                     df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
                     
@@ -1219,32 +1220,21 @@ with aba_agenda:
                         ]].copy()
                         df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
                         
-                        edited_df = st.data_editor(
-                            df_exibicao.assign(Tratar=False),
+                        # Exibição otimizada com colunas ajustadas e sem cortes
+                        st.dataframe(
+                            df_exibicao,
                             column_config={
-                                "Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True),
-                                'Status Geral': st.column_config.TextColumn("Status", width="small", disabled=True),
-                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Úteis Restantes", width="small", disabled=True),
-                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width="small", disabled=True),
-                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width="large", disabled=True),
-                                'Cidade': st.column_config.TextColumn("Cidade", width="small", disabled=True),
-                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width="medium", disabled=True),
-                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width="medium", disabled=True),
+                                'Status Geral': st.column_config.TextColumn("Status", width="small"),
+                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Restantes", width="small"),
+                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width="small"),
+                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width="large"),
+                                'Cidade': st.column_config.TextColumn("Cidade", width="medium"),
+                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width="medium"),
+                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width="medium"),
                             },
                             hide_index=True,
-                            use_container_width=True,
-                            key="editor_geral"
+                            use_container_width=True
                         )
-                        
-                        ocorrencias_para_tratar = edited_df[edited_df["Tratar"] == True][COL_OCORRENCIA].tolist()
-                        
-                        if ocorrencias_para_tratar:
-                            st.warning(f"⚠️ Você selecionou **{len(ocorrencias_para_tratar)}** ocorrência(s) para marcar como tratada(s).")
-                            if st.button("🔒 Confirmar e Remover do Painel", type="primary"):
-                                for oc in ocorrencias_para_tratar:
-                                    st.session_state.tratadas_manualmente.add(int(oc))
-                                st.success("✅ Ocorrência(s) tratada(s) com sucesso e removida(s) do painel!")
-                                st.rerun()
 
                 # ----- 2. COMODATO INATIVO -----
                 elif menu_agenda == "Comodato Inativo":
@@ -1268,31 +1258,20 @@ with aba_agenda:
 
                         st.metric("Total de Comodatos Inativos Pendentes", len(df_comodato_exibicao))
                         
-                        edited_comodato = st.data_editor(
-                            df_comodato_exibicao.assign(Tratar=False),
+                        st.dataframe(
+                            df_comodato_exibicao,
                             column_config={
-                                "Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True),
-                                'Status Comodato': st.column_config.TextColumn("Status Semanal", width="small", disabled=True),
-                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Úteis Restantes", width="small", disabled=True),
-                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width="small", disabled=True),
-                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width="large", disabled=True),
-                                'Cidade': st.column_config.TextColumn("Cidade", width="small", disabled=True),
-                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width="medium", disabled=True),
-                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width="medium", disabled=True),
+                                'Status Comodato': st.column_config.TextColumn("Status Semanal", width="small"),
+                                'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Restantes", width="small"),
+                                COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width="small"),
+                                COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width="large"),
+                                'Cidade': st.column_config.TextColumn("Cidade", width="medium"),
+                                COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width="medium"),
+                                'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width="medium"),
                             },
                             hide_index=True,
-                            use_container_width=True,
-                            key="editor_comodato"
+                            use_container_width=True
                         )
-                        
-                        comodatos_para_tratar = edited_comodato[edited_comodato["Tratar"] == True][COL_OCORRENCIA].tolist()
-                        if comodatos_para_tratar:
-                            st.warning(f"⚠️ Você selecionou **{len(comodatos_para_tratar)}** comodato(s) inativo(s) para tratar.")
-                            if st.button("🔒 Confirmar Tratativa de Comodato", type="primary", key="btn_comodato"):
-                                for oc in comodatos_para_tratar:
-                                    st.session_state.tratadas_manualmente.add(int(oc))
-                                st.success("✅ Comodato(s) tratado(s) com sucesso e removido(s) do painel!")
-                                st.rerun()
 
                 # ----- 3. OCORRÊNCIAS POR CIDADE -----
                 elif menu_agenda == "Ocorrências por Cidade":
