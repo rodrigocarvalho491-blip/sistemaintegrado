@@ -544,7 +544,7 @@ with aba_tratativa:
             qtd_centrais = st.number_input("Quantidade de Centrais de Gás", min_value=1, max_value=10, value=1, step=1, key=f"vis_qtd_cent_{rc}")
 
             st.divider()
-            st.subheader("3. Relatório Fotográfico")
+            st.subheader("3. Relatório Fotográfico - Upload de Imagens")
             
             def carregar_fotos(label, max_arquivos=None):
                 fotos = st.file_uploader(label, type=["png", "jpg", "jpeg"], accept_multiple_files=True, key=f"up_{label}_{rc}")
@@ -555,28 +555,28 @@ with aba_tratativa:
 
             dic_fotos_final = {}
             col_f1, col_f2 = st.columns(2)
-            with col_f1: dic_fotos_final["FACHADA"] = carregar_fotos("FACHADA", max_arquivos=2)
-            with col_f2: dic_fotos_final["CILINDROS"] = carregar_fotos("CILINDROS", max_arquivos=5)
+            with col_f1: dic_fotos_final["FACHADA"] = carregar_fotos("📸 FACHADA (Até 2 fotos)", max_arquivos=2)
+            with col_f2: dic_fotos_final["CILINDROS"] = carregar_fotos("📸 CILINDROS (Até 5 fotos)", max_arquivos=5)
 
             st.write("---")
             if qtd_centrais == 1:
                 c1, c2, c3 = st.columns(3)
-                with c1: dic_fotos_final["ABRIGO"] = carregar_fotos("ABRIGO", max_arquivos=10)
-                with c2: dic_fotos_final["CENTRAL"] = carregar_fotos("CENTRAL", max_arquivos=5)
-                with c3: dic_fotos_final["EQUIPAMENTOS"] = carregar_fotos("EQUIPAMENTOS", max_arquivos=None)
+                with c1: dic_fotos_final["ABRIGO"] = carregar_fotos("📸 ABRIGO (Até 10 fotos)", max_arquivos=10)
+                with c2: dic_fotos_final["CENTRAL"] = carregar_fotos("📸 CENTRAL (Até 5 fotos)", max_arquivos=5)
+                with c3: dic_fotos_final["EQUIPAMENTOS"] = carregar_fotos("📸 EQUIPAMENTOS", max_arquivos=None)
             else:
                 for i in range(1, int(qtd_centrais) + 1):
                     st.markdown(f"**📸 FOTOS - CENTRAL {i:02d}**")
                     c1, c2, c3 = st.columns(3)
                     with c1:
                         nome_abrigo = f"ABRIGO CENTRAL {i:02d}"
-                        dic_fotos_final[nome_abrigo] = carregar_fotos(nome_abrigo, max_arquivos=10)
+                        dic_fotos_final[nome_abrigo] = carregar_fotos(f"📸 {nome_abrigo} (Até 10)", max_arquivos=10)
                     with c2:
                         nome_central = f"CENTRAL {i:02d}"
-                        dic_fotos_final[nome_central] = carregar_fotos(nome_central, max_arquivos=5)
+                        dic_fotos_final[nome_central] = carregar_fotos(f"📸 {nome_central} (Até 5)", max_arquivos=5)
                     with c3:
                         nome_equip = f"EQUIPAMENTOS CENTRAL {i:02d}"
-                        dic_fotos_final[nome_equip] = carregar_fotos(nome_equip, max_arquivos=None)
+                        dic_fotos_final[nome_equip] = carregar_fotos(f"📸 {nome_equip}", max_arquivos=None)
 
             st.divider()
             if st.button("📄 Gerar PDF do Relatório Fotográfico", type="primary"):
