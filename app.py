@@ -8,6 +8,7 @@ import numpy as np
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+import altair as alt
 from datetime import datetime
 from fpdf import FPDF
 from supabase import create_client, Client
@@ -57,7 +58,6 @@ def carregar_banco_usuarios():
                 "precisa_trocar_senha": row.get("precisa_trocar_senha", False)
             }
         
-        # Garante a existência do admin master
         if "admin" not in dados:
             supabase.table("usuarios").insert({
                 "usuario": "admin", 
@@ -269,6 +269,17 @@ html, body, [class*="css"], .stApp {
 
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
+
+/* TRAVAR MENU SUPERIOR (ABAS) NO TOPO AO ROLAR */
+div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
+    position: sticky !important;
+    top: 0px !important;
+    z-index: 9999 !important;
+    background-color: #F1F5FA !important;
+    padding-top: 15px !important;
+    padding-bottom: 10px !important;
+    border-bottom: 1px solid #E2E8F0;
+}
 
 .block-container, [data-testid="stMainBlockContainer"] {
   max-width: 1180px !important;
@@ -836,7 +847,7 @@ Obs.: {observacoes}"""
                     if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()} / und]")
                     texto_padrao_contrato += f"\nPreço Cilindro: {' '.join(partes_cil)}\nConsumo mensal previsto: {consumo_cilindro_total} KGs"
 
-                texto_padrao_contrato += f"\nCondição de pagamento: {cond_pagamento}\nVigência: {vigencia}"
+                texto_padrao_contrato += f"\nCondição de paymento: {cond_pagamento}\nVigência: {vigencia}"
 
                 if qtd_entregas_c == 1:
                     texto_padrao_contrato += f"\nEquipamentos: {equipamentos_contrato}"
@@ -1030,7 +1041,6 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
                 st.warning("⚠️ **ATENÇÃO:** Utilize o preço novo abaixo para a abertura da CI!")
                 col_v1, col_v2 = st.columns([1, 2])
                 with col_v1:
-                    # disabled=False para manter o campo aberto, editável e selecionável
                     st.text_input("Preço Novo para Abertura da CI:", value=f"R$ {p_aniv_str}", disabled=False, key=f"valor_novo_ci_{rca}")
                 with col_v2:
                     st.write("")
@@ -1063,6 +1073,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
                 st.success("✅ Texto com C.I. gerado com sucesso!")
                 st.text_area("Texto com C.I.:", value=texto_ci, height=220, key=f"txt_area_ci_{rca}")
                 botao_copiar_customizado(texto_ci, "ci_txt")
+
 
 # =====================================================================
 # ABA 2: AGENDA DE OCORRÊNCIAS
@@ -1097,69 +1108,101 @@ with aba_agenda:
             df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
             
             st.divider()
-            st.subheader("1. Visitas Pendentes na Agenda")
+
+            col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
             
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
-                cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[])
-            with col_f2:
-                sub_class_unicas = sorted(list(df_pendentes[COL_SUB_CLASSIF].unique()))
-                sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[])
-            
-            df_filtrado = df_pendentes.copy()
-            if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
-            if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
-            
-            df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
-            
-            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-            col_m1.metric("Visitas Pendentes", len(df_filtrado))
-            col_m2.metric("Vence Hoje", len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]))
-            col_m3.metric("Vence Amanhã", len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]))
-            col_m4.metric("Ocorrências Vencidas", len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]))
-            
-            st.write("---")
-            if not df_filtrado.empty:
-                df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
-                df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
-                
-                edited_df = st.data_editor(
-                    df_exibicao.assign(Tratar=False),
-                    column_config={"Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True)},
-                    hide_index=True, use_container_width=True, key="editor_geral"
+            with col_menu_agenda:
+                st.markdown("### 📌 Visões da Agenda")
+                menu_agenda = st.radio(
+                    "Selecione a visão:", 
+                    [
+                        "Todas as Ocorrências",
+                        "Comodato Inativo",
+                        "Ocorrências por Cidade"
+                    ],
+                    label_visibility="collapsed"
                 )
-                
-                ocorrencias_para_tratar = edited_df[edited_df["Tratar"] == True][COL_OCORRENCIA].tolist()
-                if ocorrencias_para_tratar:
-                    if st.button("🔒 Confirmar e Remover do Painel", type="primary"):
-                        for oc in ocorrencias_para_tratar: st.session_state.tratadas_manualmente.add(int(oc))
-                        st.success("✅ Ocorrências tratadas removidas!")
-                        st.rerun()
+            
+            with col_conteudo_agenda:
 
-            st.divider()
-            st.subheader("2. Relatório Específico: Comodato Inativo")
-            df_comodato = df_pendentes[df_pendentes[COL_SUB_CLASSIF].str.contains("Comodato Inativo", case=False, na=False)].copy()
-            if df_comodato.empty:
-                st.info("Nenhuma ocorrência de Comodato Inativo encontrada.")
-            else:
-                df_comodato['Data Atendimento'] = df_comodato['Prazo_DT'].dt.strftime('%d/%m/%Y')
-                df_comodato_exibicao = df_comodato[['Status Comodato', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
-                df_comodato_exibicao[COL_OCORRENCIA] = df_comodato_exibicao[COL_OCORRENCIA].astype(str)
-                
-                st.dataframe(df_comodato_exibicao, hide_index=True, use_container_width=True)
+                # ----- 1. TODAS AS OCORRÊNCIAS -----
+                if menu_agenda == "Todas as Ocorrências":
+                    st.subheader("1. Visitas Pendentes na Agenda")
+                    
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1:
+                        cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
+                        cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[])
+                    with col_f2:
+                        sub_class_unicas = sorted(list(df_pendentes[COL_SUB_CLASSIF].unique()))
+                        sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[])
+                    
+                    df_filtrado = df_pendentes.copy()
+                    if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
+                    if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
+                    
+                    df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                    
+                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    col_m1.metric("Visitas Pendentes", len(df_filtrado))
+                    col_m2.metric("Vence Hoje", len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]))
+                    col_m3.metric("Vence Amanhã", len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]))
+                    col_m4.metric("Ocorrências Vencidas", len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]))
+                    
+                    st.write("---")
+                    if not df_filtrado.empty:
+                        df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
+                        df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
+                        
+                        edited_df = st.data_editor(
+                            df_exibicao.assign(Tratar=False),
+                            column_config={"Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True)},
+                            hide_index=True, use_container_width=True, key="editor_geral"
+                        )
+                        
+                        ocorrencias_para_tratar = edited_df[edited_df["Tratar"] == True][COL_OCORRENCIA].tolist()
+                        if ocorrencias_para_tratar:
+                            if st.button("🔒 Confirmar e Remover do Painel", type="primary"):
+                                for oc in ocorrencias_para_tratar: st.session_state.tratadas_manualmente.add(int(oc))
+                                st.success("✅ Ocorrências tratadas removidas!")
+                                st.rerun()
 
-            st.divider()
-            st.subheader("3. Ocorrências por Cidades")
-            col_c1, col_c2 = st.columns([1, 1])
-            with col_c1:
-                st.markdown("**Distribuição Visual:**")
-                st.bar_chart(df_pendentes['Cidade'].value_counts())
-            with col_c2:
-                st.markdown("**Tabela por Cidade:**")
-                df_cid = df_pendentes['Cidade'].value_counts().reset_index()
-                df_cid.columns = ["Cidade", "Quantidade"]
-                st.dataframe(df_cid, hide_index=True, use_container_width=True)
+                # ----- 2. COMODATO INATIVO -----
+                elif menu_agenda == "Comodato Inativo":
+                    st.subheader("2. Relatório Específico: Comodato Inativo")
+                    df_comodato = df_pendentes[df_pendentes[COL_SUB_CLASSIF].str.contains("Comodato Inativo", case=False, na=False)].copy()
+                    if df_comodato.empty:
+                        st.info("Nenhuma ocorrência de Comodato Inativo encontrada.")
+                    else:
+                        df_comodato['Data Atendimento'] = df_comodato['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                        df_comodato_exibicao = df_comodato[['Status Comodato', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
+                        df_comodato_exibicao[COL_OCORRENCIA] = df_comodato_exibicao[COL_OCORRENCIA].astype(str)
+                        
+                        st.dataframe(df_comodato_exibicao, hide_index=True, use_container_width=True)
+
+                # ----- 3. OCORRÊNCIAS POR CIDADE -----
+                elif menu_agenda == "Ocorrências por Cidade":
+                    st.subheader("3. Ocorrências por Cidades")
+                    
+                    df_cid = df_pendentes['Cidade'].value_counts().reset_index()
+                    df_cid.columns = ["Cidade", "Quantidade"]
+                    
+                    # 1º TABELA DE DADOS 
+                    st.markdown("**Tabela por Cidade:**")
+                    st.dataframe(df_cid, hide_index=True, use_container_width=True)
+
+                    st.write("---")
+                    
+                    # 2º GRÁFICO (Sem permissão para Zoom / Scroll estático configurado no Altair)
+                    st.markdown("**Distribuição Visual:**")
+                    
+                    chart = alt.Chart(df_cid).mark_bar(color="#0055A5").encode(
+                        x=alt.X('Cidade', sort='-y', title='Cidade'),
+                        y=alt.Y('Quantidade', title='Quantidade de Ocorrências'),
+                        tooltip=['Cidade', 'Quantidade']
+                    ).properties(height=350)
+                    
+                    st.altair_chart(chart, use_container_width=True)
 
         except Exception as e:
             st.error(f"Erro ao processar arquivo Excel: {e}")
