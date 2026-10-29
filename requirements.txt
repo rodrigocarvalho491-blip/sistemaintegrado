@@ -2,5 +2,7 @@ streamlit
 pandas
 numpy
 openpyxl
-fpdf2
+fpdf
 pillow
+requests
+supabase
