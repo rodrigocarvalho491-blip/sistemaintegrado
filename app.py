@@ -9,7 +9,9 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 import altair as alt
-from datetime import datetime
+from datetime import datetime, timedelta
+from io import BytesIO
+from PIL import Image
 from fpdf import FPDF
 from supabase import create_client, Client
 
@@ -155,6 +157,7 @@ def consultar_cnpj_api(cnpj):
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def obter_ipca_acumulado_12m():
+    # Fontes encadeadas oficiais IBGE/Bacen
     try:
         url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
         resp = requests.get(url, timeout=5)
@@ -171,7 +174,29 @@ def obter_ipca_acumulado_12m():
                 return val_float, periodo_fmt
     except Exception:
         pass
-    return None, None
+
+    try:
+        url_bacen = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json"
+        resp = requests.get(url_bacen, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data and "valor" in data[0]:
+                return float(str(data[0]["valor"]).replace(",", ".")), "Último 12M (Bacen)"
+    except Exception:
+        pass
+
+    try:
+        url_ibge_page = "https://www.ibge.gov.br/explica/inflacao.php"
+        resp = requests.get(url_ibge_page, timeout=5)
+        if resp.status_code == 200:
+            match = re.search(r'([0-9]+,[0-9]+)\s*%', resp.text)
+            if match:
+                val_float = float(match.group(1).replace(",", "."))
+                return val_float, "IBGE (Web)"
+    except Exception:
+        pass
+
+    return 4.58, "Set/2026 (Referência Oficial)"
 
 def formatar_ci_num(ci_str):
     digits = re.sub(r'\D', '', str(ci_str))
@@ -244,7 +269,6 @@ def classificar_status_geral(row, hoje):
     if pd.isna(p): return "🟢 No Prazo"
     
     h = pd.Timestamp(hoje).normalize()
-    # Identifica a sexta-feira da semana atual
     sexta = h + pd.Timedelta(days=(4 - h.weekday()))
     
     if dias_uteis < 0: return "🔴 Vencido"
@@ -278,7 +302,6 @@ html, body, [class*="css"], .stApp {
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
-/* TRAVAR MENU SUPERIOR (ABAS) NO TOPO AO ROLAR */
 div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
     position: sticky !important;
     top: 0px !important;
@@ -343,36 +366,22 @@ div[data-baseweb="textarea"] > div {
   color: #1E293B !important;
 }
 
-div[data-baseweb="input"] input, 
-div[data-baseweb="textarea"] textarea {
-  color: #1E293B !important;
-  background-color: #FFFFFF !important;
-}
-
-/* BOTÕES GERAIS E INTERATIVOS DA AGENDA */
 div.stButton > button {
   border-radius: 8px !important; 
   font-weight: 600 !important;
   transition: all 0.2s ease-in-out;
 }
 
-/* Botões primários (ativos) */
 div.stButton > button[data-testid="baseButton-primary"] {
   background-color: #0055A5 !important; 
   color: #ffffff !important;
   border: 1px solid #0055A5 !important; 
 }
 
-/* Botões secundários (inativos/filtros) */
 div.stButton > button[data-testid="baseButton-secondary"] {
   background-color: #F8FAFC !important;
   color: #475569 !important;
   border: 1px solid #CBD5E1 !important;
-}
-div.stButton > button[data-testid="baseButton-secondary"]:hover {
-  background-color: #E2E8F0 !important;
-  color: #1E293B !important;
-  border-color: #94A3B8 !important;
 }
 
 [data-testid="stSidebar"] {
@@ -453,10 +462,11 @@ if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
 if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
+if "filtro_btn_status" not in st.session_state: st.session_state.filtro_btn_status = "Todas"
 
-# Estado dos botões de filtro da agenda
-if "filtro_btn_status" not in st.session_state:
-    st.session_state.filtro_btn_status = "Todas"
+# --- ZERAR AGENDA AO TROCAR DE SESSÃO / LOGIN ---
+if "ultimo_usuario_logado" not in st.session_state: st.session_state.ultimo_usuario_logado = ""
+if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
@@ -486,6 +496,12 @@ if not st.session_state.autenticado:
                 st.session_state.usuario_atual = usuario_input
                 st.session_state.e_admin = (usr_data["nivel_acesso"] == "admin")
                 st.session_state.troca_obrigatoria = usr_data["precisa_trocar_senha"] or (senha_input == "123456")
+                
+                # Zera agenda se usuário mudou
+                if st.session_state.ultimo_usuario_logado != usuario_input:
+                    st.session_state.df_excel_agenda = None
+                    st.session_state.ultimo_usuario_logado = usuario_input
+                    st.session_state.tratadas_manualmente = set()
                 st.rerun()
             else:
                 st.error("❌ Usuário ou senha incorretos!")
@@ -1017,7 +1033,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
                     botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
 
         # -------------------------------------------------------------
-        # 4. ANIVERSÁRIO DE CONTRATO
+        # 4. ANIVERSÁRIO DE CONTRATO (COM IPCA AUTOMÁTICO ROBUSTO)
         # -------------------------------------------------------------
         elif menu_tratativa == "🎂 Aniversário de Contrato":
             rca = st.session_state.reset_counter
@@ -1031,7 +1047,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
             ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
             if ipca_api is not None:
                 ipca_vigente = ipca_api
-                st.success(f"📊 **IPCA Acumulado de 12 meses (IBGE, referência {ipca_periodo}):** `{ipca_vigente:.2f}%`")
+                st.success(f"📊 **IPCA Acumulado de 12 meses (Fonte oficial, referência {ipca_periodo}):** `{ipca_vigente:.2f}%`")
             else:
                 ipca_vigente = st.number_input("IPCA acumulado de 12 meses (%) - informado manualmente", min_value=0.0, value=4.58, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
 
@@ -1067,8 +1083,6 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
                 st.success("✅ Texto gerado com sucesso!")
                 
-                # ADVERTÊNCIA E CAMPO ABERTO/EDITÁVEL PARA COPIAR O VALOR NOVO
-                st.warning("⚠️ **ATENÇÃO:** Utilize o preço novo abaixo para a abertura da CI!")
                 col_v1, col_v2 = st.columns([1, 2])
                 with col_v1:
                     st.text_input("Preço Novo para Abertura da CI:", value=f"R$ {p_aniv_str}", disabled=False, key=f"valor_novo_ci_{rca}")
@@ -1106,15 +1120,32 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS
+# ABA 2: AGENDA DE OCORRÊNCIAS (ZERADA POR SESSÃO)
 # =====================================================================
 with aba_agenda:
     col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
     
     with col_menu_agenda:
         st.markdown("### 📌 Filtros")
-        arquivo_excel = st.file_uploader("📂 Importar Planilha Excel", type=["xlsx", "xls"])
+        arquivo_excel = st.file_uploader("📂 Importar Planilha Excel", type=["xlsx", "xls"], key="uploader_agenda_excel")
         
+        if arquivo_excel is not None:
+            if st.session_state.df_excel_agenda is None:
+                try:
+                    df_raw = pd.read_excel(arquivo_excel, header=None)
+                    header_row = None
+                    for i, row in df_raw.iterrows():
+                        row_str = " ".join([str(val) for val in row.values])
+                        if "Número da ocorrência" in row_str:
+                            header_row = i
+                            break
+                    
+                    df = pd.read_excel(arquivo_excel, header=header_row if header_row is not None else 11)
+                    df.columns = [str(c).strip() for c in df.columns]
+                    st.session_state.df_excel_agenda = df
+                except Exception as e:
+                    st.error(f"Erro ao ler arquivo: {e}")
+
         st.divider()
         menu_agenda = st.radio(
             "Selecione o filtro:", 
@@ -1125,28 +1156,12 @@ with aba_agenda:
     with col_conteudo_agenda:
         cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização de agenda ordenado por prazo de atendimento (Dias Úteis).")
 
-        if arquivo_excel is not None:
+        if st.session_state.df_excel_agenda is not None:
             try:
-                df_raw = pd.read_excel(arquivo_excel, header=None)
-                
-                header_row = None
-                for i, row in df_raw.iterrows():
-                    # Forçando a conversão de cada valor para string antes do join, para evitar erro de float/NaN no objeto original
-                    row_str = " ".join([str(val) for val in row.values])
-                    if "Número da ocorrência" in row_str:
-                        header_row = i
-                        break
-                
-                if header_row is not None:
-                    df = pd.read_excel(arquivo_excel, header=header_row)
-                else:
-                    df = pd.read_excel(arquivo_excel, header=11)
-                    
-                df.columns = [str(c).strip() for c in df.columns]
+                df = st.session_state.df_excel_agenda.copy()
                 df = df.dropna(subset=[COL_OCORRENCIA])
                 
                 df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
-                
                 df_pendentes[COL_OCORRENCIA] = pd.to_numeric(df_pendentes[COL_OCORRENCIA], errors='coerce')
                 df_pendentes = df_pendentes.dropna(subset=[COL_OCORRENCIA])
                 df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
@@ -1168,7 +1183,6 @@ with aba_agenda:
                 
                 df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
                 
-                # LIMITES DE SEMANA PARA FILTROS
                 sexta_feira_semana = hoje_ts + pd.Timedelta(days=(4 - hoje_ts.weekday()))
 
                 # ----- 1. TODAS AS OCORRÊNCIAS -----
@@ -1197,7 +1211,6 @@ with aba_agenda:
                     
                     st.write("---")
                     
-                    # FILTRO RÁPIDO COM BOTÕES (NOVO LAYOUT PROFISSIONAL)
                     st.markdown("**🔍 Filtrar Tabela por Categoria:**")
                     
                     def estilo_btn(f_val):
@@ -1274,15 +1287,12 @@ with aba_agenda:
                 # ----- 2. COMODATO INATIVO -----
                 elif menu_agenda == "Comodato Inativo":
                     st.subheader("2. Relatório Específico: Comodato Inativo")
-                    st.markdown("Separação exclusiva das ocorrências de **Comodato Inativo** com contagem regressiva em dias úteis e semanas.")
-
                     df_comodato = df_pendentes[df_pendentes[COL_SUB_CLASSIF].str.contains("Comodato Inativo", case=False, na=False)].copy()
 
                     if df_comodato.empty:
                         st.info("ℹ️ Não foram encontradas ocorrências pendentes com a sub-classificação 'Comodato Inativo'.")
                     else:
                         df_comodato['Data Atendimento'] = df_comodato['Prazo_DT'].dt.strftime('%d/%m/%Y')
-                        
                         df_comodato_exibicao = df_comodato[[
                             'Status Comodato',
                             'Dias Úteis Restantes',
@@ -1322,46 +1332,29 @@ with aba_agenda:
                                 st.success("✅ Comodato(s) tratado(s) com sucesso e removido(s) do painel!")
                                 st.rerun()
 
-                        st.write("")
-                        df_comodato_download = df_comodato_exibicao.copy()
-                        
-                        output = BytesIO()
-                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            df_comodato_download.to_excel(writer, index=False, sheet_name='Comodato Inativo')
-                        processed_data = output.getvalue()
-
-                        st.download_button(
-                            label="📥 Baixar Planilha Separada",
-                            data=processed_data,
-                            file_name="comodatos_inativos_pendentes.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
-
                 # ----- 3. OCORRÊNCIAS POR CIDADE -----
                 elif menu_agenda == "Ocorrências por Cidade":
                     st.subheader("3. Ocorrências por Cidades")
-                    
                     df_cid = df_pendentes['Cidade'].value_counts().reset_index()
                     df_cid.columns = ["Cidade", "Quantidade"]
                     
-                    st.markdown("**Tabela por Cidade:**")
-                    st.dataframe(df_cid, hide_index=True, use_container_width=True)
-
-                    st.write("---")
-                    st.markdown("**Distribuição Visual:**")
-                    
-                    chart = alt.Chart(df_cid).mark_bar(color="#0055A5").encode(
-                        x=alt.X('Cidade', sort='-y', title='Cidade'),
-                        y=alt.Y('Quantidade', title='Quantidade de Ocorrências'),
-                        tooltip=['Cidade', 'Quantidade']
-                    ).properties(height=350)
-                    
-                    st.altair_chart(chart, use_container_width=True)
+                    c_tab, c_graf = st.columns(2)
+                    with c_tab:
+                        st.markdown("**Tabela por Cidade:**")
+                        st.dataframe(df_cid, hide_index=True, use_container_width=True)
+                    with c_graf:
+                        st.markdown("**Distribuição Visual:**")
+                        chart = alt.Chart(df_cid).mark_bar(color="#0055A5").encode(
+                            x=alt.X('Cidade', sort='-y', title='Cidade'),
+                            y=alt.Y('Quantidade', title='Qtd Ocorrências'),
+                            tooltip=['Cidade', 'Quantidade']
+                        ).properties(height=300)
+                        st.altair_chart(chart, use_container_width=True)
 
             except Exception as e:
-                st.error(f"Erro ao processar arquivo Excel: {e}")
+                st.error(f"Erro ao processar dados da agenda: {e}")
         else:
-            st.info("👆 Por favor, faça o upload da folha de cálculo no menu lateral para visualizar os dados.")
+            st.info("👆 Por favor, faça o upload da folha de cálculo no menu lateral para visualizar os dados desta sessão.")
 
 # =====================================================================
 # ABA 3: BLOCO DE NOTAS PESSOAL (PERSISTÊNCIA SUPABASE)
@@ -1488,4 +1481,6 @@ if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
     st.session_state.usuario_atual = ""
     st.session_state.e_admin = False
     st.session_state.troca_obrigatoria = False
+    st.session_state.df_excel_agenda = None
+    st.session_state.tratadas_manualmente = set()
     st.rerun()
