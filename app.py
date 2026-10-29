@@ -329,19 +329,19 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 .cg-subtitle { font-size: 0.95rem; margin-top: 0.2rem; color: #64748B !important; font-weight: 500; }
 
 div.stButton > button {
-  border-radius: 10px !important; 
-  font-weight: 600 !important;
+  border-radius: 12px !important; 
+  font-weight: 700 !important;
   transition: all 0.2s ease-in-out;
-  padding: 12px 10px !important;
-  min-height: 75px !important;
-  font-size: 0.9rem !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  padding: 14px 12px !important;
+  min-height: 85px !important;
+  font-size: 0.95rem !important;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.06);
 }
 div.stButton > button[data-testid="baseButton-primary"] {
   background-color: #004080 !important; 
   color: #ffffff !important;
   border: 2px solid #F28C28 !important; 
-  box-shadow: 0 4px 12px rgba(0,85,165,0.25) !important;
+  box-shadow: 0 6px 16px rgba(0,85,165,0.3) !important;
 }
 div.stButton > button[data-testid="baseButton-secondary"] {
   background-color: #F8FAFC !important;
@@ -1146,7 +1146,7 @@ with aba_agenda:
                 
                 hoje_ts = pd.Timestamp(pd.Timestamp(datetime.now()).normalize())
                 
-                # Sexta-feira da semana atual (para o filtro semanal simplificado)
+                # Sexta-feira da semana atual (para o filtro semanal)
                 segunda_feira_semana = hoje_ts - pd.Timedelta(days=hoje_ts.weekday())
                 sexta_feira_semana = segunda_feira_semana + pd.Timedelta(days=4)
                 
@@ -1177,10 +1177,10 @@ with aba_agenda:
                     vence_hoje_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0])
                     vence_amanha_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1])
                     
-                    # Regra solicitada: "Vencem na Semana" = Ocorrências vencidas + Ocorrências que vencem até a sexta-feira
+                    # Regra solicitada: "Vencem na Semana" = Ocorrências vencidas + Ocorrências que vencem até a sexta-feira da semana atual
                     df_vencem_semana = df_base_filtrado[
                         (df_base_filtrado['Dias Úteis Restantes'] < 0) | 
-                        (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana)
+                        (df_base_filtrado['Prazo_DT'].dt.normalize() <= sexta_feira_semana)
                     ]
                     vencem_semana_qtd = len(df_vencem_semana)
 
@@ -1223,7 +1223,6 @@ with aba_agenda:
                     elif fs == "Vence Amanhã":
                         df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
                     elif fs == "Vencem na Semana":
-                        # Regra solicitada: Vencidas + vencem até a sexta-feira
                         df_filtrado = df_vencem_semana.copy()
 
                     df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
