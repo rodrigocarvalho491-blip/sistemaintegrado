@@ -1026,11 +1026,12 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
                 st.success("✅ Texto gerado com sucesso!")
                 
-                # ADVERTÊNCIA E CAMPO PARA COPIAR APENAS O VALOR NOVO
+                # ADVERTÊNCIA E CAMPO ABERTO/EDITÁVEL PARA COPIAR O VALOR NOVO
                 st.warning("⚠️ **ATENÇÃO:** Utilize o preço novo abaixo para a abertura da CI!")
                 col_v1, col_v2 = st.columns([1, 2])
                 with col_v1:
-                    st.text_input("Preço Novo para Abertura da CI:", value=f"R$ {p_aniv_str}", disabled=True, key=f"valor_novo_ci_{rca}")
+                    # disabled=False para manter o campo aberto, editável e selecionável
+                    st.text_input("Preço Novo para Abertura da CI:", value=f"R$ {p_aniv_str}", disabled=False, key=f"valor_novo_ci_{rca}")
                 with col_v2:
                     st.write("")
                     st.write("")
