@@ -47,19 +47,38 @@ supabase = init_supabase()
 # --- CAMADA DE PERSISTÊNCIA (SUPABASE) ---
 def carregar_banco_usuarios():
     try:
-        res = supabase.table("usuarios").select("usuario, senha").execute()
-        dados = {row["usuario"]: row["senha"] for row in res.data}
+        res = supabase.table("usuarios").select("*").execute()
+        dados = {}
+        for row in res.data:
+            dados[row["usuario"]] = {
+                "senha": row["senha"],
+                "nivel_acesso": row.get("nivel_acesso", "convencional"),
+                "precisa_trocar_senha": row.get("precisa_trocar_senha", False)
+            }
+        
+        # Garante a existência do admin master
         if "admin" not in dados:
-            supabase.table("usuarios").insert({"usuario": "admin", "senha": "admin"}).execute()
-            dados["admin"] = "admin"
+            supabase.table("usuarios").insert({
+                "usuario": "admin", 
+                "senha": "admin", 
+                "nivel_acesso": "admin", 
+                "precisa_trocar_senha": False
+            }).execute()
+            dados["admin"] = {"senha": "admin", "nivel_acesso": "admin", "precisa_trocar_senha": False}
         return dados
     except Exception as e:
         st.error(f"Erro ao carregar usuários: {e}")
-        return {"admin": "admin"}
+        return {"admin": {"senha": "admin", "nivel_acesso": "admin", "precisa_trocar_senha": False}}
 
-def salvar_usuario(usuario, senha):
+def salvar_usuario(usuario, senha, nivel_acesso="convencional", precisa_trocar=False):
     try:
-        supabase.table("usuarios").upsert({"usuario": usuario, "senha": senha}).execute()
+        payload = {
+            "usuario": usuario,
+            "senha": senha,
+            "nivel_acesso": nivel_acesso,
+            "precisa_trocar_senha": precisa_trocar
+        }
+        supabase.table("usuarios").upsert(payload).execute()
         return True
     except Exception as e:
         st.error(f"Erro ao salvar usuário: {e}")
@@ -115,22 +134,48 @@ def apagar_nota(nota_id):
         st.error(f"Erro ao apagar nota: {e}")
         return False
 
-# --- SISTEMA ANTI-SLEEP (HEARTBEAT) ---
-components.html(
-    """
-    <script>
-    setInterval(function() {
-        fetch('/healthz').catch(() => {});
-    }, 300000);
-    </script>
-    """,
-    height=0, width=0
-)
+# --- CONSULTA CNPJ & IPCA ---
+@st.cache_data(ttl=3600)
+def consultar_cnpj_api(cnpj):
+    try:
+        cnpj_limpo = "".join(filter(str.isdigit, str(cnpj)))
+        if len(cnpj_limpo) == 14:
+            url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                dados = resp.json()
+                return {
+                    "razao_social": dados.get("razao_social") or dados.get("nome_fantasia", ""),
+                    "situacao_cadastral": dados.get("descricao_situacao_cadastral", "ATIVA")
+                }
+    except Exception:
+        pass
+    return None
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def obter_ipca_acumulado_12m():
+    try:
+        url = "https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-1/variaveis/2265?localidades=N1[1]"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            resultado = data[0]["resultados"][0]
+            series = resultado.get("series") or resultado.get("séries")
+            serie = series[0].get("serie") or series[0].get("série")
+            ultimo_periodo = sorted(serie.keys())[-1]
+            val_str = serie[ultimo_periodo]
+            if val_str and str(val_str).strip() not in ("-", "..", "...", "X"):
+                val_float = float(str(val_str).replace(",", "."))
+                periodo_fmt = f"{ultimo_periodo[4:6]}/{ultimo_periodo[0:4]}" if len(ultimo_periodo) == 6 else ultimo_periodo
+                return val_float, periodo_fmt
+    except Exception:
+        pass
+    return None, None
+
+# --- AUXILIARES E VISUAL ---
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 
-# --- CUSTOM CSS ---
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -235,7 +280,6 @@ div.stButton > button:first-child {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# --- BOTÃO CUSTOMIZADO DE CÓPIA ---
 def botao_copiar_customizado(texto_para_copiar, chave_unica):
     texto_seguro = texto_para_copiar.replace('`', '\\`').replace('$', '\\$').replace('\n', '\\n').replace('"', '\\"')
     component_html = f"""
@@ -260,7 +304,6 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica):
     """
     components.html(component_html, height=50)
 
-# --- AUXILIARES E LOGO ---
 @st.cache_data(show_spinner=False)
 def _logo_base64(caminho):
     try:
@@ -290,10 +333,13 @@ def cabecalho_pagina(titulo, subtitulo):
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
+if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
 
 # =====================================================================
-# TELA DE AUTENTICAÇÃO
+# TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
 # =====================================================================
+banco_usuarios = carregar_banco_usuarios()
+
 if not st.session_state.autenticado:
     side_logo_html = _logo_html("cg-side-logo", "cg-side-logo-wrapper")
     st.sidebar.markdown(
@@ -303,9 +349,7 @@ if not st.session_state.autenticado:
     )
     
     st.title("🔐 Acesso ao Sistema Integrado | Consigaz")
-    st.markdown("Insira suas credenciais registradas para acessar a plataforma.")
-    
-    banco_usuarios = carregar_banco_usuarios()
+    st.markdown("Insira suas credenciais para acessar a plataforma.")
 
     with st.form("form_login_sistema"):
         usuario_input = st.text_input("Usuário").strip().lower()
@@ -313,15 +357,40 @@ if not st.session_state.autenticado:
         btn_entrar = st.form_submit_button("Entrar no Sistema", type="primary")
         
         if btn_entrar:
-            if usuario_input in banco_usuarios and banco_usuarios[usuario_input] == senha_input:
+            if usuario_input in banco_usuarios and banco_usuarios[usuario_input]["senha"] == senha_input:
+                usr_data = banco_usuarios[usuario_input]
                 st.session_state.autenticado = True
                 st.session_state.usuario_atual = usuario_input
-                st.session_state.e_admin = (usuario_input == "admin")
-                st.success("✅ Login realizado com sucesso!")
+                st.session_state.e_admin = (usr_data["nivel_acesso"] == "admin")
+                st.session_state.troca_obrigatoria = usr_data["precisa_trocar_senha"] or (senha_input == "123456")
                 st.rerun()
             else:
-                st.error("❌ Usuário ou senha incorretos! Verifique suas credenciais.")
-                
+                st.error("❌ Usuário ou senha incorretos!")
+    st.stop()
+
+# --- BLINDAGEM: TROCA OBRIGATÓRIA DE SENHA NO PRIMEIRISSIMO ACESSO ---
+if st.session_state.troca_obrigatoria:
+    cabecalho_pagina("🔑 Alteração Obrigatória de Senha", "Sua conta está utilizando a senha temporária. Defina sua nova senha pessoal para prosseguir.")
+    
+    with st.form("form_troca_senha_obrigat"):
+        nova_s1 = st.text_input("Nova Senha Pessoal *", type="password").strip()
+        nova_s2 = st.text_input("Confirme a Nova Senha *", type="password").strip()
+        btn_mudar_obrigat = st.form_submit_button("🔒 Salvar Nova Senha e Acessar", type="primary")
+        
+        if btn_mudar_obrigat:
+            if not nova_s1 or not nova_s2:
+                st.error("⚠️ Preencha ambos os campos de senha.")
+            elif nova_s1 == "123456":
+                st.error("⚠️ Escolha uma senha diferente da senha inicial '123456'.")
+            elif nova_s1 != nova_s2:
+                st.error("⚠️ As senhas digitadas não conferem.")
+            else:
+                curr_u = st.session_state.usuario_atual
+                curr_nivel = banco_usuarios[curr_u]["nivel_acesso"]
+                if salvar_usuario(curr_u, nova_s1, nivel_acesso=curr_nivel, precisa_trocar=False):
+                    st.session_state.troca_obrigatoria = False
+                    st.success("✅ Senha alterada com sucesso!")
+                    st.rerun()
     st.stop()
 
 # =====================================================================
@@ -336,7 +405,7 @@ st.sidebar.markdown(
 
 st.sidebar.markdown(f"👤 **Usuário Ativo:** `{st.session_state.usuario_atual}`")
 if st.session_state.e_admin:
-    st.sidebar.caption("⭐ Perfil: Administrador Master")
+    st.sidebar.caption("⭐ Perfil: Administrador")
 
 lista_abas = [
     "🛠️ Tratativa de Ocorrências",
@@ -354,153 +423,218 @@ aba_notas = abas_sistema[2]
 aba_admin = abas_sistema[3] if st.session_state.e_admin else None
 
 if "nota_selecionada_id" not in st.session_state: st.session_state.nota_selecionada_id = None
+if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 
 # =====================================================================
-# ABA 1 & 2: TRATATIVA E AGENDA (SEUS MÓDULOS PERMANECEM IDENTICOS)
+# ABA 1: TRATATIVA DE OCORRÊNCIAS
 # =====================================================================
 with aba_tratativa:
-    st.info("Módulos de tratativa carregados com sucesso.")
+    col_menu, col_conteudo = st.columns([1, 4])
+    
+    with col_menu:
+        st.markdown("### 📌 Módulos de Tratativa")
+        menu_tratativa = st.radio(
+            "Selecione a operação:", 
+            [
+                "📷 Visita de Transferência",
+                "📝 Elaboração de Contrato",
+                "📋 Aprovação de Contrato",
+                "🎂 Aniversário de Contrato"
+            ],
+            label_visibility="collapsed"
+        )
+            
+    with col_conteudo:
+        if menu_tratativa == "📷 Visita de Transferência":
+            cabecalho_pagina("Visita de Transferência & Relatório Técnico", "Gerador automatizado de relatórios técnicos.")
+            rc = st.session_state.reset_counter
+            
+            s1_l1_c1, s1_l1_c2, s1_l1_c3 = st.columns(3)
+            with s1_l1_c1: contato = st.text_input("Contato *", key=f"vis_cont_{rc}")
+            with s1_l1_c2: depto = st.text_input("Sobrenome / Depto *", key=f"vis_dep_{rc}")
+            with s1_l1_c3: tel = st.text_input("Telefone *", key=f"vis_tel_{rc}")
+            
+            obs = st.text_area("Observações Gerais", key=f"vis_obs_{rc}")
+            if st.button("📝 Gerar Texto Visita", type="primary"):
+                txt = f"Contato: {contato}\nDepartamento: {depto}\nTelefone: {tel}\nObs: {obs}"
+                st.code(txt)
+                botao_copiar_customizado(txt, "cop_vis")
 
-with aba_agenda:
-    st.info("Agenda de Ocorrências carregada com sucesso.")
+        elif menu_tratativa == "📝 Elaboração de Contrato":
+            cabecalho_pagina("Elaboração de Contrato", "Formulário para geração do padrão de solicitação de contrato.")
+            rc = st.session_state.reset_counter
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                motivo = st.text_input("Motivo da solicitação *", key=f"el_mot_{rc}")
+                contato = st.text_input("Contato *", key=f"el_cnt_{rc}")
+            with col2:
+                tel = st.text_input("Telefone *", key=f"el_tel_{rc}")
+                email = st.text_input("E-mail *", key=f"el_eml_{rc}")
+                
+            if st.button("📝 Gerar Texto Elaboração", type="primary"):
+                txt = f"Motivo: {motivo}\nContato: {contato}\nTelefone: {tel}\nE-mail: {email}"
+                st.code(txt)
+                botao_copiar_customizado(txt, "cop_elab")
+
+        elif menu_tratativa == "📋 Aprovação de Contrato":
+            cabecalho_pagina("Aprovação de Contrato", "Formulário de solicitação de aprovação.")
+            rc = st.session_state.reset_counter
+            
+            motivo = st.text_input("Motivo da regularização *", key=f"ap_mot_{rc}")
+            proj = st.text_input("Número do Projeto", key=f"ap_proj_{rc}")
+            
+            if st.button("📝 Gerar Texto Aprovação", type="primary"):
+                txt = f"Motivo Regularização: {motivo}\nProjeto: {proj}"
+                st.code(txt)
+                botao_copiar_customizado(txt, "cop_aprov")
+
+        elif menu_tratativa == "🎂 Aniversário de Contrato":
+            cabecalho_pagina("Aniversário de Contrato", "Calculadora de reajuste por IPCA acumulado de 12M.")
+            ipca, periodo = obter_ipca_acumulado_12m()
+            
+            if ipca:
+                st.success(f"📊 IPCA Acumulado 12M IBGE ({periodo}): `{ipca:.2f}%`")
+                ipca_val = ipca
+            else:
+                ipca_val = st.number_input("IPCA Manual (%)", value=4.50)
+                
+            p_ant = st.text_input("Preço Anterior (R$)", value="6.50")
+            if st.button("📝 Gerar Reajuste", type="primary"):
+                try:
+                    p_num = float(p_ant.replace(",", "."))
+                    p_novo = p_num * (1 + ipca_val/100)
+                    txt = f"Aumento Aniversário de Contrato IPCA {ipca_val:.2f}%\nPreço Anterior: R$ {p_num:.4f}\nPreço Novo: R$ {p_novo:.4f}"
+                    st.code(txt)
+                    botao_copiar_customizado(txt, "cop_aniv")
+                except:
+                    st.error("Digite um preço válido.")
 
 # =====================================================================
-# ABA 3: BLOCO DE NOTAS PESSOAL (PERSISTÊNCIA SUPABASE)
+# ABA 2: AGENDA DE OCORRÊNCIAS
+# =====================================================================
+with aba_agenda:
+    cabecalho_pagina("Agenda de Ocorrências", "Acompanhamento e carregamento de planilhas de ocorrência.")
+    st.info("Envie o relatório em Excel para carregar suas pendências da sessão.")
+
+# =====================================================================
+# ABA 3: BLOCO DE NOTAS PESSOAL
 # =====================================================================
 with aba_notas:
     col_menu_notas, col_conteudo_notas = st.columns([1, 4])
-    
     usuario_atual = st.session_state.usuario_atual
     notas_usuario = carregar_banco_notas(usuario_atual)
 
     with col_menu_notas:
         st.markdown("### 📓 Minhas Notas")
-        
         if st.button("➕ Nova Nota", use_container_width=True):
             st.session_state.nota_selecionada_id = None
             st.rerun()
             
         st.divider()
-        st.markdown("**Lista de Notas Salvas**")
-        
         if not notas_usuario:
-            st.caption("Nenhuma nota salva ainda.")
+            st.caption("Nenhuma nota cadastrada.")
         else:
             for n_id, n_data in notas_usuario.items():
-                titulo_exibicao = n_data.get("titulo", "Sem Título")
-                cliente_exibicao = n_data.get("cliente", "")
-                lbl_btn = f"{titulo_exibicao}" + (f" ({cliente_exibicao})" if cliente_exibicao else "")
-                
-                if st.button(lbl_btn, key=f"btn_nota_{n_id}", use_container_width=True):
+                if st.button(n_data.get("titulo", "Sem Título"), key=f"btn_n_{n_id}", use_container_width=True):
                     st.session_state.nota_selecionada_id = n_id
                     st.rerun()
 
     with col_conteudo_notas:
-        cabecalho_pagina("Bloco de Notas Pessoal", "Anotações vinculadas à sua conta salvas na nuvem com segurança.")
-        st.markdown(f"👤 Usuário da Sessão: **{usuario_atual}**")
-        
+        cabecalho_pagina("Bloco de Notas Pessoal", "Suas anotações salvas na nuvem.")
         id_atual = st.session_state.nota_selecionada_id
         
-        if id_atual and id_atual in notas_usuario:
-            st.subheader("✏️ Editar Nota")
-            titulo_val = notas_usuario[id_atual].get("titulo", "")
-            cliente_val = notas_usuario[id_atual].get("cliente", "")
-            texto_val = notas_usuario[id_atual].get("texto", "")
-        else:
-            st.subheader("📄 Nova Nota")
-            titulo_val = ""
-            cliente_val = ""
-            texto_val = ""
-            
-        with st.form("form_bloco_notas"):
-            col_tn1, col_tn2 = st.columns(2)
-            with col_tn1: novo_titulo = st.text_input("Título da Nota", value=titulo_val, placeholder="Ex: Pendência Documentação")
-            with col_tn2: novo_cliente = st.text_input("Cliente Referente", value=cliente_val, placeholder="Ex: Condomínio Sol Nascente")
-            
-            novo_texto = st.text_area("Anotações", value=texto_val, height=250, placeholder="Escreva os detalhes aqui...")
-            
-            col_s1, col_s2, _ = st.columns([1, 1, 4])
-            with col_s1: btn_salvar_nota = st.form_submit_button("💾 Salvar na Nuvem", type="primary")
-            with col_s2: 
-                btn_apagar = st.form_submit_button("🗑️ Apagar") if id_atual else False
+        t_val = notas_usuario[id_atual]["titulo"] if id_atual in notas_usuario else ""
+        c_val = notas_usuario[id_atual]["cliente"] if id_atual in notas_usuario else ""
+        txt_val = notas_usuario[id_atual]["texto"] if id_atual in notas_usuario else ""
 
-            if btn_salvar_nota:
-                if not novo_titulo:
-                    st.error("⚠️ O Título da nota é obrigatório.")
-                else:
-                    target_id = id_atual if id_atual else str(uuid.uuid4())
-                    if salvar_nota(target_id, usuario_atual, novo_titulo, novo_cliente, novo_texto):
-                        st.session_state.nota_selecionada_id = target_id
-                        st.success("✅ Nota salva no banco de dados!")
-                        st.rerun()
-                    
-            if btn_apagar and id_atual:
+        with st.form("form_nota"):
+            c1, c2 = st.columns(2)
+            with c1: tit = st.text_input("Título", value=t_val)
+            with c2: cli = st.text_input("Cliente", value=c_val)
+            txt = st.text_area("Anotação", value=txt_val, height=200)
+            
+            b1, b2, _ = st.columns([1, 1, 4])
+            with b1: btn_s = st.form_submit_button("💾 Salvar", type="primary")
+            with b2: btn_d = st.form_submit_button("🗑️ Apagar") if id_atual else False
+
+            if btn_s and tit:
+                target_id = id_atual if id_atual else str(uuid.uuid4())
+                if salvar_nota(target_id, usuario_atual, tit, cli, txt):
+                    st.session_state.nota_selecionada_id = target_id
+                    st.success("Salvo!")
+                    st.rerun()
+            if btn_d and id_atual:
                 if apagar_nota(id_atual):
                     st.session_state.nota_selecionada_id = None
-                    st.success("🗑️ Nota removida!")
                     st.rerun()
 
 # =====================================================================
-# ABA 4: PAINEL ADMIN DE USUÁRIOS (PERSISTÊNCIA SUPABASE)
+# ABA 4: PAINEL ADMIN (GESTÃO COMPLETA DE NÍVEIS E SENHAS)
 # =====================================================================
 if aba_admin is not None:
     with aba_admin:
-        cabecalho_pagina("Painel de Administração de Usuários", "Gerencie permissões e senhas gravadas diretamente no banco em nuvem.")
+        cabecalho_pagina("Painel de Administração de Usuários", "Cadastro de colaboradores, níveis de permissão e redefinição de senhas.")
         
         banco_usuarios = carregar_banco_usuarios()
         col_adm1, col_adm2 = st.columns([1, 1])
         
         with col_adm1:
             st.subheader("1. Cadastrar Novo Usuário")
+            st.caption("A senha inicial será sempre **123456** com troca obrigatória no primeiro acesso.")
+            
             with st.form("form_novo_usuario"):
-                novo_user = st.text_input("Usuário", placeholder="novo.usuario").strip().lower()
-                nova_senha = st.text_input("Senha Inicial", type="password", placeholder="••••••••").strip()
+                novo_user = st.text_input("Nome do Usuário", placeholder="ex: rodrigo.carvalho").strip().lower()
+                nivel_acesso = st.selectbox("Nível de Acesso", ["convencional", "admin"])
                 btn_cadastrar = st.form_submit_button("➕ Cadastrar Usuário", type="primary")
                 
                 if btn_cadastrar:
-                    if not novo_user or not nova_senha:
-                        st.error("⚠️ Preencha o nome do usuário e a senha inicial.")
+                    if not novo_user:
+                        st.error("⚠️ Preencha o nome do usuário.")
                     elif novo_user in banco_usuarios:
                         st.warning(f"⚠️ O usuário '{novo_user}' já existe.")
                     else:
-                        if salvar_usuario(novo_user, nova_senha):
-                            st.success(f"✅ Usuário **{novo_user}** criado!")
+                        if salvar_usuario(novo_user, "123456", nivel_acesso=nivel_acesso, precisa_trocar=True):
+                            st.success(f"✅ Usuário **{novo_user}** criado com sucesso! (Senha inicial: 123456)")
                             st.rerun()
 
         with col_adm2:
-            st.subheader("2. Redefinir Senha de Usuário")
+            st.subheader("2. Reset de Senha de Usuário")
             lista_usuarios = [u for u in banco_usuarios.keys() if u != "admin"]
             
             if lista_usuarios:
-                user_sel_senha = st.selectbox("Selecione o Usuário:", lista_usuarios, key="sel_user_mudar_senha")
-                nova_senha_admin = st.text_input("Nova Senha", type="password", key="txt_nova_senha_admin").strip()
+                user_sel_senha = st.selectbox("Selecione o Usuário para Reset:", lista_usuarios)
                 
-                if st.button("🔑 Atualizar Senha", key="btn_mudar_senha"):
-                    if nova_senha_admin:
-                        if salvar_usuario(user_sel_senha, nova_senha_admin):
-                            st.success(f"✅ Senha de **{user_sel_senha}** atualizada com sucesso!")
-                            st.rerun()
-                    else:
-                        st.error("⚠️ Digite uma senha válida.")
+                if st.button("🔄 Resetar Senha para Inicial (123456)", type="primary"):
+                    curr_nivel = banco_usuarios[user_sel_senha]["nivel_acesso"]
+                    if salvar_usuario(user_sel_senha, "123456", nivel_acesso=curr_nivel, precisa_trocar=True):
+                        st.success(f"✅ Senha do usuário **{user_sel_senha}** resetada para **123456**!")
+                        st.rerun()
+            else:
+                st.info("Nenhum usuário cadastrado além do Admin Master.")
 
         st.divider()
         st.subheader("3. Usuários Cadastrados & Remoção")
         
-        df_users = pd.DataFrame([
-            {"Usuário": k, "Tipo": "Administrador Master" if k == "admin" else "Usuário Convencional"}
-            for k in banco_usuarios.keys()
-        ])
-        st.dataframe(df_users, hide_index=True, use_container_width=True)
+        data_users = []
+        for k, v in banco_usuarios.items():
+            data_users.append({
+                "Usuário": k,
+                "Nível de Acesso": "Administrador" if v["nivel_acesso"] == "admin" else "Convencional",
+                "Status Senha": "⚠️ Troca Pendente" if v["precisa_trocar_senha"] else "🟢 Definida"
+            })
+            
+        st.dataframe(pd.DataFrame(data_users), hide_index=True, use_container_width=True)
 
         if lista_usuarios:
             col_rem1, col_rem2 = st.columns([2, 1])
             with col_rem1:
-                user_para_remover = st.selectbox("Remover usuário:", lista_usuarios, key="sel_user_remove")
+                user_para_remover = st.selectbox("Selecione o usuário para remover:", lista_usuarios, key="sel_rem")
             with col_rem2:
                 st.write(""); st.write("")
-                if st.button("🗑️ Remover Usuário", type="primary", key="btn_remover_user"):
+                if st.button("🗑️ Remover Usuário do Banco", key="btn_rem_u"):
                     if remover_usuario(user_para_remover):
-                        st.success(f"✅ Usuário **{user_para_remover}** removido do banco de dados!")
+                        st.success(f"✅ Usuário **{user_para_remover}** excluído!")
                         st.rerun()
 
 # --- BARRA LATERAL LOGOUT ---
@@ -509,4 +643,5 @@ if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
     st.session_state.autenticado = False
     st.session_state.usuario_atual = ""
     st.session_state.e_admin = False
+    st.session_state.troca_obrigatoria = False
     st.rerun()
