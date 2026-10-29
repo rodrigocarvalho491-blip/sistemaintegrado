@@ -8,7 +8,8 @@ import numpy as np
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime
+from datetime import datetime, timedelta
+from io import BytesIO
 from supabase import create_client, Client
 
 # --- FORÇAR TEMA CLARO GLOBALMENTE NO STREAMLIT ---
@@ -56,7 +57,6 @@ def carregar_banco_usuarios():
                 "precisa_trocar_senha": row.get("precisa_trocar_senha", False)
             }
         
-        # Garante a existência do admin master
         if "admin" not in dados:
             supabase.table("usuarios").insert({
                 "usuario": "admin", 
@@ -134,24 +134,7 @@ def apagar_nota(nota_id):
         st.error(f"Erro ao apagar nota: {e}")
         return False
 
-# --- CONSULTA CNPJ & IPCA ---
-@st.cache_data(ttl=3600)
-def consultar_cnpj_api(cnpj):
-    try:
-        cnpj_limpo = "".join(filter(str.isdigit, str(cnpj)))
-        if len(cnpj_limpo) == 14:
-            url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
-            resp = requests.get(url, timeout=5)
-            if resp.status_code == 200:
-                dados = resp.json()
-                return {
-                    "razao_social": dados.get("razao_social") or dados.get("nome_fantasia", ""),
-                    "situacao_cadastral": dados.get("descricao_situacao_cadastral", "ATIVA")
-                }
-    except Exception:
-        pass
-    return None
-
+# --- CONSULTAS AUXILIARES & IPCA ---
 @st.cache_data(ttl=1800, show_spinner=False)
 def obter_ipca_acumulado_12m():
     try:
@@ -329,11 +312,54 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
+# --- FUNÇÕES PARA PROCESSAMENTO DA AGENDA EXCEL ---
+COL_OCORRENCIA = "Número da ocorrência"
+COL_CLIENTE = "Nome do cliente"
+COL_ENDERECO = "Endereço de Entrega"
+COL_ABERTURA = "Data/Hora de abertura"
+COL_PRAZO = "Prazo de Atendimento"
+COL_FECHAMENTO = "Data/Hora de fechamento"
+COL_SUB_CLASSIF = "Subclassificação Ocorrência"
+
+def extrair_cidade(endereco):
+    if pd.isna(endereco): return "-"
+    s = str(endereco).strip().replace(';', ',').replace('|', ',')
+    partes = [p.strip() for p in s.split(',')]
+    if len(partes) >= 2:
+        cidade = partes[-2].strip()
+        if cidade.isdigit() and len(partes) >= 3:
+            cidade = partes[-3].strip()
+        return cidade.title()
+    return s.title()
+
+def calcular_dias_uteis(data_inicio, data_fim):
+    h = pd.Timestamp(data_inicio).normalize().date()
+    p = pd.Timestamp(data_fim).normalize().date()
+    if p > h: return int(np.busday_count(h, p))
+    elif p < h: return -int(np.busday_count(p, h))
+    else: return 0
+
+def classificar_status_geral(dias_uteis):
+    if dias_uteis < 0: return "🔴 Vencido"
+    elif dias_uteis == 0: return "🔵 Vence Hoje"
+    elif dias_uteis == 1: return "🟠 Vence Amanhã"
+    elif 2 <= dias_uteis <= 5: return "🟡 Vence na Semana"
+    else: return "🟢 No Prazo"
+
+def classificar_status_comodato(dias_uteis):
+    if dias_uteis < 0: return "🔴 Vencido"
+    elif dias_uteis == 0: return "🔵 Vence Hoje"
+    elif dias_uteis == 1: return "🟠 Vence Amanhã"
+    elif dias_uteis <= 5: return "🔴 3ª Semana" 
+    elif dias_uteis <= 10: return "🟡 2ª Semana" 
+    else: return "🟢 1ª Semana" 
+
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
+if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
@@ -368,7 +394,6 @@ if not st.session_state.autenticado:
                 st.error("❌ Usuário ou senha incorretos!")
     st.stop()
 
-# --- BLINDAGEM: TROCA OBRIGATÓRIA DE SENHA NO PRIMEIRISSIMO ACESSO ---
 if st.session_state.troca_obrigatoria:
     cabecalho_pagina("🔑 Alteração Obrigatória de Senha", "Sua conta está utilizando a senha temporária. Defina sua nova senha pessoal para prosseguir.")
     
@@ -445,15 +470,14 @@ with aba_tratativa:
         )
             
     with col_conteudo:
+        rc = st.session_state.reset_counter
+
         if menu_tratativa == "📷 Visita de Transferência":
             cabecalho_pagina("Visita de Transferência & Relatório Técnico", "Gerador automatizado de relatórios técnicos.")
-            rc = st.session_state.reset_counter
-            
             s1_l1_c1, s1_l1_c2, s1_l1_c3 = st.columns(3)
             with s1_l1_c1: contato = st.text_input("Contato *", key=f"vis_cont_{rc}")
             with s1_l1_c2: depto = st.text_input("Sobrenome / Depto *", key=f"vis_dep_{rc}")
             with s1_l1_c3: tel = st.text_input("Telefone *", key=f"vis_tel_{rc}")
-            
             obs = st.text_area("Observações Gerais", key=f"vis_obs_{rc}")
             if st.button("📝 Gerar Texto Visita", type="primary"):
                 txt = f"Contato: {contato}\nDepartamento: {depto}\nTelefone: {tel}\nObs: {obs}"
@@ -462,8 +486,6 @@ with aba_tratativa:
 
         elif menu_tratativa == "📝 Elaboração de Contrato":
             cabecalho_pagina("Elaboração de Contrato", "Formulário para geração do padrão de solicitação de contrato.")
-            rc = st.session_state.reset_counter
-            
             col1, col2 = st.columns(2)
             with col1:
                 motivo = st.text_input("Motivo da solicitação *", key=f"el_mot_{rc}")
@@ -471,7 +493,6 @@ with aba_tratativa:
             with col2:
                 tel = st.text_input("Telefone *", key=f"el_tel_{rc}")
                 email = st.text_input("E-mail *", key=f"el_eml_{rc}")
-                
             if st.button("📝 Gerar Texto Elaboração", type="primary"):
                 txt = f"Motivo: {motivo}\nContato: {contato}\nTelefone: {tel}\nE-mail: {email}"
                 st.code(txt)
@@ -479,11 +500,8 @@ with aba_tratativa:
 
         elif menu_tratativa == "📋 Aprovação de Contrato":
             cabecalho_pagina("Aprovação de Contrato", "Formulário de solicitação de aprovação.")
-            rc = st.session_state.reset_counter
-            
             motivo = st.text_input("Motivo da regularização *", key=f"ap_mot_{rc}")
             proj = st.text_input("Número do Projeto", key=f"ap_proj_{rc}")
-            
             if st.button("📝 Gerar Texto Aprovação", type="primary"):
                 txt = f"Motivo Regularização: {motivo}\nProjeto: {proj}"
                 st.code(txt)
@@ -492,13 +510,11 @@ with aba_tratativa:
         elif menu_tratativa == "🎂 Aniversário de Contrato":
             cabecalho_pagina("Aniversário de Contrato", "Calculadora de reajuste por IPCA acumulado de 12M.")
             ipca, periodo = obter_ipca_acumulado_12m()
-            
             if ipca:
                 st.success(f"📊 IPCA Acumulado 12M IBGE ({periodo}): `{ipca:.2f}%`")
                 ipca_val = ipca
             else:
                 ipca_val = st.number_input("IPCA Manual (%)", value=4.50)
-                
             p_ant = st.text_input("Preço Anterior (R$)", value="6.50")
             if st.button("📝 Gerar Reajuste", type="primary"):
                 try:
@@ -511,11 +527,104 @@ with aba_tratativa:
                     st.error("Digite um preço válido.")
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS
+# ABA 2: AGENDA DE OCORRÊNCIAS (COMPLETA RESTAURADA)
 # =====================================================================
 with aba_agenda:
-    cabecalho_pagina("Agenda de Ocorrências", "Acompanhamento e carregamento de planilhas de ocorrência.")
-    st.info("Envie o relatório em Excel para carregar suas pendências da sessão.")
+    cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização de agenda ordenado por prazo de atendimento.")
+    
+    arquivo_excel = st.file_uploader("Faça o upload do relatório Excel (Pós-Vendas) 📂", type=["xlsx", "xls"])
+    
+    if arquivo_excel is not None:
+        try:
+            df = pd.read_excel(arquivo_excel, header=11)
+            df = df.dropna(subset=[COL_OCORRENCIA])
+            
+            df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
+            df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
+            df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.tratadas_manualmente)]
+            
+            df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
+            df_pendentes['Abertura_DT'] = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+            df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
+            
+            df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
+            df_pendentes[COL_SUB_CLASSIF] = df_pendentes[COL_SUB_CLASSIF].fillna("-").astype(str)
+            
+            hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
+            
+            df_pendentes['Status Geral'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_geral)
+            df_pendentes['Status Comodato'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_comodato)
+            
+            df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
+            
+            st.divider()
+            st.subheader("1. Visitas Pendentes na Agenda")
+            
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                cidades_unicas = sorted(list(df_pendentes['Cidade'].unique()))
+                cidades_selecionadas = st.multiselect("Filtrar por Cidade(s):", cidades_unicas, default=[])
+            with col_f2:
+                sub_class_unicas = sorted(list(df_pendentes[COL_SUB_CLASSIF].unique()))
+                sub_class_selecionadas = st.multiselect("Filtrar por Sub-Classificação:", sub_class_unicas, default=[])
+            
+            df_filtrado = df_pendentes.copy()
+            if cidades_selecionadas: df_filtrado = df_filtrado[df_filtrado['Cidade'].isin(cidades_selecionadas)]
+            if sub_class_selecionadas: df_filtrado = df_filtrado[df_filtrado[COL_SUB_CLASSIF].isin(sub_class_selecionadas)]
+            
+            df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
+            
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            col_m1.metric("Visitas Pendentes", len(df_filtrado))
+            col_m2.metric("Vence Hoje", len(df_filtrado[df_filtrado['Status Geral'] == "🔵 Vence Hoje"]))
+            col_m3.metric("Vence Amanhã", len(df_filtrado[df_filtrado['Status Geral'] == "🟠 Vence Amanhã"]))
+            col_m4.metric("Ocorrências Vencidas", len(df_filtrado[df_filtrado['Status Geral'] == "🔴 Vencido"]))
+            
+            st.write("---")
+            if not df_filtrado.empty:
+                df_exibicao = df_filtrado[['Status Geral', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
+                df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
+                
+                edited_df = st.data_editor(
+                    df_exibicao.assign(Tratar=False),
+                    column_config={"Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True)},
+                    hide_index=True, use_container_width=True, key="editor_geral"
+                )
+                
+                ocorrencias_para_tratar = edited_df[edited_df["Tratar"] == True][COL_OCORRENCIA].tolist()
+                if ocorrencias_para_tratar:
+                    if st.button("🔒 Confirmar e Remover do Painel", type="primary"):
+                        for oc in ocorrencias_para_tratar: st.session_state.tratadas_manualmente.add(int(oc))
+                        st.success("✅ Ocorrências tratadas removidas!")
+                        st.rerun()
+
+            st.divider()
+            st.subheader("2. Relatório Específico: Comodato Inativo")
+            df_comodato = df_pendentes[df_pendentes[COL_SUB_CLASSIF].str.contains("Comodato Inativo", case=False, na=False)].copy()
+            if df_comodato.empty:
+                st.info("Nenhuma ocorrência de Comodato Inativo encontrada.")
+            else:
+                df_comodato['Data Atendimento'] = df_comodato['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                df_comodato_exibicao = df_comodato[['Status Comodato', 'Dias Úteis Restantes', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', COL_SUB_CLASSIF, 'Data Atendimento']].copy()
+                df_comodato_exibicao[COL_OCORRENCIA] = df_comodato_exibicao[COL_OCORRENCIA].astype(str)
+                
+                st.dataframe(df_comodato_exibicao, hide_index=True, use_container_width=True)
+
+            st.divider()
+            st.subheader("3. Ocorrências por Cidades")
+            col_c1, col_c2 = st.columns([1, 1])
+            with col_c1:
+                st.markdown("**Distribuição Visual:**")
+                st.bar_chart(df_pendentes['Cidade'].value_counts())
+            with col_c2:
+                st.markdown("**Tabela por Cidade:**")
+                df_cid = df_pendentes['Cidade'].value_counts().reset_index()
+                df_cid.columns = ["Cidade", "Quantidade"]
+                st.dataframe(df_cid, hide_index=True, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Erro ao processar arquivo Excel: {e}")
 
 # =====================================================================
 # ABA 3: BLOCO DE NOTAS PESSOAL
@@ -570,7 +679,7 @@ with aba_notas:
                     st.rerun()
 
 # =====================================================================
-# ABA 4: PAINEL ADMIN (GESTÃO COMPLETA DE NÍVEIS E SENHAS)
+# ABA 4: PAINEL ADMIN
 # =====================================================================
 if aba_admin is not None:
     with aba_admin:
@@ -595,7 +704,7 @@ if aba_admin is not None:
                         st.warning(f"⚠️ O usuário '{novo_user}' já existe.")
                     else:
                         if salvar_usuario(novo_user, "123456", nivel_acesso=nivel_acesso, precisa_trocar=True):
-                            st.success(f"✅ Usuário **{novo_user}** criado com sucesso! (Senha inicial: 123456)")
+                            st.success(f"✅ Usuário **{novo_user}** criado com sucesso!")
                             st.rerun()
 
         with col_adm2:
@@ -610,8 +719,6 @@ if aba_admin is not None:
                     if salvar_usuario(user_sel_senha, "123456", nivel_acesso=curr_nivel, precisa_trocar=True):
                         st.success(f"✅ Senha do usuário **{user_sel_senha}** resetada para **123456**!")
                         st.rerun()
-            else:
-                st.info("Nenhum usuário cadastrado além do Admin Master.")
 
         st.divider()
         st.subheader("3. Usuários Cadastrados & Remoção")
