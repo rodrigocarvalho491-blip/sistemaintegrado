@@ -228,6 +228,12 @@ def extrair_cidade(endereco):
         return cidade.title()
     return s.title()
 
+def limpar_subclassificacao(val):
+    if pd.isna(val): return "-"
+    s = str(val).strip()
+    s_limpo = s.replace("[NEGÓCIOS]", "").replace("[NEGOCIOS]", "").replace("[Negócios]", "").replace("[Negocios]", "").strip()
+    return s_limpo if s_limpo else s
+
 def calcular_dias_uteis(data_inicio, data_fim):
     h = pd.Timestamp(data_inicio).normalize().date()
     p = pd.Timestamp(data_fim).normalize().date()
@@ -323,24 +329,29 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 .cg-subtitle { font-size: 0.95rem; margin-top: 0.2rem; color: #64748B !important; font-weight: 500; }
 
 div.stButton > button {
-  border-radius: 8px !important; 
+  border-radius: 10px !important; 
   font-weight: 600 !important;
   transition: all 0.2s ease-in-out;
+  padding: 12px 10px !important;
+  min-height: 75px !important;
+  font-size: 0.9rem !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
 }
 div.stButton > button[data-testid="baseButton-primary"] {
-  background-color: #0055A5 !important; 
+  background-color: #004080 !important; 
   color: #ffffff !important;
-  border: 1px solid #0055A5 !important; 
+  border: 2px solid #F28C28 !important; 
+  box-shadow: 0 4px 12px rgba(0,85,165,0.25) !important;
 }
 div.stButton > button[data-testid="baseButton-secondary"] {
   background-color: #F8FAFC !important;
-  color: #475569 !important;
+  color: #1E293B !important;
   border: 1px solid #CBD5E1 !important;
 }
 div.stButton > button[data-testid="baseButton-secondary"]:hover {
   background-color: #E2E8F0 !important;
-  color: #1E293B !important;
-  border-color: #94A3B8 !important;
+  color: #003366 !important;
+  border-color: #0055A5 !important;
 }
 
 [data-testid="stSidebar"] {
@@ -1129,11 +1140,13 @@ with aba_agenda:
                 
                 df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
                 df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
-                df_pendentes[COL_SUB_CLASSIF] = df_pendentes[COL_SUB_CLASSIF].fillna("-").astype(str)
+                
+                # Limpeza da Subclassificação para remover [NEGÓCIOS]
+                df_pendentes[COL_SUB_CLASSIF] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_subclassificacao)
                 
                 hoje_ts = pd.Timestamp(pd.Timestamp(datetime.now()).normalize())
                 
-                # Intervalo exato da semana corrente (Segunda a Sexta) com base no dia de acesso
+                # Sexta-feira da semana atual (para o filtro semanal simplificado)
                 segunda_feira_semana = hoje_ts - pd.Timedelta(days=hoje_ts.weekday())
                 sexta_feira_semana = segunda_feira_semana + pd.Timedelta(days=4)
                 
@@ -1164,36 +1177,37 @@ with aba_agenda:
                     vence_hoje_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0])
                     vence_amanha_qtd = len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1])
                     
-                    # Regra solicitada: "Vencem na Semana" = Ocorrências vencidas + Ocorrências com prazo de atendimento dentro da semana vigente
+                    # Regra solicitada: "Vencem na Semana" = Ocorrências vencidas + Ocorrências que vencem até a sexta-feira
                     df_vencem_semana = df_base_filtrado[
                         (df_base_filtrado['Dias Úteis Restantes'] < 0) | 
-                        ((df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana))
+                        (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana)
                     ]
                     vencem_semana_qtd = len(df_vencem_semana)
 
                     st.write("")
+                    st.markdown("**📊 Painel de Filtros Rápidos (Clique no cartão desejado):**")
                     
-                    # MÉTRICAS INTERATIVAS (O próprio card é o botão de filtro)
+                    # PAINEL DE BOTÕES SUPERIORES MAIORES E MAIS ELABORADOS
                     col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
                     
                     with col_m1:
-                        if st.button(f"Total (Filtros)\n\n**{total_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
+                        if st.button(f"📋 Total (Filtros)\n\n**{total_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Todas" else "secondary"):
                             st.session_state.filtro_btn_status = "Todas"
                             st.rerun()
                     with col_m2:
-                        if st.button(f"Vencidas\n\n**{vencidas_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
+                        if st.button(f"🔴 Vencidas\n\n**{vencidas_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencidas" else "secondary"):
                             st.session_state.filtro_btn_status = "Vencidas"
                             st.rerun()
                     with col_m3:
-                        if st.button(f"Vence Hoje\n\n**{vence_hoje_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
+                        if st.button(f"🔵 Vence Hoje\n\n**{vence_hoje_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Hoje" else "secondary"):
                             st.session_state.filtro_btn_status = "Vence Hoje"
                             st.rerun()
                     with col_m4:
-                        if st.button(f"Vence Amanhã\n\n**{vence_amanha_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
+                        if st.button(f"🟠 Vence Amanhã\n\n**{vence_amanha_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vence Amanhã" else "secondary"):
                             st.session_state.filtro_btn_status = "Vence Amanhã"
                             st.rerun()
                     with col_m5:
-                        if st.button(f"Vencem na Semana\n\n**{vencem_semana_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
+                        if st.button(f"📅 Vencem na Semana\n\n**{vencem_semana_qtd}**", use_container_width=True, type="primary" if st.session_state.filtro_btn_status == "Vencem na Semana" else "secondary"):
                             st.session_state.filtro_btn_status = "Vencem na Semana"
                             st.rerun()
 
@@ -1209,7 +1223,7 @@ with aba_agenda:
                     elif fs == "Vence Amanhã":
                         df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
                     elif fs == "Vencem na Semana":
-                        # Regra solicitada: Vencidas + Prazo entre Seg e Sex da semana atual
+                        # Regra solicitada: Vencidas + vencem até a sexta-feira
                         df_filtrado = df_vencem_semana.copy()
 
                     df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
