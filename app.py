@@ -1131,7 +1131,8 @@ with aba_agenda:
                 
                 header_row = None
                 for i, row in df_raw.iterrows():
-                    row_str = " ".join(row.astype(str).values)
+                    # Forçando a conversão de cada valor para string antes do join, para evitar erro de float/NaN no objeto original
+                    row_str = " ".join([str(val) for val in row.values])
                     if "Número da ocorrência" in row_str:
                         header_row = i
                         break
@@ -1141,7 +1142,7 @@ with aba_agenda:
                 else:
                     df = pd.read_excel(arquivo_excel, header=11)
                     
-                df.columns = df.columns.str.strip()
+                df.columns = [str(c).strip() for c in df.columns]
                 df = df.dropna(subset=[COL_OCORRENCIA])
                 
                 df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
