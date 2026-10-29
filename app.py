@@ -12,7 +12,6 @@ import altair as alt
 from datetime import datetime, timedelta
 from io import BytesIO
 from PIL import Image
-from pydantic import ValidationError
 
 # --- FORÇAR TEMA CLARO GLOBALMENTE NO STREAMLIT ---
 os.makedirs(".streamlit", exist_ok=True)
@@ -236,17 +235,15 @@ def calcular_dias_uteis(data_inicio, data_fim):
     elif p < h: return -int(np.busday_count(p, h))
     else: return 0
 
-def classificar_status_geral(row, hoje_ts):
+def classificar_status_geral(row, segunda_feira_ts, sexta_feira_ts):
     dias_uteis = row['Dias Úteis Restantes']
     p = row['Prazo_DT']
     if pd.isna(p): return "🟢 No Prazo"
     
-    sexta = hoje_ts + pd.Timedelta(days=(4 - hoje_ts.weekday()))
-    
     if dias_uteis < 0: return "🔴 Vencido"
     if dias_uteis == 0: return "🔵 Vence Hoje"
     if dias_uteis == 1: return "🟠 Vence Amanhã"
-    if p <= sexta: return "🟡 Vence na Semana"
+    if segunda_feira_ts <= p <= sexta_feira_ts: return "🟡 Vence na Semana"
     return "🟢 No Prazo"
 
 def classificar_status_comodato(dias_uteis):
@@ -1139,13 +1136,15 @@ with aba_agenda:
                 
                 hoje_ts = pd.Timestamp(pd.Timestamp(datetime.now()).normalize())
                 
+                # Intervalo da semana corrente (Segunda a Sexta) com base no dia de acesso
+                segunda_feira_semana = hoje_ts - pd.Timedelta(days=hoje_ts.weekday())
+                sexta_feira_semana = segunda_feira_semana + pd.Timedelta(days=4)
+                
                 df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje_ts.date(), x))
-                df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, hoje_ts), axis=1)
+                df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, segunda_feira_semana, sexta_feira_semana), axis=1)
                 df_pendentes['Status Comodato'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_comodato)
                 
                 df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
-                
-                sexta_feira_semana = hoje_ts + pd.Timedelta(days=(4 - hoje_ts.weekday()))
 
                 # ----- 1. TODAS AS OCORRÊNCIAS -----
                 if menu_agenda == "Todas as Ocorrências":
@@ -1169,7 +1168,7 @@ with aba_agenda:
                     col_m2.metric("Vencidas", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] < 0]))
                     col_m3.metric("Vence Hoje", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 0]))
                     col_m4.metric("Vence Amanhã", len(df_base_filtrado[df_base_filtrado['Dias Úteis Restantes'] == 1]))
-                    col_m5.metric("Vencem na Semana", len(df_base_filtrado[df_base_filtrado['Prazo_DT'] <= sexta_feira_semana]))
+                    col_m5.metric("Vencem na Semana", len(df_base_filtrado[(df_base_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_base_filtrado['Prazo_DT'] <= sexta_feira_semana)]))
                     
                     st.write("---")
                     
@@ -1201,7 +1200,7 @@ with aba_agenda:
                     elif fs == "Vence Amanhã":
                         df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
                     elif fs == "Vencem na Semana":
-                        df_filtrado = df_filtrado[df_filtrado['Prazo_DT'] <= sexta_feira_semana]
+                        df_filtrado = df_filtrado[(df_filtrado['Prazo_DT'] >= segunda_feira_semana) & (df_filtrado['Prazo_DT'] <= sexta_feira_semana)]
 
                     df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
                     
