@@ -179,7 +179,7 @@ def formatar_ci_num(ci_str):
         return ci_str.strip()
     return "000.000.000"
 
-# --- GERADOR DE PDF DE RELATÓRIO FOTOGRÁFICO ---
+# --- GERADOR DE PDF DE RELATÓRIO FOTOGRÁFICO COM TABELA DE EQUIPAMENTOS ---
 class RelatorioPDF(FPDF):
     def __init__(self, cod_cliente="", nome_cliente="", logo_path=""):
         super().__init__()
@@ -193,7 +193,7 @@ class RelatorioPDF(FPDF):
         if self.page_no() == 1:
             self.set_y(10)
             self.set_font("Arial", "B", 15)
-            self.cell(0, 8, "RELATÓRIO FOTOGRÁFICO", align="C", ln=1)
+            self.cell(0, 8, "RELATÓRIO FOTOGRÁFICO E TÉCNICO", align="C", ln=1)
             info_cabecalho = f"{self.cod_cliente} | {self.nome_cliente}".strip(" |")
             if info_cabecalho:
                 self.set_font("Arial", "B", 11)
@@ -206,55 +206,6 @@ class RelatorioPDF(FPDF):
         self.set_y(-15)
         self.set_font("Arial", "I", 8)
         self.cell(0, 10, f"Página {self.page_no()}", align="C")
-
-# --- FUNÇÕES PARA PROCESSAMENTO DA AGENDA EXCEL ---
-COL_OCORRENCIA = "Número da ocorrência"
-COL_CLIENTE = "Nome do cliente"
-COL_ENDERECO = "Endereço de Entrega"
-COL_ABERTURA = "Data/Hora de abertura"
-COL_PRAZO = "Prazo de Atendimento"
-COL_FECHAMENTO = "Data/Hora de fechamento"
-COL_SUB_CLASSIF = "Subclassificação Ocorrência"
-
-def extrair_cidade(endereco):
-    if pd.isna(endereco): return "-"
-    s = str(endereco).strip().replace(';', ',').replace('|', ',')
-    partes = [p.strip() for p in s.split(',')]
-    if len(partes) >= 2:
-        cidade = partes[-2].strip()
-        if cidade.isdigit() and len(partes) >= 3:
-            cidade = partes[-3].strip()
-        return cidade.title()
-    return s.title()
-
-def limpar_subclassificacao(val):
-    if pd.isna(val): return "-"
-    s = str(val).strip()
-    s_limpo = s.replace("[NEGÓCIOS]", "").replace("[NEGOCIOS]", "").replace("[Negócios]", "").replace("[Negocios]", "").strip()
-    return s_limpo if s_limpo else s
-
-def calcular_dias_uteis(data_inicio, data_fim):
-    h = pd.Timestamp(data_inicio).normalize().date()
-    p = pd.Timestamp(data_fim).normalize().date()
-    if p > h: return int(np.busday_count(h, p))
-    elif p < h: return -int(np.busday_count(p, h))
-    else: return 0
-
-def classificar_status_geral(row):
-    dias_uteis = row['Dias Úteis Restantes']
-    if pd.isna(row['Prazo_DT']): return "🟢 No Prazo"
-    if dias_uteis < 0: return "🔴 Vencido"
-    if dias_uteis == 0: return "🔵 Vence Hoje"
-    if dias_uteis == 1: return "🟠 Vence Amanhã"
-    return "🟢 No Prazo"
-
-def classificar_status_comodato(dias_uteis):
-    if dias_uteis < 0: return "🔴 Vencido"
-    elif dias_uteis == 0: return "🔵 Vence Hoje"
-    elif dias_uteis == 1: return "🟠 Vence Amanhã"
-    elif dias_uteis <= 5: return "🔴 3ª Semana" 
-    elif dias_uteis <= 10: return "🟡 2ª Semana" 
-    else: return "🟢 1ª Semana" 
 
 # --- AUXILIARES E VISUAL ---
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
@@ -410,7 +361,7 @@ if "ultimo_usuario_logado" not in st.session_state: st.session_state.ultimo_usua
 if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None
 
 if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
-if "last_central" not in st.session_state: st.session_state.last_central = "Central 01"
+if "last_central" not in st.session_state: st.session_state.last_central = "Central"
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
@@ -554,7 +505,7 @@ with aba_tratativa:
             st.divider()
             st.subheader("2. Informações Contratuais & Centrais")
             
-            # Escolha de Quantidade de Centrais antes do preenchimento contratual
+            # Opção de Quantidade de Centrais
             qtd_centrais_visita = st.number_input("Quantidade de Centrais no Cliente *", min_value=1, max_value=10, value=1, step=1, key=f"vis_qtd_centrais_{rc}")
             st.write("")
 
@@ -633,7 +584,7 @@ with aba_tratativa:
             with c_nome_eq:
                 nome_eq_add = st.text_input("Equipamento", placeholder="Ex: Forno Industrial", key=f"nome_eq_add_{rc}")
             with c_vaz_eq:
-                vazao_eq_add = st.text_input("Vazão Unit. (kg/h)", placeholder="Ex: 1 ou 0,5", key=f"vazao_eq_add_{rc}")
+                vazao_eq_add = st.text_input("Vazão Unit. (kg/h)", placeholder="Ex: 1,6 ou 0,5", key=f"vazao_eq_add_{rc}")
             with c_btn_eq:
                 st.write(""); st.write("")
                 if st.button("➕ Add", key=f"btn_add_eq_vis_{rc}"):
@@ -674,17 +625,18 @@ with aba_tratativa:
                             vazao_geral_todas += item["vazao_total"]
                             
                             c_txt, c_del = st.columns([5, 1])
-                            c_txt.text(f"• {item['qtd']:02d} {item['nome']} - {item['vazao_unit']} kg/h (Total Item: {item['vazao_total']:.2f} kg/h)".replace(".", ","))
+                            v_unit_fmt = f"{item['vazao_unit']:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                            c_txt.text(f"• {item['qtd']:02d} {item['nome']} - {v_unit_fmt} kg/h")
                             if c_del.button("❌", key=f"del_eq_{idx}_{rc}"):
                                 st.session_state.equipamentos.pop(idx)
                                 st.rerun()
                     
                     v_str_c = f"{vazao_c:.2f}".replace(".", ",").rstrip("0").rstrip(",")
-                    st.caption(f"Vazão Total {c_nome}: {v_str_c} kg/h")
+                    st.caption(f"Vazão Subtotal {c_nome}: {v_str_c} kg/h")
                 
                 st.write("")
                 v_str_geral = f"{vazao_geral_todas:.2f}".replace(".", ",").rstrip("0").rstrip(",")
-                st.markdown(f"🔥 **Total Geral de Vazão Disponível: {v_str_geral} kg/h**")
+                st.markdown(f"🔥 **Total - {v_str_geral} kg/h**")
 
             st.divider()
             st.subheader("4. Novos Negócios & Satisfação")
@@ -741,15 +693,17 @@ with aba_tratativa:
             col_b1, col_b2 = st.columns(2)
             with col_b1:
                 if st.button("📝 Gerar Texto para Sistema", type="primary"):
-                    linha_art = "Não informado"
+                    # Formatação da ART
+                    linha_art = "( ) Sim ( ) Não"
                     if possui_art == "Sim":
                         linha_art = f"(x) Sim ( ) Não {desc_art.strip()}"
                     elif possui_art == "Não":
-                        linha_art = f"( ) Sim (x) Não - {desc_art.strip()}"
+                        linha_art = f"( ) Sim (x) Não {desc_art.strip()}"
 
-                    # Formatação de equipamentos de contrato por central
+                    # Equipamentos no Contrato
                     if qtd_centrais_visita == 1:
-                        texto_eq_contrato = f"{eq_contrato or ''}. {eq_dict_visita.get(1, '').strip()}".strip()
+                        desc_eq_val = eq_dict_visita.get(1, "").strip()
+                        texto_eq_contrato = f"{eq_contrato or ''}. {desc_eq_val}".strip()
                     else:
                         linhas_eq_contr = [f"[Equipamentos Central {i:02d}: {eq_dict_visita.get(i, '').strip()}]" for i in range(1, int(qtd_centrais_visita) + 1)]
                         texto_eq_contrato = f"{eq_contrato or ''}. " + " ".join(linhas_eq_contr)
@@ -761,14 +715,18 @@ with aba_tratativa:
                     texto_negocios = f"{indica_negocios or ''}" + (f" - {desc_negocios.strip()}" if indica_negocios == "Sim" and desc_negocios.strip() else "")
                     texto_satisfacao = f"{cliente_satisfeito or ''}" + (f", {desc_satisfacao.strip()}" if desc_satisfacao.strip() else "")
 
-                    # Montagem do Texto de Equipamentos Disponíveis no Cliente
+                    # Montagem exata do bloco de equipamentos por central
                     texto_disp_equip = ""
                     if st.session_state.equipamentos:
                         centrais_cad = sorted(list(set([e["central"] for e in st.session_state.equipamentos])))
                         tot_vazao_geral = 0.0
                         
                         for c_n in centrais_cad:
-                            texto_disp_equip += f"\n[{c_n.upper()}]\n"
+                            if qtd_centrais_visita > 1:
+                                texto_disp_equip += f"\n[{c_n.upper()}]\n"
+                            else:
+                                texto_disp_equip += "\n[CENTRAL]\n"
+
                             vazao_c_sum = 0.0
                             for item in st.session_state.equipamentos:
                                 if item["central"] == c_n:
@@ -776,18 +734,27 @@ with aba_tratativa:
                                     texto_disp_equip += f"{item['qtd']:02d} {item['nome']} - {v_unit_fmt} kg/h\n"
                                     vazao_c_sum += item["vazao_total"]
                                     tot_vazao_geral += item["vazao_total"]
+                            
                             v_c_sum_fmt = f"{vazao_c_sum:.2f}".replace(".", ",").rstrip("0").rstrip(",")
-                            texto_disp_equip += f"Vazão Subtotal {c_n}: {v_c_sum_fmt} kg/h\n"
+                            if qtd_centrais_visita > 1:
+                                texto_disp_equip += f"Vazão Subtotal {c_n}: {v_c_sum_fmt} kg/h\n"
+                            else:
+                                texto_disp_equip += f"Vazão Subtotal Central: {v_c_sum_fmt} kg/h\n"
                         
                         tot_g_fmt = f"{tot_vazao_geral:.2f}".replace(".", ",").rstrip("0").rstrip(",")
                         texto_disp_equip += f"\nTotal - {tot_g_fmt} kg/h"
                     else:
-                        texto_disp_equip = "Nenhum equipamento cadastrado."
+                        texto_disp_equip = "\nTotal - 0 kg/h"
 
-                    texto_final = f"""Contato: {contato} Sobrenome ou departamento: {departamento} Telefone: {telefone}
+                    # Montagem final respeitando todas as quebras e espaçamentos
+                    texto_final = f"""Contato: {contato}
+ Sobrenome ou departamento: {departamento}
+Telefone: {telefone}
+
 Equipamentos de acordo com o contrato vigente? {texto_eq_contrato}
-Representante 2 está correto? {texto_rep2} Possui programação cadastrada? {texto_freq}
-Consumo mensal atual de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg
+Representante 2 está correto? {texto_rep2}
+Possui programação cadastrada? {texto_freq}
+Consumo de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg
 Laudo ART emitido? {linha_art} Central atende as normas? {texto_central_norma}
 
 Quais equipamentos disponíveis no cliente?
@@ -796,10 +763,11 @@ Quais equipamentos disponíveis no cliente?
 Indicação de novos negócios do cliente: {texto_negocios}
 Cliente possui débitos? {texto_debitos}
 Cliente está satisfeito com o atendimento da Consigaz? {texto_satisfacao}
+
 Obs.: {observacoes}"""
 
                     st.success("✅ Texto para o Sistema gerado com sucesso!")
-                    st.text_area("Texto Gerado:", value=texto_final, height=280, key=f"txt_area_transf_{rc}")
+                    st.text_area("Texto Gerado:", value=texto_final, height=350, key=f"txt_area_transf_{rc}")
                     botao_copiar_customizado(texto_final, "transf_txt")
 
             with col_b2:
@@ -809,10 +777,34 @@ Obs.: {observacoes}"""
                     else:
                         pdf = RelatorioPDF(cod_cliente=cod_cliente, nome_cliente=nome_cliente, logo_path=LOGO_PATH)
                         pdf.add_page()
-                        pdf.set_font("Arial", "", 12)
-                        pdf.cell(0, 10, f"Contato: {contato} | Telefone: {telefone}", ln=True)
-                        pdf.cell(0, 10, f"Departamento: {departamento}", ln=True)
-                        
+                        pdf.set_font("Arial", "", 11)
+                        pdf.cell(0, 7, f"Contato: {contato} | Telefone: {telefone}", ln=True)
+                        pdf.cell(0, 7, f"Departamento: {departamento}", ln=True)
+                        pdf.ln(3)
+
+                        # Adiciona a Tabela de Equipamentos ao PDF
+                        if st.session_state.equipamentos:
+                            pdf.set_font("Arial", "B", 11)
+                            pdf.cell(0, 8, "EQUIPAMENTOS DISPONÍVEIS NO CLIENTE", ln=True)
+                            pdf.set_fill_color(240, 240, 240)
+                            pdf.cell(20, 7, "QTD", border=1, align="C", fill=True)
+                            pdf.cell(110, 7, "EQUIPAMENTO", border=1, align="L", fill=True)
+                            pdf.cell(55, 7, "VAZÃO UNIT. (KG/H)", border=1, align="C", fill=True, ln=True)
+                            
+                            pdf.set_font("Arial", "", 10)
+                            tot_pdf = 0.0
+                            for item in st.session_state.equipamentos:
+                                v_unit_fmt = f"{item['vazao_unit']:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                                pdf.cell(20, 6, f"{item['qtd']:02d}", border=1, align="C")
+                                pdf.cell(110, 6, f"{item['nome']} ({item['central']})", border=1, align="L")
+                                pdf.cell(55, 6, f"{v_unit_fmt} kg/h", border=1, align="C", ln=True)
+                                tot_pdf += item["vazao_total"]
+
+                            tot_pdf_fmt = f"{tot_pdf:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                            pdf.set_font("Arial", "B", 10)
+                            pdf.cell(130, 7, "TOTAL DE VAZÃO:", border=1, align="R", fill=True)
+                            pdf.cell(55, 7, f"{tot_pdf_fmt} kg/h", border=1, align="C", fill=True, ln=True)
+
                         cod_limpo = re.sub(r'\D', '', str(cod_cliente))
                         data_str = datetime.now().strftime("%d-%m-%y")
                         nome_arquivo_pdf = f"relatorio_{cod_limpo}_{data_str}.pdf"
