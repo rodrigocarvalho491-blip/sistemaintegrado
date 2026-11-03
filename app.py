@@ -399,7 +399,7 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
-# --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO ---
+# --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
@@ -408,6 +408,9 @@ if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_man
 if "filtro_btn_status" not in st.session_state: st.session_state.filtro_btn_status = "Todas"
 if "ultimo_usuario_logado" not in st.session_state: st.session_state.ultimo_usuario_logado = ""
 if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None
+
+if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
+if "last_central" not in st.session_state: st.session_state.last_central = "Central 01"
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
@@ -533,6 +536,7 @@ with aba_tratativa:
             
             if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_novo_vis_{rc}"):
                 st.session_state.reset_counter += 1
+                st.session_state.equipamentos = []
                 st.rerun()
 
             st.divider()
@@ -548,15 +552,31 @@ with aba_tratativa:
             with s1_l2_c3: st.write("")
 
             st.divider()
-            st.subheader("2. Informações Contratuais")
+            st.subheader("2. Informações Contratuais & Centrais")
             
-            s2_l1_c1, s2_l1_c2, s2_l1_c3, s2_l1_c4 = st.columns(4)
-            with s2_l1_c1:
+            # Escolha de Quantidade de Centrais antes do preenchimento contratual
+            qtd_centrais_visita = st.number_input("Quantidade de Centrais no Cliente *", min_value=1, max_value=10, value=1, step=1, key=f"vis_qtd_centrais_{rc}")
+            st.write("")
+
+            eq_dict_visita = {}
+            if qtd_centrais_visita == 1:
+                col_eq_c1, col_eq_c2 = st.columns(2)
+                with col_eq_c1:
+                    eq_contrato = st.radio("Equipamentos de acordo com contrato? *", ["Sim", "Não"], horizontal=True, index=None, key=f"eq_cont_{rc}")
+                with col_eq_c2:
+                    desc_eq_contrato = st.text_input("Quais equipamentos contratados? *", placeholder="Ex: 01 B190 + 01 CC", key=f"desc_eq_{rc}")
+                    eq_dict_visita[1] = desc_eq_contrato
+            else:
                 eq_contrato = st.radio("Equipamentos de acordo com contrato? *", ["Sim", "Não"], horizontal=True, index=None, key=f"eq_cont_{rc}")
-            with s2_l1_c2:
-                desc_eq_contrato = ""
-                if eq_contrato: 
-                    desc_eq_contrato = st.text_input("Quais equipamentos disponíveis? *", key=f"desc_eq_{rc}")
+                st.markdown("**Equipamentos Contratados por Central:**")
+                cols_cent = st.columns(min(int(qtd_centrais_visita), 3))
+                for i in range(1, int(qtd_centrais_visita) + 1):
+                    c_idx = (i - 1) % len(cols_cent)
+                    with cols_cent[c_idx]:
+                        eq_dict_visita[i] = st.text_input(f"Equipamentos Central {i:02d} *", placeholder="Ex: 01 B190 + 01 CC", key=f"desc_eq_cent_{i}_{rc}")
+
+            st.write("")
+            s2_l1_c3, s2_l1_c4 = st.columns(2)
             with s2_l1_c3:
                 tem_freq = st.radio("Possui programação cadastrada? *", ["Sim", "Não"], horizontal=True, index=None, key=f"tem_freq_{rc}")
             with s2_l1_c4:
@@ -565,16 +585,13 @@ with aba_tratativa:
                     desc_freq = st.text_input("Qual a programação? *", key=f"desc_freq_{rc}")
                 elif tem_freq == "Não":
                     desc_freq = st.text_input("Nº OC de Cadastramento *", key=f"desc_freq_nao_{rc}")
-            
+
             s2_l2_c1, s2_l2_c2 = st.columns(2)
-            with s2_l2_c1:
-                consumo_previsto = st.text_input("Consumo Previsto (kg) *", key=f"cons_prev_{rc}")
-            with s2_l2_c2:
-                consumo_real = st.text_input("Consumo Real/Médio (kg) *", key=f"cons_real_{rc}")
+            with s2_l2_c1: consumo_previsto = st.text_input("Consumo Previsto (kg) *", key=f"cons_prev_{rc}")
+            with s2_l2_c2: consumo_real = st.text_input("Consumo Real/Médio (kg) *", key=f"cons_real_{rc}")
                 
             s2_l3_c1, s2_l3_c2 = st.columns(2)
-            with s2_l3_c1:
-                possui_art = st.radio("Laudo ART emitido? *", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_art_{rc}")
+            with s2_l3_c1: possui_art = st.radio("Laudo ART emitido? *", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_art_{rc}")
             with s2_l3_c2:
                 desc_art = ""
                 if possui_art == "Sim":
@@ -583,31 +600,94 @@ with aba_tratativa:
                     desc_art = st.text_input("Nº OC de Solicitação de Laudo *", key=f"desc_art_nao_{rc}")
 
             s2_l4_c1, s2_l4_c2 = st.columns(2)
-            with s2_l4_c1:
-                possui_debitos = st.radio("Cliente possui débitos? *", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rc}")
+            with s2_l4_c1: possui_debitos = st.radio("Cliente possui débitos? *", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rc}")
             with s2_l4_c2:
                 desc_debitos = ""
                 if possui_debitos == "Sim":
                     desc_debitos = st.text_input("Detalhes dos Débitos", key=f"desc_deb_{rc}")
 
             s2_l5_c1, s2_l5_c2 = st.columns(2)
-            with s2_l5_c1:
-                central_norma = st.radio("Central atende as normas? *", ["Sim", "Não"], horizontal=True, index=None, key=f"central_norma_{rc}")
+            with s2_l5_c1: central_norma = st.radio("Central atende as normas? *", ["Sim", "Não"], horizontal=True, index=None, key=f"central_norma_{rc}")
             with s2_l5_c2:
                 desc_central_norma = ""
                 if central_norma == "Não":
                     desc_central_norma = st.text_input("Motivo Central fora de norma", key=f"desc_norma_{rc}")
 
             s2_l6_c1, s2_l6_c2 = st.columns(2)
-            with s2_l6_c1:
-                rep2_correto = st.radio("Representante 2 está correto? *", ["Sim", "Não"], horizontal=True, index=None, key=f"rep2_{rc}")
+            with s2_l6_c1: rep2_correto = st.radio("Representante 2 está correto? *", ["Sim", "Não"], horizontal=True, index=None, key=f"rep2_{rc}")
             with s2_l6_c2:
                 desc_rep2 = ""
                 if rep2_correto == "Não":
                     desc_rep2 = st.text_input("Nº OC de Regularização", key=f"desc_rep2_{rc}")
 
             st.divider()
-            st.subheader("3. Novos Negócios & Satisfação")
+            st.subheader("3. Equipamentos Disponíveis no Cliente (Cálculo de Vazão)")
+            
+            opcoes_centrais_list = [f"Central {i:02d}" for i in range(1, int(qtd_centrais_visita) + 1)] if qtd_centrais_visita > 1 else ["Central"]
+            
+            c_cent_sel, c_qtd_eq, c_nome_eq, c_vaz_eq, c_btn_eq = st.columns([2, 1, 3, 2, 1])
+            with c_cent_sel:
+                central_dest = st.selectbox("Central", opcoes_centrais_list, key=f"sel_cent_dest_{rc}")
+            with c_qtd_eq:
+                qtd_eq_add = st.number_input("Qtd", min_value=1, value=1, step=1, key=f"qtd_eq_add_{rc}")
+            with c_nome_eq:
+                nome_eq_add = st.text_input("Equipamento", placeholder="Ex: Forno Industrial", key=f"nome_eq_add_{rc}")
+            with c_vaz_eq:
+                vazao_eq_add = st.text_input("Vazão Unit. (kg/h)", placeholder="Ex: 1 ou 0,5", key=f"vazao_eq_add_{rc}")
+            with c_btn_eq:
+                st.write(""); st.write("")
+                if st.button("➕ Add", key=f"btn_add_eq_vis_{rc}"):
+                    if nome_eq_add.strip() and vazao_eq_add.strip():
+                        try:
+                            v_unit = float(vazao_eq_add.replace(",", ".").lower().replace("kg/h", "").strip())
+                            q_num = int(qtd_eq_add)
+                            v_tot_item = v_unit * q_num
+                            
+                            st.session_state.equipamentos.append({
+                                "central": central_dest,
+                                "qtd": q_num,
+                                "nome": nome_eq_add.strip().title(),
+                                "vazao_unit": v_unit,
+                                "vazao_total": v_tot_item
+                            })
+                            st.success("Adicionado!")
+                            st.rerun()
+                        except ValueError:
+                            st.error("Digite um valor numérico para a vazão.")
+                    else:
+                        st.warning("Preencha o nome e vazão.")
+
+            # Exibição de Equipamentos Cadastrados e Totais
+            if st.session_state.equipamentos:
+                st.write("")
+                st.markdown("**Lista de Equipamentos Cadastrados:**")
+                
+                centrais_unicas = sorted(list(set([e["central"] for e in st.session_state.equipamentos])))
+                vazao_geral_todas = 0.0
+
+                for c_nome in centrais_unicas:
+                    st.markdown(f"🔹 **{c_nome.upper()}**")
+                    vazao_c = 0.0
+                    for idx, item in enumerate(st.session_state.equipamentos):
+                        if item["central"] == c_nome:
+                            vazao_c += item["vazao_total"]
+                            vazao_geral_todas += item["vazao_total"]
+                            
+                            c_txt, c_del = st.columns([5, 1])
+                            c_txt.text(f"• {item['qtd']:02d} {item['nome']} - {item['vazao_unit']} kg/h (Total Item: {item['vazao_total']:.2f} kg/h)".replace(".", ","))
+                            if c_del.button("❌", key=f"del_eq_{idx}_{rc}"):
+                                st.session_state.equipamentos.pop(idx)
+                                st.rerun()
+                    
+                    v_str_c = f"{vazao_c:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                    st.caption(f"Vazão Total {c_nome}: {v_str_c} kg/h")
+                
+                st.write("")
+                v_str_geral = f"{vazao_geral_todas:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                st.markdown(f"🔥 **Total Geral de Vazão Disponível: {v_str_geral} kg/h**")
+
+            st.divider()
+            st.subheader("4. Novos Negócios & Satisfação")
             s3_c1, s3_c2 = st.columns(2)
             with s3_c1:
                 indica_negocios = st.radio("Indicação de novos negócios? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ind_neg_{rc}")
@@ -621,10 +701,6 @@ with aba_tratativa:
                     desc_satisfacao = st.text_input("Observação sobre satisfação", key=f"desc_sat_{rc}")
 
             observacoes = st.text_area("Observações Gerais", key=f"obs_transf_{rc}")
-
-            st.divider()
-            st.subheader("4. Quantidade de Centrais")
-            qtd_centrais = st.number_input("Quantidade de Centrais de Gás", min_value=1, max_value=10, value=1, step=1, key=f"vis_qtd_cent_{rc}")
 
             st.divider()
             st.subheader("5. Relatório Fotográfico - Upload de Imagens")
@@ -642,13 +718,13 @@ with aba_tratativa:
             with col_f2: dic_fotos_final["CILINDROS"] = carregar_fotos("📸 CILINDROS (Até 5 fotos)", max_arquivos=5)
 
             st.write("---")
-            if qtd_centrais == 1:
+            if qtd_centrais_visita == 1:
                 c1, c2, c3 = st.columns(3)
                 with c1: dic_fotos_final["ABRIGO"] = carregar_fotos("📸 ABRIGO (Até 10 fotos)", max_arquivos=10)
                 with c2: dic_fotos_final["CENTRAL"] = carregar_fotos("📸 CENTRAL (Até 5 fotos)", max_arquivos=5)
                 with c3: dic_fotos_final["EQUIPAMENTOS"] = carregar_fotos("📸 EQUIPAMENTOS", max_arquivos=None)
             else:
-                for i in range(1, int(qtd_centrais) + 1):
+                for i in range(1, int(qtd_centrais_visita) + 1):
                     st.markdown(f"**📸 FOTOS - CENTRAL {i:02d}**")
                     c1, c2, c3 = st.columns(3)
                     with c1:
@@ -671,7 +747,13 @@ with aba_tratativa:
                     elif possui_art == "Não":
                         linha_art = f"( ) Sim (x) Não - {desc_art.strip()}"
 
-                    texto_eq_contrato = f"{eq_contrato or ''}. {desc_eq_contrato.strip()}".strip()
+                    # Formatação de equipamentos de contrato por central
+                    if qtd_centrais_visita == 1:
+                        texto_eq_contrato = f"{eq_contrato or ''}. {eq_dict_visita.get(1, '').strip()}".strip()
+                    else:
+                        linhas_eq_contr = [f"[Equipamentos Central {i:02d}: {eq_dict_visita.get(i, '').strip()}]" for i in range(1, int(qtd_centrais_visita) + 1)]
+                        texto_eq_contrato = f"{eq_contrato or ''}. " + " ".join(linhas_eq_contr)
+
                     texto_rep2 = f"{rep2_correto or ''}" + (f" - {desc_rep2.strip()}" if rep2_correto == "Não" and desc_rep2.strip() else "")
                     texto_freq = f"{tem_freq or ''}" + (f" - {desc_freq.strip()}" if desc_freq.strip() else "")
                     texto_debitos = f"{possui_debitos or ''}" + (f" - {desc_debitos.strip()}" if possui_debitos == "Sim" and desc_debitos.strip() else "")
@@ -679,13 +761,45 @@ with aba_tratativa:
                     texto_negocios = f"{indica_negocios or ''}" + (f" - {desc_negocios.strip()}" if indica_negocios == "Sim" and desc_negocios.strip() else "")
                     texto_satisfacao = f"{cliente_satisfeito or ''}" + (f", {desc_satisfacao.strip()}" if desc_satisfacao.strip() else "")
 
+                    # Montagem do Texto de Equipamentos Disponíveis no Cliente
+                    texto_disp_equip = ""
+                    if st.session_state.equipamentos:
+                        centrais_cad = sorted(list(set([e["central"] for e in st.session_state.equipamentos])))
+                        tot_vazao_geral = 0.0
+                        
+                        for c_n in centrais_cad:
+                            texto_disp_equip += f"\n[{c_n.upper()}]\n"
+                            vazao_c_sum = 0.0
+                            for item in st.session_state.equipamentos:
+                                if item["central"] == c_n:
+                                    v_unit_fmt = f"{item['vazao_unit']:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                                    texto_disp_equip += f"{item['qtd']:02d} {item['nome']} - {v_unit_fmt} kg/h\n"
+                                    vazao_c_sum += item["vazao_total"]
+                                    tot_vazao_geral += item["vazao_total"]
+                            v_c_sum_fmt = f"{vazao_c_sum:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                            texto_disp_equip += f"Vazão Subtotal {c_n}: {v_c_sum_fmt} kg/h\n"
+                        
+                        tot_g_fmt = f"{tot_vazao_geral:.2f}".replace(".", ",").rstrip("0").rstrip(",")
+                        texto_disp_equip += f"\nTotal - {tot_g_fmt} kg/h"
+                    else:
+                        texto_disp_equip = "Nenhum equipamento cadastrado."
+
                     texto_final = f"""Contato: {contato} Sobrenome ou departamento: {departamento} Telefone: {telefone}
-Equipamentos de acordo com o contrato vigente? {texto_eq_contrato} Representante 2 está correto? {texto_rep2} Possui programação cadastrada? {texto_freq} Consumo mensal atual de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg Laudo ART emitido? {linha_art} Central atende as normas? {texto_central_norma}
-Indicação de novos negócios do cliente: {texto_negocios} Cliente possui débitos? {texto_debitos} Cliente está satisfeito com o atendimento da Consigaz? {texto_satisfacao}
+Equipamentos de acordo com o contrato vigente? {texto_eq_contrato}
+Representante 2 está correto? {texto_rep2} Possui programação cadastrada? {texto_freq}
+Consumo mensal atual de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg
+Laudo ART emitido? {linha_art} Central atende as normas? {texto_central_norma}
+
+Quais equipamentos disponíveis no cliente?
+{texto_disp_equip}
+
+Indicação de novos negócios do cliente: {texto_negocios}
+Cliente possui débitos? {texto_debitos}
+Cliente está satisfeito com o atendimento da Consigaz? {texto_satisfacao}
 Obs.: {observacoes}"""
 
                     st.success("✅ Texto para o Sistema gerado com sucesso!")
-                    st.text_area("Texto Gerado:", value=texto_final, height=250, key=f"txt_area_transf_{rc}")
+                    st.text_area("Texto Gerado:", value=texto_final, height=280, key=f"txt_area_transf_{rc}")
                     botao_copiar_customizado(texto_final, "transf_txt")
 
             with col_b2:
