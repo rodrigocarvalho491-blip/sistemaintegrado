@@ -582,7 +582,7 @@ with aba_tratativa:
             with c_qtd_eq:
                 qtd_eq_add = st.number_input("Qtd", min_value=1, value=1, step=1, key=f"qtd_eq_add_{rc}")
             with c_nome_eq:
-                nome_eq_add = st.text_input("Equipamento", placeholder="Ex: Forno Industrial", key=f"nome_eq_add_{rc}")
+                nome_eq_add = st.text_input("Equipamento", placeholder="Ex: Fogão 04 Bocas", key=f"nome_eq_add_{rc}")
             with c_vaz_eq:
                 vazao_eq_add = st.text_input("Vazão Unit. (kg/h)", placeholder="Ex: 1,6 ou 0,5", key=f"vazao_eq_add_{rc}")
             with c_btn_eq:
@@ -636,7 +636,7 @@ with aba_tratativa:
                 
                 st.write("")
                 v_str_geral = f"{vazao_geral_todas:.2f}".replace(".", ",").rstrip("0").rstrip(",")
-                st.markdown(f"🔥 **Total - {v_str_geral} kg/h**")
+                st.markdown(f"🔥 **Vazão Total - {v_str_geral} kg/h**")
 
             st.divider()
             st.subheader("4. Novos Negócios & Satisfação")
@@ -715,7 +715,7 @@ with aba_tratativa:
                     texto_negocios = f"{indica_negocios or ''}" + (f" - {desc_negocios.strip()}" if indica_negocios == "Sim" and desc_negocios.strip() else "")
                     texto_satisfacao = f"{cliente_satisfeito or ''}" + (f", {desc_satisfacao.strip()}" if desc_satisfacao.strip() else "")
 
-                    # Montagem exata do bloco de equipamentos por central
+                    # Montagem exata do bloco de equipamentos por central com hífen nas linhas
                     texto_disp_equip = ""
                     if st.session_state.equipamentos:
                         centrais_cad = sorted(list(set([e["central"] for e in st.session_state.equipamentos])))
@@ -723,41 +723,43 @@ with aba_tratativa:
                         
                         for c_n in centrais_cad:
                             if qtd_centrais_visita > 1:
-                                texto_disp_equip += f"\n[{c_n.upper()}]\n"
+                                texto_disp_equip += f"[{c_n.upper()}]\n"
                             else:
-                                texto_disp_equip += "\n[CENTRAL]\n"
+                                texto_disp_equip += "[CENTRAL]\n"
 
                             vazao_c_sum = 0.0
                             for item in st.session_state.equipamentos:
                                 if item["central"] == c_n:
                                     v_unit_fmt = f"{item['vazao_unit']:.2f}".replace(".", ",").rstrip("0").rstrip(",")
-                                    texto_disp_equip += f"{item['qtd']:02d} {item['nome']} - {v_unit_fmt} kg/h\n"
+                                    texto_disp_equip += f"- {item['qtd']:02d} {item['nome']} - {v_unit_fmt} kg/h\n"
                                     vazao_c_sum += item["vazao_total"]
                                     tot_vazao_geral += item["vazao_total"]
                             
                             v_c_sum_fmt = f"{vazao_c_sum:.2f}".replace(".", ",").rstrip("0").rstrip(",")
                             if qtd_centrais_visita > 1:
-                                texto_disp_equip += f"Vazão Subtotal {c_n}: {v_c_sum_fmt} kg/h\n"
+                                texto_disp_equip += f"Vazão Subtotal {c_n}: {v_c_sum_fmt} kg/h\n\n"
                             else:
-                                texto_disp_equip += f"Vazão Subtotal Central: {v_c_sum_fmt} kg/h\n"
+                                texto_disp_equip += f"Vazão Subtotal Central: {v_c_sum_fmt} kg/h\n\n"
                         
                         tot_g_fmt = f"{tot_vazao_geral:.2f}".replace(".", ",").rstrip("0").rstrip(",")
-                        texto_disp_equip += f"\nTotal - {tot_g_fmt} kg/h"
+                        texto_disp_equip += f"Vazão Total - {tot_g_fmt} kg/h"
                     else:
-                        texto_disp_equip = "\nTotal - 0 kg/h"
+                        texto_disp_equip = "Vazão Total - 0 kg/h"
 
-                    # Montagem final respeitando todas as quebras e espaçamentos
+                    # Montagem final respeitando rigorosamente a estrutura de quebras e espaços informada
                     texto_final = f"""Contato: {contato}
- Sobrenome ou departamento: {departamento}
+Sobrenome ou departamento: {departamento}
 Telefone: {telefone}
 
 Equipamentos de acordo com o contrato vigente? {texto_eq_contrato}
 Representante 2 está correto? {texto_rep2}
 Possui programação cadastrada? {texto_freq}
 Consumo de acordo com o contrato vigente? Consumo previsto: {consumo_previsto} kg | Consumo médio: {consumo_real} kg
-Laudo ART emitido? {linha_art} Central atende as normas? {texto_central_norma}
+Laudo ART emitido? {linha_art}
+Central atende as normas? {texto_central_norma}
 
 Quais equipamentos disponíveis no cliente?
+
 {texto_disp_equip}
 
 Indicação de novos negócios do cliente: {texto_negocios}
@@ -802,7 +804,7 @@ Obs.: {observacoes}"""
 
                             tot_pdf_fmt = f"{tot_pdf:.2f}".replace(".", ",").rstrip("0").rstrip(",")
                             pdf.set_font("Arial", "B", 10)
-                            pdf.cell(130, 7, "TOTAL DE VAZÃO:", border=1, align="R", fill=True)
+                            pdf.cell(130, 7, "VAZÃO TOTAL:", border=1, align="R", fill=True)
                             pdf.cell(55, 7, f"{tot_pdf_fmt} kg/h", border=1, align="C", fill=True, ln=True)
 
                         cod_limpo = re.sub(r'\D', '', str(cod_cliente))
