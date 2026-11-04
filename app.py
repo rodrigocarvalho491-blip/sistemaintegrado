@@ -1215,3 +1215,4 @@ elif menu == "🎂 Aniversário de Contrato":
         st.success("✅ Texto com C.I. gerado com sucesso! Copie abaixo:")
         st.text_area("Texto Gerado:", value=texto_ci, height=200, key=f"txt_area_ci_{rca}")
         botao_copiar_customizado(texto_ci, "ci_txt")
+    
