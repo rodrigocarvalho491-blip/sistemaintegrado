@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from PIL import Image
 from fpdf import FPDF
+import tempfile
 
 # --- FORÇAR TEMA CLARO GLOBALMENTE NO STREAMLIT ---
 os.makedirs(".streamlit", exist_ok=True)
@@ -179,7 +180,7 @@ def formatar_ci_num(ci_str):
         return ci_str.strip()
     return "000.000.000"
 
-# --- GERADOR DE PDF DE RELATÓRIO FOTOGRÁFICO COM FOTOS PRIMEIRO E TABELA POR ÚLTIMO ---
+# --- GERADOR DE PDF DE RELATÓRIO FOTOGRÁFICO ---
 class RelatorioPDF(FPDF):
     def __init__(self, cod_cliente="", nome_cliente="", logo_path=""):
         super().__init__()
@@ -210,6 +211,7 @@ class RelatorioPDF(FPDF):
 # --- AUXILIARES E VISUAL ---
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
+LOGO2_PATH = os.path.join(DIRETORIO_ATUAL, "logo2.png")
 
 CUSTOM_CSS = """
 <style>
@@ -362,6 +364,7 @@ if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda =
 
 if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
 if "last_central" not in st.session_state: st.session_state.last_central = "Central"
+if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 
 # =====================================================================
 # TELA DE AUTENTICAÇÃO E TROCA OBRIGATÓRIA DE SENHA
@@ -455,7 +458,6 @@ aba_notas = abas_sistema[2]
 aba_admin = abas_sistema[3] if st.session_state.e_admin else None
 
 if "nota_selecionada_id" not in st.session_state: st.session_state.nota_selecionada_id = None
-if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 
 # =====================================================================
 # ABA 1: TRATATIVA DE OCORRÊNCIAS
@@ -834,7 +836,7 @@ Obs.: {observacoes}"""
                                 pdf.set_fill_color(230, 230, 230)
                                 pdf.cell(20, 7, "QTD", border=1, align="C", fill=True)
                                 pdf.cell(115, 7, "EQUIPAMENTO", border=1, align="L", fill=True)
-                                pdf.cell(50, 7, "VAZÃO UNIT.", border=1, align="C", fill=True, ln=True)
+                                pdf.cell(50, 7, "VAZÃO UNIT.", border=1, align="C", fill=True, ln=1)
                                 
                                 pdf.set_font("Arial", "", 10)
                                 vazao_c_pdf = 0.0
@@ -850,7 +852,7 @@ Obs.: {observacoes}"""
                                 v_c_pdf_fmt = f"{vazao_c_pdf:.2f}".replace(".", ",").rstrip("0").rstrip(",")
                                 pdf.set_font("Arial", "B", 10)
                                 pdf.cell(135, 7, f"VAZÃO TOTAL {c_n.upper()}:", border=1, align="R", fill=True)
-                                pdf.cell(50, 7, f"{v_c_pdf_fmt} kg/h", border=1, align="C", fill=True, ln=True)
+                                pdf.cell(50, 7, f"{v_c_pdf_fmt} kg/h", border=1, align="C", fill=True, ln=1)
                                 pdf.ln(4)
 
                         cod_limpo = re.sub(r'\D', '', str(cod_cliente))
