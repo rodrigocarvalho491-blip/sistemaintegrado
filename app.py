@@ -189,24 +189,28 @@ class RelatorioPDF(FPDF):
         self.logo_path = logo_path
 
     def header(self):
-        # Logotipo Consigaz fixo no canto superior esquerdo
+        # Logotipo Consigaz fixo no canto superior esquerdo em todas as páginas
         if self.logo_path and os.path.exists(self.logo_path):
             self.image(self.logo_path, x=10, y=8, w=45)
             
-        # Título centralizado e espaçado para nunca colidir com a logo
-        self.set_y(10)
-        self.set_font("Arial", "B", 14)
-        self.set_x(60)
-        self.cell(140, 8, "RELATÓRIO FOTOGRÁFICO", align="C", ln=1)
-        
-        info_cabecalho = f"{self.cod_cliente} | {self.nome_cliente}".strip(" |")
-        if info_cabecalho:
-            self.set_font("Arial", "B", 10)
+        # O TÍTULO PRINCIPAL APARECE APENAS NA PRIMEIRA PÁGINA
+        if self.page_no() == 1:
+            self.set_y(10)
+            self.set_font("Arial", "B", 14)
             self.set_x(60)
-            self.cell(140, 6, info_cabecalho, align="C", ln=1)
+            self.cell(140, 8, "RELATÓRIO FOTOGRÁFICO", align="C", ln=1)
             
-        # Margem superior segura para o conteúdo iniciar abaixo do cabeçalho
-        self.set_y(35)
+            info_cabecalho = f"{self.cod_cliente} | {self.nome_cliente}".strip(" |")
+            if info_cabecalho:
+                self.set_font("Arial", "B", 10)
+                self.set_x(60)
+                self.cell(140, 6, info_cabecalho, align="C", ln=1)
+            
+            # Margem superior segura para o conteúdo da 1ª página
+            self.set_y(35)
+        else:
+            # Nas páginas seguintes, reservamos o espaço para o logo, garantindo o início perfeito
+            self.set_y(30)
 
     def footer(self):
         self.set_y(-15)
@@ -777,16 +781,17 @@ Obs.: {observacoes}"""
                         st.error("⚠️ Preencha o Código do Cliente e Nome/Razão Social.")
                     else:
                         pdf = RelatorioPDF(cod_cliente=cod_cliente, nome_cliente=nome_cliente, logo_path=LOGO_PATH)
-                        pdf.set_margins(10, 35, 10)
+                        pdf.set_margins(10, 32, 10)
                         pdf.set_auto_page_break(auto=True, margin=20)
                         
-                        # 1. RENDERIZAR PRIMEIRAMENTE AS FOTOS POR CATEGORIA COM CORREÇÃO DE ALINHAMENTO E DISTANCIAMENTO
+                        # 1. RENDERIZAR PRIMEIRAMENTE AS FOTOS POR CATEGORIA
                         for categoria, arquivos in dic_fotos_final.items():
                             if arquivos:
                                 pdf.add_page()
+                                # Título da categoria alinhado à esquerda no topo de cada página, logo abaixo da logo
                                 pdf.set_font("Arial", "B", 11)
                                 pdf.cell(0, 6, categoria.upper(), ln=1, align="L")
-                                pdf.ln(2)
+                                pdf.ln(4)
                                 
                                 for idx, arq in enumerate(arquivos):
                                     temp_path = None
@@ -814,7 +819,7 @@ Obs.: {observacoes}"""
                                             pdf.add_page()
                                         
                                         pdf.image(temp_path, x=pos_x_centro, y=pdf.get_y(), w=w_alvo, h=h_alvo)
-                                        # Distanciamento de 1 quebra de linha (espaço) exigido entre as fotos
+                                        # Distanciamento exato de 1 quebra de linha (espaço) entre as fotos
                                         pdf.set_y(pdf.get_y() + h_alvo + 10)
                                     except Exception:
                                         pass
@@ -830,7 +835,7 @@ Obs.: {observacoes}"""
                             pdf.add_page()
                             pdf.set_font("Arial", "B", 11)
                             pdf.cell(0, 6, "EQUIPAMENTOS DISPONÍVEIS NO CLIENTE", ln=1, align="L")
-                            pdf.ln(2)
+                            pdf.ln(4)
                             
                             centrais_cad = sorted(list(set([e["central"] for e in st.session_state.equipamentos])))
                             tot_pdf_geral = 0.0
