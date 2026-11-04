@@ -189,29 +189,24 @@ class RelatorioPDF(FPDF):
         self.logo_path = logo_path
 
     def header(self):
-        # A logo fica alinhada à esquerda no topo (ex: y=10)
+        # Logotipo Consigaz fixo no canto superior esquerdo
         if self.logo_path and os.path.exists(self.logo_path):
-            self.image(self.logo_path, x=10, y=10, w=45)
+            self.image(self.logo_path, x=10, y=8, w=45)
             
-        if self.page_no() == 1:
-            # Deslocamos o título principal mais para baixo ou para a direita da logo
-            # para garantir que NUNCA sobreponha o logotipo Consigaz.
-            self.set_y(10)
-            self.set_font("Arial", "B", 14)
-            # Imprime o título empurrado para a direita (X=60) para não colidir com a logo (X=10 a 55)
+        # Título centralizado e espaçado para nunca colidir com a logo
+        self.set_y(10)
+        self.set_font("Arial", "B", 14)
+        self.set_x(60)
+        self.cell(140, 8, "RELATÓRIO FOTOGRÁFICO", align="C", ln=1)
+        
+        info_cabecalho = f"{self.cod_cliente} | {self.nome_cliente}".strip(" |")
+        if info_cabecalho:
+            self.set_font("Arial", "B", 10)
             self.set_x(60)
-            self.cell(140, 8, "RELATÓRIO FOTOGRÁFICO", align="C", ln=1)
+            self.cell(140, 6, info_cabecalho, align="C", ln=1)
             
-            info_cabecalho = f"{self.cod_cliente} | {self.nome_cliente}".strip(" |")
-            if info_cabecalho:
-                self.set_font("Arial", "B", 10)
-                self.set_x(60)
-                self.cell(140, 6, info_cabecalho, align="C", ln=1)
-                
-            # Espaçamento seguro após o cabeçalho da primeira página
-            self.set_y(38)
-        else:
-            self.set_y(25)
+        # Margem superior segura para o conteúdo iniciar abaixo do cabeçalho
+        self.set_y(35)
 
     def footer(self):
         self.set_y(-15)
@@ -782,10 +777,10 @@ Obs.: {observacoes}"""
                         st.error("⚠️ Preencha o Código do Cliente e Nome/Razão Social.")
                     else:
                         pdf = RelatorioPDF(cod_cliente=cod_cliente, nome_cliente=nome_cliente, logo_path=LOGO_PATH)
-                        pdf.set_margins(10, 38, 10)
+                        pdf.set_margins(10, 35, 10)
                         pdf.set_auto_page_break(auto=True, margin=20)
                         
-                        # 1. RENDERIZAR PRIMEIRAMENTE AS FOTOS POR CATEGORIA
+                        # 1. RENDERIZAR PRIMEIRAMENTE AS FOTOS POR CATEGORIA COM CORREÇÃO DE ALINHAMENTO E DISTANCIAMENTO
                         for categoria, arquivos in dic_fotos_final.items():
                             if arquivos:
                                 pdf.add_page()
@@ -819,7 +814,8 @@ Obs.: {observacoes}"""
                                             pdf.add_page()
                                         
                                         pdf.image(temp_path, x=pos_x_centro, y=pdf.get_y(), w=w_alvo, h=h_alvo)
-                                        pdf.set_y(pdf.get_y() + h_alvo + 5)
+                                        # Distanciamento de 1 quebra de linha (espaço) exigido entre as fotos
+                                        pdf.set_y(pdf.get_y() + h_alvo + 10)
                                     except Exception:
                                         pass
                                     finally:
