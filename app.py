@@ -307,9 +307,7 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 
 div.stButton > button {
   width: 100%;
-  padding: 0.75rem 1rem;
-  font-size: 1.05rem !important;
-  font-weight: 700 !important;
+  padding: 0.6rem 0.5rem;
   border-radius: 10px !important;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   transition: all 0.2s ease;
@@ -1387,11 +1385,11 @@ if aba_agenda is not None:
 
             st.divider()
             st.markdown("### 🏷️ Legenda de Status")
-            st.markdown("🔴 **Vencido** (SLA < 0)")
-            st.markdown("🔵 **Vence Hoje** (SLA = 0)")
-            st.markdown("🟠 **Vence Amanhã** (SLA = 1)")
-            st.markdown("🟡 **Vence em 05 dias** (SLA 2 a 5)")
-            st.markdown("🟢 **No Prazo** (SLA > 5)")
+            st.markdown("🔴 **Vencido**")
+            st.markdown("🔵 **Vence Hoje**")
+            st.markdown("🟠 **Vence Amanhã**")
+            st.markdown("🟡 **Vence em 05 dias**")
+            st.markdown("🟢 **No Prazo**")
 
         with col_conteudo_agenda:
             cabecalho_pagina("Módulo de Pós-Vendas & Atendimento", "Sistema Integrado de Gestão de Ocorrências por Prazos, SLAs e Geografia")
@@ -1520,7 +1518,7 @@ if aba_agenda is not None:
                     else:
                         st.subheader("2. Agenda Geral de Visitas Pendentes")
 
-                    # --- BOTÕES DE FILTRO RÁPIDO SUPERIORES ---
+                    # --- BOTÕES DE FILTRO RÁPIDO SUPERIORES COM DESTAQUE NUMÉRICO ---
                     st.markdown("### Filtros por Status e Prazos")
                     
                     total_visitas = len(df_base_visao)
@@ -1531,19 +1529,19 @@ if aba_agenda is not None:
 
                     c1, c2, c3, c4, c5 = st.columns(5)
                     with c1:
-                        if st.button(f"📋 Todas\n({total_visitas})", use_container_width=True):
+                        if st.button(f"📋 **{total_visitas}**\nTodas", use_container_width=True):
                             st.session_state.filtro_dashboard_ativo = "Todas"
                     with c2:
-                        if st.button(f"🔴 Vencido\n({vencidas_qt})", use_container_width=True):
+                        if st.button(f"🔴 **{vencidas_qt}**\nVencido", use_container_width=True):
                             st.session_state.filtro_dashboard_ativo = "Vencidas"
                     with c3:
-                        if st.button(f"🔵 Vence Hoje\n({hoje_qt})", use_container_width=True):
+                        if st.button(f"🔵 **{hoje_qt}**\nVence Hoje", use_container_width=True):
                             st.session_state.filtro_dashboard_ativo = "Hoje"
                     with c4:
-                        if st.button(f"🟠 Vence Amanhã\n({amanha_qt})", use_container_width=True):
+                        if st.button(f"🟠 **{amanha_qt}**\nVence Amanhã", use_container_width=True):
                             st.session_state.filtro_dashboard_ativo = "Amanhã"
                     with c5:
-                        if st.button(f"🟡 Vence em 05 dias\n({cinco_dias_qt})", use_container_width=True):
+                        if st.button(f"🟡 **{cinco_dias_qt}**\nVence em 05 dias", use_container_width=True):
                             st.session_state.filtro_dashboard_ativo = "05 Dias"
 
                     st.caption(f"Filtro ativo de status: **{st.session_state.filtro_dashboard_ativo}**")
