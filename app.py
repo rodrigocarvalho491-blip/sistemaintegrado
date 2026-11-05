@@ -180,6 +180,25 @@ def formatar_ci_num(ci_str):
         return ci_str.strip()
     return "000.000.000"
 
+# --- LEITOR ROBUSTO DE ARQUIVOS (EXCEL / HTML) ---
+def ler_arquivo_excel_robusto(uploaded_file):
+    bytes_data = uploaded_file.getvalue()
+    try:
+        return pd.read_excel(BytesIO(bytes_data))
+    except Exception:
+        try:
+            dfs = pd.read_html(BytesIO(bytes_data), encoding='ISO-8859-1')
+            if dfs:
+                return dfs[0]
+        except Exception:
+            try:
+                dfs = pd.read_html(BytesIO(bytes_data), encoding='utf-8')
+                if dfs:
+                    return dfs[0]
+            except Exception as e:
+                raise e
+    raise ValueError("Formato de arquivo não suportado ou corrompido.")
+
 # --- GERADOR DE PDF DE RELATÓRIO FOTOGRÁFICO CORRIGIDO ---
 class RelatorioPDF(FPDF):
     def __init__(self, cod_cliente="", nome_cliente="", logo_path=""):
@@ -1396,27 +1415,24 @@ if aba_agenda is not None:
 
             if arquivo_excel is not None:
                 try:
-                    # Leitura adaptada conforme o perfil (Convencional vs Supervisor)
-                    if st.session_state.e_supervisor:
-                        try:
-                            df = pd.read_excel(arquivo_excel)
-                        except Exception:
-                            dfs = pd.read_html(arquivo_excel, encoding='ISO-8859-1')
-                            df = dfs[0]
-                    else:
-                        df_raw = pd.read_excel(arquivo_excel, header=None)
-                        header_row = None
-                        for i, row in df_raw.iterrows():
-                            row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
-                            if "Número da ocorrência" in row_str:
-                                header_row = i
-                                break
-                        if header_row is not None:
-                            df = pd.read_excel(arquivo_excel, header=header_row)
-                        else:
-                            df = pd.read_excel(arquivo_excel, header=11)
+                    # LEITURA ROBUSTA SUPORTANDO TANTO EXCEL QUANTO HTML-DISFARÇADO DE .XLS
+                    df = ler_arquivo_excel_robusto(arquivo_excel)
                         
-                    df.columns = df.columns.str.strip()
+                    df.columns = [str(c).strip() for c in df.columns]
+                    
+                    # Se houver cabeçalho deslocado (comum em relatórios legados), procura a linha correta
+                    if COL_OCORRENCIA not in df.columns:
+                        for idx_r, row in df.iterrows():
+                            row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
+                            if COL_OCORRENCIA in row_str:
+                                df.columns = [str(c).strip() for c in df.iloc[idx_r].values]
+                                df = df.iloc[idx_r+1:].reset_index(drop=True)
+                                break
+
+                    if COL_OCORRENCIA not in df.columns:
+                        st.error(f"❌ A coluna obrigatória '{COL_OCORRENCIA}' não foi encontrada no arquivo. Verifique se o relatório está correto.")
+                        st.stop()
+
                     df = df.dropna(subset=[COL_OCORRENCIA])
                     
                     df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
@@ -1610,9 +1626,9 @@ if aba_agenda is not None:
                         st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
 
                 except Exception as e:
-                    st.error(f"⚠️ Ocorreu um erro ao processar o ficheiro. Certifique-se de ser o relatório correspondente ao seu perfil. Erro técnico: {e}")
+                    st.error(f"⚠️ Ocorreu um erro ao processar o arquivo. Certifique-se de que é o relatório correto. Erro técnico: {e}")
             else:
-                st.info("👆 Por favor, faça o upload da folha de cálculo atualizada de ocorrências no menu lateral esquerdo para carregar o dashboard.")
+                st.info("👆 Por favor, faça o upload da planilha atualizada de ocorrências no menu lateral esquerdo para carregar o dashboard.")
 
 
 # =====================================================================
