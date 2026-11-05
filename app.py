@@ -375,6 +375,7 @@ def cabecalho_pagina(titulo, subtitulo):
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
+if "e_supervisor" not in st.session_state: st.session_state.e_supervisor = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
 if "filtro_dashboard_ativo" not in st.session_state: st.session_state.filtro_dashboard_ativo = "Todas"
 if "ultimo_usuario_logado" not in st.session_state: st.session_state.ultimo_usuario_logado = ""
@@ -410,7 +411,9 @@ if not st.session_state.autenticado:
                 usr_data = banco_usuarios[usuario_input]
                 st.session_state.autenticado = True
                 st.session_state.usuario_atual = usuario_input
-                st.session_state.e_admin = (usr_data["nivel_acesso"] == "admin")
+                nivel_acc = usr_data["nivel_acesso"]
+                st.session_state.e_admin = (nivel_acc == "admin")
+                st.session_state.e_supervisor = (nivel_acc == "supervisor")
                 st.session_state.troca_obrigatoria = usr_data["precisa_trocar_senha"] or (senha_input == "123456")
                 
                 if st.session_state.ultimo_usuario_logado != usuario_input:
@@ -458,6 +461,8 @@ st.sidebar.markdown(
 st.sidebar.markdown(f"👤 **Usuário Ativo:** `{st.session_state.usuario_atual}`")
 if st.session_state.e_admin:
     st.sidebar.caption("⭐ Perfil: Administrador")
+elif st.session_state.e_supervisor:
+    st.sidebar.caption("📊 Perfil: Supervisor")
 
 lista_abas = [
     "🛠️ Tratativa de Ocorrências",
@@ -465,14 +470,14 @@ lista_abas = [
     "📓 Bloco de Notas Pessoal"
 ]
 
-if st.session_state.e_admin:
+if st.session_state.e_admin or st.session_state.e_supervisor:
     lista_abas.append("⚙️ Painel Admin")
 
 abas_sistema = st.tabs(lista_abas)
 aba_tratativa = abas_sistema[0]
 aba_agenda = abas_sistema[1]
 aba_notas = abas_sistema[2]
-aba_admin = abas_sistema[3] if st.session_state.e_admin else None
+aba_admin = abas_sistema[3] if (st.session_state.e_admin or st.session_state.e_supervisor) else None
 
 if "nota_selecionada_id" not in st.session_state: st.session_state.nota_selecionada_id = None
 
@@ -1287,7 +1292,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (ATUALIZADA)
+# ABA 2: AGENDA DE OCORRÊNCIAS (ATUALIZADA COM PERFIL SUPERVISOR)
 # =====================================================================
 with aba_agenda:
     COL_OCORRENCIA = "Número da ocorrência"
@@ -1297,6 +1302,7 @@ with aba_agenda:
     COL_PRAZO = "Prazo de Atendimento"
     COL_FECHAMENTO = "Data/Hora de fechamento"
     COL_SUB_CLASSIF = "Subclassificação Ocorrência"
+    COL_PROPRIETARIO = "Proprietário da ocorrência"
 
     def extrair_cidade(endereco):
         if pd.isna(endereco):
@@ -1339,20 +1345,6 @@ with aba_agenda:
         else:
             return "🟢"
 
-    def classificar_status_comodato(dias_uteis):
-        if dias_uteis < 0:
-            return "🔴"
-        elif dias_uteis == 0:
-            return "🔵"
-        elif dias_uteis == 1:
-            return "🟠"
-        elif dias_uteis <= 5:
-            return "🔴"
-        elif dias_uteis <= 10:
-            return "🟡"
-        else:
-            return "🟢"
-
     col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
 
     with col_menu_agenda:
@@ -1364,9 +1356,21 @@ with aba_agenda:
         )
         
         st.divider()
+        
+        # Opções de visualização no menu lateral
+        opcoes_visao = ["Todas Ocorrências", "Comodato Inativo", "Ocorrências por Cidade"]
+        if st.session_state.e_supervisor:
+            opcoes_visao.extend([
+                "🥧 Gráfico: Á Vencer por Consultor",
+                "🥧 Gráfico: Vencidas por Consultor",
+                "🥧 Gráfico: Vence Hoje por Consultor",
+                "🥧 Gráfico: Vence Amanhã por Consultor",
+                "🥧 Gráfico: Vence em 05 Dias por Consultor"
+            ])
+
         tipo_visao_agenda = st.radio(
             "Visualização:",
-            ["Todas Ocorrências", "Comodato Inativo", "Ocorrências por Cidade"],
+            opcoes_visao,
             label_visibility="collapsed"
         )
 
@@ -1383,19 +1387,12 @@ with aba_agenda:
 
         if arquivo_excel is not None:
             try:
-                df_raw = pd.read_excel(arquivo_excel, header=None)
-                
-                header_row = None
-                for i, row in df_raw.iterrows():
-                    row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    if "Número da ocorrência" in row_str:
-                        header_row = i
-                        break
-                
-                if header_row is not None:
-                    df = pd.read_excel(arquivo_excel, header=header_row)
-                else:
-                    df = pd.read_excel(arquivo_excel, header=11)
+                # Leitura robusta do arquivo compatível com tabelas HTML / Excel
+                try:
+                    df = pd.read_excel(arquivo_excel)
+                except Exception:
+                    dfs = pd.read_html(arquivo_excel, encoding='ISO-8859-1')
+                    df = dfs[0]
                     
                 df.columns = df.columns.str.strip()
                 df = df.dropna(subset=[COL_OCORRENCIA])
@@ -1412,21 +1409,62 @@ with aba_agenda:
                 df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
                 df_pendentes['Classificação Limpa'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_classificacao)
                 
+                if COL_PROPRIETARIO in df_pendentes.columns:
+                    df_pendentes['Consultor'] = df_pendentes[COL_PROPRIETARIO].fillna("Não Atribuído").astype(str)
+                elif 'Vendedor/Consultor' in df_pendentes.columns:
+                    df_pendentes['Consultor'] = df_pendentes['Vendedor/Consultor'].fillna("Não Atribuído").astype(str)
+                else:
+                    df_pendentes['Consultor'] = "Geral"
+
                 hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 df_pendentes['SLA'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
-                
                 df_pendentes['Status Geral'] = df_pendentes['SLA'].apply(classificar_status_geral)
-                df_pendentes['Status Comodato'] = df_pendentes['SLA'].apply(classificar_status_comodato)
                 df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
 
-                # Tratamento para as visualizações do menu lateral
                 df_base_visao = df_pendentes.copy()
-                if tipo_visao_agenda == "Comodato Inativo":
-                    df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
-                    st.subheader("⚠️ Relatório Específico: Comodato Inativo")
+
+                # --- TRATAMENTO DOS GRÁFICOS EM PIZA PARA SUPERVISOR ---
+                if "Gráfico:" in tipo_visao_agenda:
+                    st.subheader(f"📊 {tipo_visao_agenda}")
+                    
+                    if "Á Vencer" in tipo_visao_agenda:
+                        df_graf = df_base_visao[df_base_visao['SLA'] > 0]
+                        titulo_pizza = "Ocorrências À Vencer por Consultor"
+                    elif "Vencidas" in tipo_visao_agenda:
+                        df_graf = df_base_visao[df_base_visao['SLA'] < 0]
+                        titulo_pizza = "Ocorrências Vencidas por Consultor"
+                    elif "Vence Hoje" in tipo_visao_agenda:
+                        df_graf = df_base_visao[df_base_visao['SLA'] == 0]
+                        titulo_pizza = "Ocorrências Vence Hoje por Consultor"
+                    elif "Vence Amanhã" in tipo_visao_agenda:
+                        df_graf = df_base_visao[df_base_visao['SLA'] == 1]
+                        titulo_pizza = "Ocorrências Vence Amanhã por Consultor"
+                    else:
+                        df_graf = df_base_visao[(df_base_visao['SLA'] >= 2) & (df_base_visao['SLA'] <= 5)]
+                        titulo_pizza = "Ocorrências Vence em 05 Dias por Consultor"
+
+                    if not df_graf.empty:
+                        df_agrup_consultor = df_graf.groupby('Consultor').size().reset_index(name='Total')
+                        
+                        col_g1, col_g2 = st.columns([1, 1])
+                        with col_g1:
+                            st.markdown(f"**Tabela Resumo - {titulo_pizza}**")
+                            st.dataframe(df_agrup_consultor.sort_values(by='Total', ascending=False), hide_index=True, use_container_width=True)
+                        with col_g2:
+                            chart_pizza = alt.Chart(df_agrup_consultor).mark_arc(innerRadius=50, outerRadius=110).encode(
+                                theta=alt.Theta(field="Total", type="quantitative"),
+                                color=alt.Color(field="Consultor", type="nominal", title="Consultor"),
+                                tooltip=['Consultor', 'Total']
+                            ).properties(title=titulo_pizza, height=300)
+                            st.altair_chart(chart_pizza, use_container_width=True)
+                    else:
+                        st.info("Nenhuma ocorrência encontrada para este critério e filtro de consultor.")
+                    
+                    st.stop()
+
+                # --- VISÃO: OCORRÊNCIAS POR CIDADE ---
                 elif tipo_visao_agenda == "Ocorrências por Cidade":
                     st.subheader("🏙️ Ocorrências por Cidade")
-                    
                     cidades_unicas = sorted(list(df_base_visao['Cidade'].unique()))
                     cidade_sel = st.selectbox("Selecione a Cidade:", cidades_unicas)
                     
@@ -1436,9 +1474,9 @@ with aba_agenda:
                     col_tabela_cidade, col_grafico_cidade = st.columns(2)
                     
                     with col_tabela_cidade:
-                        st.markdown(f"**Tabela de Ocorrências - {cidade_sel}**")
+                        st.markdown(f"**Tabela Consolidada por Cidade**")
                         df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
-                        st.dataframe(df_mapa_agrup, hide_index=True, use_container_width=True)
+                        st.dataframe(df_mapa_agrup.sort_values(by='Total Ocorrências', ascending=False), hide_index=True, use_container_width=True)
                         
                     with col_grafico_cidade:
                         st.markdown("**Gráfico de OCs por Cidade**")
@@ -1450,6 +1488,11 @@ with aba_agenda:
                         st.altair_chart(chart, use_container_width=True)
                         
                     st.stop()
+
+                # --- OUTRAS VISÕES (Comodato Inativo ou Geral) ---
+                if tipo_visao_agenda == "Comodato Inativo":
+                    df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
+                    st.subheader("⚠️ Relatório Específico: Comodato Inativo")
                 else:
                     st.subheader("2. Agenda Geral de Visitas Pendentes")
 
@@ -1482,17 +1525,20 @@ with aba_agenda:
                 st.caption(f"Filtro ativo de status: **{st.session_state.filtro_dashboard_ativo}**")
                 st.divider()
 
-                # --- OPÇÕES DE FILTRO POR CIDADE E CLASSIFICAÇÃO EM "TODAS OCORRÊNCIAS" ---
-                col_fc1, col_fc2 = st.columns(2)
+                # --- FILTROS DE CONSULTOR, CIDADE E CLASSIFICAÇÃO ---
+                col_fc1, col_fc2, col_fc3 = st.columns(3)
+                lista_consultores = ["Todos"] + sorted(list(df_base_visao['Consultor'].unique()))
                 lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
                 lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
 
                 with col_fc1:
-                    cidade_filtro_sel = st.selectbox("Filtrar por Cidade:", lista_cidades_filtro)
+                    consultor_sel = st.selectbox("Consultor:", lista_consultores)
                 with col_fc2:
-                    class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
+                    cidade_filtro_sel = st.selectbox("Cidade:", lista_cidades_filtro)
+                with col_fc3:
+                    class_filtro_sel = st.selectbox("Classificação:", lista_class_filtro)
 
-                # Aplicar filtro interativo de status e seleções adicionais
+                # Aplicar filtros interativos
                 df_filtrado = df_base_visao.copy()
                 if st.session_state.filtro_dashboard_ativo == "Vencidas":
                     df_filtrado = df_filtrado[df_filtrado['SLA'] < 0]
@@ -1503,6 +1549,8 @@ with aba_agenda:
                 elif st.session_state.filtro_dashboard_ativo == "05 Dias":
                     df_filtrado = df_filtrado[(df_filtrado['SLA'] >= 2) & (df_filtrado['SLA'] <= 5)]
 
+                if consultor_sel != "Todos":
+                    df_filtrado = df_filtrado[df_filtrado['Consultor'] == consultor_sel]
                 if cidade_filtro_sel != "Todas":
                     df_filtrado = df_filtrado[df_filtrado['Cidade'] == cidade_filtro_sel]
                 if class_filtro_sel != "Todas":
@@ -1520,10 +1568,11 @@ with aba_agenda:
                         COL_CLIENTE, 
                         'Cidade', 
                         'Classificação Limpa',
-                        'Prazo'
+                        'Prazo',
+                        'Consultor'
                     ]].copy()
                     
-                    df_exibicao.columns = ['Status', 'SLA', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
+                    df_exibicao.columns = ['Status', 'SLA', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo', 'Consultor']
                     df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str)
                     
                     st.dataframe(
@@ -1591,7 +1640,7 @@ with aba_notas:
                     st.rerun()
 
 # =====================================================================
-# ABA 4: PAINEL ADMIN
+# ABA 4: PAINEL ADMIN / SUPERVISOR
 # =====================================================================
 if aba_admin is not None:
     with aba_admin:
@@ -1606,7 +1655,7 @@ if aba_admin is not None:
             
             with st.form("form_novo_usuario"):
                 novo_user = st.text_input("Nome do Usuário", placeholder="ex: rodrigo.carvalho").strip().lower()
-                nivel_acesso = st.selectbox("Nível de Acesso", ["convencional", "admin"])
+                nivel_acesso = st.selectbox("Nível de Acesso", ["convencional", "supervisor", "admin"])
                 btn_cadastrar = st.form_submit_button("➕ Cadastrar Usuário", type="primary")
                 
                 if btn_cadastrar:
@@ -1637,9 +1686,15 @@ if aba_admin is not None:
         
         data_users = []
         for k, v in banco_usuarios.items():
+            nivel_txt = "Convencional"
+            if v["nivel_acesso"] == "admin":
+                nivel_txt = "Administrador"
+            elif v["nivel_acesso"] == "supervisor":
+                nivel_txt = "Supervisor"
+
             data_users.append({
                 "Usuário": k,
-                "Nível de Acesso": "Administrador" if v["nivel_acesso"] == "admin" else "Convencional",
+                "Nível de Acesso": nivel_txt,
                 "Status Senha": "⚠️ Troca Pendente" if v["precisa_trocar_senha"] else "🟢 Definida"
             })
             
@@ -1662,6 +1717,7 @@ if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
     st.session_state.autenticado = False
     st.session_state.usuario_atual = ""
     st.session_state.e_admin = False
+    st.session_state.e_supervisor = False
     st.session_state.troca_obrigatoria = False
     st.session_state.df_excel_agenda = None
     st.rerun()
