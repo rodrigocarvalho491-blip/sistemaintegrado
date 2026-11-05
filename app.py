@@ -304,6 +304,21 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 }
 .cg-side-logo { height: 38px; width: auto; display: inline-block; }
 .cg-side-name { margin-top: 0.6rem; font-size: 0.7rem; font-weight: 700; color: #64748B !important; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* Estilização personalizada para botões de filtro maiores */
+div.stButton > button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+}
+div.stButton > button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,85,165,0.15);
+}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -1275,7 +1290,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD VISUAL COM MENU LATERAL E BOTÕES)
+# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD VISUAL COM 5 BOTÕES E 5 DIAS ÚTEIS)
 # =====================================================================
 with aba_agenda:
     COL_OCORRENCIA = "Número da ocorrência"
@@ -1317,7 +1332,7 @@ with aba_agenda:
         elif dias_uteis == 1:
             return "🟠 Vence Amanhã"
         elif 2 <= dias_uteis <= 5:
-            return "🟡 Vence na Semana"
+            return "🟡 Vence em 05 dias"
         else:
             return "🟢 No Prazo"
 
@@ -1408,45 +1423,45 @@ with aba_agenda:
                 else:
                     st.subheader("2. Agenda Geral de Visitas Pendentes")
 
-                # --- BOTÕES DE FILTRO RÁPIDO SUPERIORES (MÉTRICAS INTERATIVAS) ---
+                # --- 5 BOTÕES DE FILTRO RÁPIDO SUPERIORES (MAIORES E VISÍVEIS) ---
                 st.markdown("### Filtros por Status e Prazos")
                 
-                # Cálculo exato da semana útil em relação ao dia de acesso (Segunda a Sexta-feira da semana corrente)
-                inicio_semana = hoje - timedelta(days=hoje.weekday())  # Segunda-feira
-                fim_semana = inicio_semana + timedelta(days=4, hours=23, minutes=59, seconds=59)  # Sexta-feira
-
                 total_visitas = len(df_base_visao)
-                hoje_qt = len(df_base_visao[df_base_visao['Dias Úteis Restantes'] == 0])
-                
-                # Vence na semana: prazos entre segunda e sexta-feira da semana atual
-                semana_qt = len(df_base_visao[(df_base_visao['Prazo_DT'] >= inicio_semana) & (df_base_visao['Prazo_DT'] <= fim_semana)])
                 vencidas_qt = len(df_base_visao[df_base_visao['Dias Úteis Restantes'] < 0])
+                hoje_qt = len(df_base_visao[df_base_visao['Dias Úteis Restantes'] == 0])
+                amanha_qt = len(df_base_visao[df_base_visao['Dias Úteis Restantes'] == 1])
+                cinco_dias_qt = len(df_base_visao[(df_base_visao['Dias Úteis Restantes'] >= 2) & (df_base_visao['Dias Úteis Restantes'] <= 5)])
 
-                m1, m2, m3, m4 = st.columns(4)
-                with m1:
-                    if st.button(f"📋 Todas ({total_visitas})", use_container_width=True):
+                c1, c2, c3, c4, c5 = st.columns(5)
+                with c1:
+                    if st.button(f"📋 Todas\n({total_visitas})", use_container_width=True):
                         st.session_state.filtro_dashboard_ativo = "Todas"
-                with m2:
-                    if st.button(f"🔵 Vence Hoje ({hoje_qt})", use_container_width=True):
-                        st.session_state.filtro_dashboard_ativo = "Hoje"
-                with m3:
-                    if st.button(f"🗓️ Vence na Semana ({semana_qt})", use_container_width=True):
-                        st.session_state.filtro_dashboard_ativo = "Semana"
-                with m4:
-                    if st.button(f"🔴 Vencidas ({vencidas_qt})", use_container_width=True):
+                with c2:
+                    if st.button(f"🔴 Vencido\n({vencidas_qt})", use_container_width=True):
                         st.session_state.filtro_dashboard_ativo = "Vencidas"
+                with c3:
+                    if st.button(f"🔵 Vence Hoje\n({hoje_qt})", use_container_width=True):
+                        st.session_state.filtro_dashboard_ativo = "Hoje"
+                with c4:
+                    if st.button(f"🟠 Vence Amanhã\n({amanha_qt})", use_container_width=True):
+                        st.session_state.filtro_dashboard_ativo = "Amanhã"
+                with c5:
+                    if st.button(f"🟡 Vence em 05 dias\n({cinco_dias_qt})", use_container_width=True):
+                        st.session_state.filtro_dashboard_ativo = "05 Dias"
 
                 st.caption(f"Filtro ativo de status: **{st.session_state.filtro_dashboard_ativo}**")
                 st.divider()
 
                 # Aplicar filtro interativo baseado no botão clicado
                 df_filtrado = df_base_visao.copy()
-                if st.session_state.filtro_dashboard_ativo == "Hoje":
-                    df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 0]
-                elif st.session_state.filtro_dashboard_ativo == "Semana":
-                    df_filtrado = df_filtrado[(df_filtrado['Prazo_DT'] >= inicio_semana) & (df_filtrado['Prazo_DT'] <= fim_semana)]
-                elif st.session_state.filtro_dashboard_ativo == "Vencidas":
+                if st.session_state.filtro_dashboard_ativo == "Vencidas":
                     df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] < 0]
+                elif st.session_state.filtro_dashboard_ativo == "Hoje":
+                    df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 0]
+                elif st.session_state.filtro_dashboard_ativo == "Amanhã":
+                    df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
+                elif st.session_state.filtro_dashboard_ativo == "05 Dias":
+                    df_filtrado = df_filtrado[(df_filtrado['Dias Úteis Restantes'] >= 2) & (df_filtrado['Dias Úteis Restantes'] <= 5)]
 
                 df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
 
