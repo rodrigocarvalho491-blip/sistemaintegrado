@@ -192,7 +192,6 @@ def ler_arquivo_excel_robusto(uploaded_file):
         pass
         
     # 2. Fallback Seguro: Parsear HTML disfarçado de XLS (comum em exports de sistemas)
-    # Sem depender de bs4, html5lib ou lxml
     try:
         try:
             html_text = bytes_data.decode('utf-8')
@@ -212,9 +211,7 @@ def ler_arquivo_excel_robusto(uploaded_file):
             cells = []
             for cell_match in re.finditer(r'<t[dh][^>]*>(.*?)</t[dh]>', row_content, re.DOTALL | re.IGNORECASE):
                 cell_text = cell_match.group(1)
-                # Remove nested tags
                 cell_text = re.sub(r'<[^>]+>', '', cell_text)
-                # Resolve basic HTML entities
                 cell_text = cell_text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
                 cells.append(cell_text.strip())
             
@@ -224,7 +221,6 @@ def ler_arquivo_excel_robusto(uploaded_file):
         if not rows:
             raise ValueError("Tabela HTML extraída está vazia.")
             
-        # Pad rows to avoid mismatched column length errors in pandas
         max_cols = max(len(r) for r in rows)
         header = rows[0]
         if len(header) < max_cols:
@@ -1435,6 +1431,7 @@ if aba_agenda is not None:
             opcoes_visao = ["Todas Ocorrências", "Comodato Inativo", "Ocorrências por Cidade"]
             if st.session_state.e_supervisor:
                 opcoes_visao.append("📊 Dashboard de Gestão (Gráficos)")
+                opcoes_visao.append("📈 Ocorrências por Classificação")
 
             tipo_visao_agenda = st.radio(
                 "Visualização:",
@@ -1455,12 +1452,10 @@ if aba_agenda is not None:
 
             if arquivo_excel is not None:
                 try:
-                    # LEITURA ROBUSTA SUPORTANDO TANTO EXCEL QUANTO HTML-DISFARÇADO DE .XLS
                     df = ler_arquivo_excel_robusto(arquivo_excel)
                         
                     df.columns = [str(c).strip() for c in df.columns]
                     
-                    # Se houver cabeçalho deslocado (comum em relatórios legados), procura a linha correta
                     if COL_OCORRENCIA not in df.columns:
                         for idx_r, row in df.iterrows():
                             row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
@@ -1506,53 +1501,99 @@ if aba_agenda is not None:
 
                     # --- DASHBOARD UNIFICADO DE GESTÃO (GRÁFICOS 02 POR LINHA) PARA SUPERVISOR ---
                     if st.session_state.e_supervisor and tipo_visao_agenda == "📊 Dashboard de Gestão (Gráficos)":
-                        st.subheader("📊 Dashboard Unificado de Gestão - Visão do Supervisor")
-                        st.markdown("Visão consolidada de todos os indicadores de atendimento por consultor.")
+                        st.subheader("📊 Dashboard Executivo de Gestão - Indicadores por Consultor")
+                        st.markdown("Visão consolidada, limpa e profissional dos prazos e SLAs por consultor.")
                         st.write("")
 
                         graficos_config = [
-                            ("🔴 Vencidas por Consultor", df_base_visao[df_base_visao['SLA'] < 0]),
-                            ("🔵 Vence Hoje por Consultor", df_base_visao[df_base_visao['SLA'] == 0]),
-                            ("🟠 Vence Amanhã por Consultor", df_base_visao[df_base_visao['SLA'] == 1]),
-                            ("🟡 Vence em 05 Dias por Consultor", df_base_visao[(df_base_visao['SLA'] >= 2) & (df_base_visao['SLA'] <= 5)]),
-                            ("🟢 À Vencer (No Prazo) por Consultor", df_base_visao[df_base_visao['SLA'] > 0]),
+                            ("🔴 Ocorrências Vencidas por Consultor", df_base_visao[df_base_visao['SLA'] < 0], "#D32F2F"),
+                            ("🔵 Vencimento Hoje por Consultor", df_base_visao[df_base_visao['SLA'] == 0], "#1976D2"),
+                            ("🟠 Vencimento Amanhã por Consultor", df_base_visao[df_base_visao['SLA'] == 1], "#F57C00"),
+                            ("🟡 Vencimento em até 05 Dias por Consultor", df_base_visao[(df_base_visao['SLA'] >= 2) & (df_base_visao['SLA'] <= 5)], "#FBC02D"),
+                            ("🟢 No Prazo por Consultor", df_base_visao[df_base_visao['SLA'] > 0], "#388E3C"),
                         ]
 
                         for i in range(0, len(graficos_config), 2):
                             col_g1, col_g2 = st.columns(2)
                             
                             with col_g1:
-                                titulo_1, df_g1 = graficos_config[i]
+                                titulo_1, df_g1, cor_tema_1 = graficos_config[i]
                                 st.markdown(f"#### {titulo_1}")
                                 if not df_g1.empty:
                                     df_ag_1 = df_g1.groupby('Consultor').size().reset_index(name='Total')
-                                    chart_1 = alt.Chart(df_ag_1).mark_arc(innerRadius=45, outerRadius=95).encode(
-                                        theta=alt.Theta(field="Total", type="quantitative"),
-                                        color=alt.Color(field="Consultor", type="nominal", title="Consultor"),
+                                    df_ag_1 = df_ag_1.sort_values(by='Total', ascending=False)
+                                    chart_1 = alt.Chart(df_ag_1).mark_bar(
+                                        color=cor_tema_1, cornerRadiusTopLeft=6, cornerRadiusTopRight=6
+                                    ).encode(
+                                        x=alt.X('Total:Q', title='Total de Ocorrências'),
+                                        y=alt.Y('Consultor:N', sort='-x', title='Consultor'),
                                         tooltip=['Consultor', 'Total']
                                     ).properties(height=240)
                                     st.altair_chart(chart_1, use_container_width=True)
-                                    st.dataframe(df_ag_1.sort_values(by='Total', ascending=False), hide_index=True, use_container_width=True)
+                                    st.dataframe(df_ag_1.rename(columns={'Total': 'Qtd Ocorrências'}), hide_index=True, use_container_width=True)
                                 else:
                                     st.info("Nenhum registro para este critério.")
                             
                             if i + 1 < len(graficos_config):
                                 with col_g2:
-                                    titulo_2, df_g2 = graficos_config[i + 1]
+                                    titulo_2, df_g2, cor_tema_2 = graficos_config[i + 1]
                                     st.markdown(f"#### {titulo_2}")
                                     if not df_g2.empty:
                                         df_ag_2 = df_g2.groupby('Consultor').size().reset_index(name='Total')
-                                        chart_2 = alt.Chart(df_ag_2).mark_arc(innerRadius=45, outerRadius=95).encode(
-                                            theta=alt.Theta(field="Total", type="quantitative"),
-                                            color=alt.Color(field="Consultor", type="nominal", title="Consultor"),
+                                        df_ag_2 = df_ag_2.sort_values(by='Total', ascending=False)
+                                        chart_2 = alt.Chart(df_ag_2).mark_bar(
+                                            color=cor_tema_2, cornerRadiusTopLeft=6, cornerRadiusTopRight=6
+                                        ).encode(
+                                            x=alt.X('Total:Q', title='Total de Ocorrências'),
+                                            y=alt.Y('Consultor:N', sort='-x', title='Consultor'),
                                             tooltip=['Consultor', 'Total']
                                         ).properties(height=240)
                                         st.altair_chart(chart_2, use_container_width=True)
-                                        st.dataframe(df_ag_2.sort_values(by='Total', ascending=False), hide_index=True, use_container_width=True)
+                                        st.dataframe(df_ag_2.rename(columns={'Total': 'Qtd Ocorrências'}), hide_index=True, use_container_width=True)
                                     else:
                                         st.info("Nenhum registro para este critério.")
                             
                             st.divider()
+                        st.stop()
+
+                    # --- VISÃO: OCORRÊNCIAS POR CLASSIFICAÇÃO (SUPERVISOR) ---
+                    elif tipo_visao_agenda == "📈 Ocorrências por Classificação":
+                        st.subheader("📈 Gestão de Ocorrências por Classificação")
+                        
+                        if st.session_state.e_supervisor:
+                            lista_cons_class = ["Todos"] + sorted(list(df_base_visao['Consultor'].unique()))
+                            cons_sel_class = st.selectbox("Filtrar por Consultor:", lista_cons_class, key="sel_cons_class")
+                            if cons_sel_class != "Todos":
+                                df_class_vis = df_base_visao[df_base_visao['Consultor'] == cons_sel_class]
+                            else:
+                                df_class_vis = df_base_visao.copy()
+                        else:
+                            df_class_vis = df_base_visao.copy()
+
+                        if df_class_vis.empty:
+                            st.info("Nenhum registro encontrado para os filtros selecionados.")
+                        else:
+                            df_class_agrup = df_class_vis.groupby('Classificação Limpa').size().reset_index(name='Total')
+                            df_class_agrup = df_class_agrup.sort_values(by='Total', ascending=False)
+
+                            col_tabela_class, col_grafico_class = st.columns(2)
+                            
+                            with col_tabela_class:
+                                st.markdown("#### 📋 Quantitativo por Classificação")
+                                df_tabela_ex = df_class_agrup.rename(columns={'Classificação Limpa': 'Classificação', 'Total': 'Qtd Ocorrências'})
+                                st.dataframe(df_tabela_ex, hide_index=True, use_container_width=True)
+                                
+                            with col_grafico_class:
+                                st.markdown("#### 📊 Gráfico Comparativo")
+                                chart_class = alt.Chart(df_class_agrup).mark_bar(
+                                    color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6
+                                ).encode(
+                                    x=alt.X('Total:Q', title='Quantidade de Ocorrências'),
+                                    y=alt.Y('Classificação Limpa:N', sort='-x', title='Classificação'),
+                                    tooltip=['Classificação Limpa', 'Total']
+                                ).properties(height=350)
+                                st.altair_chart(chart_class, use_container_width=True)
+                                
                         st.stop()
 
                     # --- VISÃO: OCORRÊNCIAS POR CIDADE ---
@@ -1638,7 +1679,6 @@ if aba_agenda is not None:
                         with col_fc2:
                             class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
 
-                    # Aplicar filtros interativos
                     df_filtrado = df_base_visao.copy()
                     if st.session_state.filtro_dashboard_ativo == "Vencidas":
                         df_filtrado = df_filtrado[df_filtrado['SLA'] < 0]
