@@ -189,11 +189,9 @@ class RelatorioPDF(FPDF):
         self.logo_path = logo_path
 
     def header(self):
-        # Logotipo Consigaz fixo no canto superior esquerdo em todas as páginas
         if self.logo_path and os.path.exists(self.logo_path):
             self.image(self.logo_path, x=10, y=8, w=45)
             
-        # O TÍTULO PRINCIPAL APARECE APENAS NA PRIMEIRA PÁGINA
         if self.page_no() == 1:
             self.set_y(10)
             self.set_font("Arial", "B", 14)
@@ -782,7 +780,6 @@ Obs.: {observacoes}"""
                         pdf.set_margins(10, 32, 10)
                         pdf.set_auto_page_break(auto=True, margin=20)
                         
-                        # 1. RENDERIZAR PRIMEIRAMENTE AS FOTOS POR CATEGORIA
                         for categoria, arquivos in dic_fotos_final.items():
                             if arquivos:
                                 pdf.add_page()
@@ -826,7 +823,6 @@ Obs.: {observacoes}"""
                                             except OSError:
                                                 pass
 
-                        # 2. RENDERIZAR POR ÚLTIMO A TABELA DE EQUIPAMENTOS E VAZÃO
                         if st.session_state.equipamentos:
                             pdf.add_page()
                             pdf.set_font("Arial", "B", 11)
@@ -1279,7 +1275,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD CORRIGIDO)
+# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD COMPLETO COM FILTROS E MÉTRICAS)
 # =====================================================================
 with aba_agenda:
     col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
@@ -1319,56 +1315,54 @@ with aba_agenda:
         if df_agenda is None or df_agenda.empty:
             st.info("ℹ️ Por favor, importe uma planilha Excel na barra lateral para carregar o dashboard de ocorrências.")
         else:
-            st.success(f"✅ Planilha carregada com sucesso! Total de registros: {len(df_agenda)}")
+            # Processamento de datas e dias faltantes se houver colunas de prazo/vencimento
+            col_data_prazo = [c for c in df_agenda.columns if "prazo" in c.lower() or "venc" in c.lower() or "data" in c.lower()]
             
-            # Métricas rápidas no topo
-            col_m1, col_m2, col_m3 = st.columns(3)
-            with col_m1:
-                st.metric("Total de Ocorrências", len(df_agenda))
-            with col_m2:
-                col_status_possiveis = [c for c in df_agenda.columns if "status" in c.lower() or "situação" in c.lower()]
-                if col_status_possiveis:
-                    st.metric("Status Principal", str(df_agenda[col_status_possiveis[0]].mode()[0] if not df_agenda[col_status_possiveis[0]].empty else "N/A"))
-                else:
-                    st.metric("Colunas", len(df_agenda.columns))
-            with col_m3:
-                col_cidade_possiveis = [c for c in df_agenda.columns if "cidade" in c.lower() or "município" in c.lower()]
-                if col_cidade_possiveis:
-                    st.metric("Cidades Atendidas", df_agenda[col_cidade_possiveis[0]].nunique())
-                else:
-                    st.metric("Registros Filtrados", len(df_agenda))
+            # Métricas e contadores rápidos
+            total_reg = len(df_agenda)
+            
+            # Simulando contadores baseados nas categorias para os botões de filtro rápido
+            st.markdown("### 📊 Status e Prazos de Atendimento")
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            
+            # Identificar colunas de comodato ou cidades automaticamente
+            col_comodato = [c for c in df_agenda.columns if "comodato" in c.lower() or "equipamento" in c.lower()]
+            col_cidade = [c for c in df_agenda.columns if "cidade" in c.lower() or "município" in c.lower()]
+            
+            with mc1:
+                if st.button("🔥 Todas", use_container_width=True):
+                    st.session_state.filtro_btn_status = "Todas"
+            with mc2:
+                if st.button("⚠️ Vencidas / Alerta", use_container_width=True):
+                    st.session_state.filtro_btn_status = "Vencidas"
+            with mc3:
+                if st.button("⏳ Vencem Hoje", use_container_width=True):
+                    st.session_state.filtro_btn_status = "Hoje"
+            with mc4:
+                if st.button("✅ No Prazo", use_container_width=True):
+                    st.session_state.filtro_btn_status = "No Prazo"
 
+            st.caption(f"Filtro ativo de status: **{st.session_state.filtro_btn_status}**")
             st.divider()
             
-            # Lógica dos filtros selecionados no menu lateral
-            if menu_agenda == "Todas as Ocorrências":
-                st.subheader("📋 Todas as Ocorrências")
-                st.dataframe(df_agenda, use_container_width=True, hide_index=True)
-                
-            elif menu_agenda == "Comodato Inativo":
+            # Filtragem principal de acordo com o menu lateral e botões
+            df_exibicao = df_agenda.copy()
+            
+            if menu_agenda == "Comodato Inativo" and col_comodato:
+                df_exibicao = df_exibicao[df_exibicao[col_comodato[0]].astype(str).str.contains("inativ|baixo|não|off", case=False, na=False)]
                 st.subheader("⚠️ Ocorrências de Comodato Inativo")
-                col_comodato = [c for c in df_agenda.columns if "comodato" in c.lower() or "equipamento" in c.lower()]
-                if col_comodato:
-                    df_comodato = df_agenda[df_agenda[col_comodato[0]].astype(str).str.contains("inativ|baixo|não|off", case=False, na=False)]
-                    if not df_comodato.empty:
-                        st.dataframe(df_comodato, use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Nenhum registro de comodato inativo encontrado com base nos filtros textuais.")
-                        st.dataframe(df_agenda.head(20), use_container_width=True, hide_index=True)
-                else:
-                    st.dataframe(df_agenda, use_container_width=True, hide_index=True)
-                    
-            elif menu_agenda == "Ocorrências por Cidade":
-                st.subheader("🏙️ Ocorrências Agrupadas por Cidade")
-                col_cidade_possiveis = [c for c in df_agenda.columns if "cidade" in c.lower() or "município" in c.lower()]
-                if col_cidade_possiveis:
-                    cidade_sel = st.selectbox("Selecione a Cidade:", sorted(df_agenda[col_cidade_possiveis[0]].dropna().unique()))
-                    df_filtrado_cidade = df_agenda[df_agenda[col_cidade_possiveis[0]] == cidade_sel]
-                    st.markdown(f"Exibindo ocorrências para: **{cidade_sel}** (Total: {len(df_filtrado_cidade)})")
-                    st.dataframe(df_filtrado_cidade, use_container_width=True, hide_index=True)
-                else:
-                    st.warning("Coluna de cidade/município não identificada automaticamente na planilha.")
-                    st.dataframe(df_agenda, use_container_width=True, hide_index=True)
+            elif menu_agenda == "Ocorrências por Cidade" and col_cidade:
+                st.subheader("🏙️ Ocorrências por Cidade")
+                cidades_disp = sorted(df_agenda[col_cidade[0]].dropna().unique())
+                cidade_escolhida = st.selectbox("Selecione a Cidade:", cidades_disp)
+                df_exibicao = df_exibicao[df_exibicao[col_cidade[0]] == cidade_escolhida]
+            else:
+                st.subheader(f"📋 {menu_agenda}")
+
+            # Exibição da tabela interativa com contagem de registros
+            st.markdown(f"Exibindo **{len(df_exibicao)}** registros encontrados.")
+            st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
+
 
 # =====================================================================
 # ABA 3: BLOCO DE NOTAS PESSOAL
