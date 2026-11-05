@@ -305,7 +305,6 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 .cg-side-logo { height: 38px; width: auto; display: inline-block; }
 .cg-side-name { margin-top: 0.6rem; font-size: 0.7rem; font-weight: 700; color: #64748B !important; letter-spacing: 0.08em; text-transform: uppercase; }
 
-/* Estilização personalizada para botões de filtro maiores */
 div.stButton > button {
   width: 100%;
   padding: 0.75rem 1rem;
@@ -1288,7 +1287,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD ATUALIZADO)
+# ABA 2: AGENDA DE OCORRÊNCIAS (ATUALIZADA)
 # =====================================================================
 with aba_agenda:
     COL_OCORRENCIA = "Número da ocorrência"
@@ -1315,7 +1314,6 @@ with aba_agenda:
     def limpar_classificacao(texto):
         if pd.isna(texto):
             return "-"
-        # Remove tudo que estiver entre colchetes, ex: [NEGÓCIOS]
         texto_limpo = re.sub(r'\[.*?\]', '', str(texto)).strip()
         return texto_limpo if texto_limpo else str(texto)
 
@@ -1331,29 +1329,29 @@ with aba_agenda:
 
     def classificar_status_geral(dias_uteis):
         if dias_uteis < 0:
-            return "🔴 Vencido"
+            return "🔴"
         elif dias_uteis == 0:
-            return "🔵 Vence Hoje"
+            return "🔵"
         elif dias_uteis == 1:
-            return "🟠 Vence Amanhã"
+            return "🟠"
         elif 2 <= dias_uteis <= 5:
-            return "🟡 Vence em 05 dias"
+            return "🟡"
         else:
-            return "🟢 No Prazo"
+            return "🟢"
 
     def classificar_status_comodato(dias_uteis):
         if dias_uteis < 0:
-            return "🔴 Vencido"
+            return "🔴"
         elif dias_uteis == 0:
-            return "🔵 Vence Hoje"
+            return "🔵"
         elif dias_uteis == 1:
-            return "🟠 Vence Amanhã"
+            return "🟠"
         elif dias_uteis <= 5:
-            return "🔴 3ª Semana"
+            return "🔴"
         elif dias_uteis <= 10:
-            return "🟡 2ª Semana"
+            return "🟡"
         else:
-            return "🟢 1ª Semana"
+            return "🟢"
 
     col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
 
@@ -1371,6 +1369,14 @@ with aba_agenda:
             ["Todas Ocorrências", "Comodato Inativo", "Ocorrências por Cidade"],
             label_visibility="collapsed"
         )
+
+        st.divider()
+        st.markdown("### 🏷️ Legenda de Status")
+        st.markdown("🔴 **Vencido** (SLA < 0)")
+        st.markdown("🔵 **Vence Hoje** (SLA = 0)")
+        st.markdown("🟠 **Vence Amanhã** (SLA = 1)")
+        st.markdown("🟡 **Vence em 05 dias** (SLA 2 a 5)")
+        st.markdown("🟢 **No Prazo** (SLA > 5)")
 
     with col_conteudo_agenda:
         cabecalho_pagina("Módulo de Pós-Vendas & Atendimento", "Sistema Integrado de Gestão de Ocorrências por Prazos, SLAs e Geografia")
@@ -1413,7 +1419,7 @@ with aba_agenda:
                 df_pendentes['Status Comodato'] = df_pendentes['SLA'].apply(classificar_status_comodato)
                 df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
 
-                # Tratamento para o menu lateral "Comodato Inativo" ou "Ocorrências por Cidade"
+                # Tratamento para as visualizações do menu lateral
                 df_base_visao = df_pendentes.copy()
                 if tipo_visao_agenda == "Comodato Inativo":
                     df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
@@ -1421,7 +1427,6 @@ with aba_agenda:
                 elif tipo_visao_agenda == "Ocorrências por Cidade":
                     st.subheader("🏙️ Ocorrências por Cidade")
                     
-                    # Exibição em meia tela: Tabela de OCs por cidade na metade e Gráfico na outra metade
                     cidades_unicas = sorted(list(df_base_visao['Cidade'].unique()))
                     cidade_sel = st.selectbox("Selecione a Cidade:", cidades_unicas)
                     
@@ -1431,30 +1436,20 @@ with aba_agenda:
                     col_tabela_cidade, col_grafico_cidade = st.columns(2)
                     
                     with col_tabela_cidade:
-                        st.markdown(f"**Ocorrências para: {cidade_sel}**")
-                        if not df_cidade_filtrada.empty:
-                            df_exib_cidade = df_cidade_filtrada[[
-                                'Status Geral', 'SLA', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Classificação Limpa', 'Prazo'
-                            ]].copy()
-                            df_exib_cidade.columns = ['Status', 'SLA', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
-                            df_exib_cidade['Nº OC'] = df_exib_cidade['Nº OC'].astype(str)
-                            
-                            st.dataframe(df_exib_cidade, hide_index=True, use_container_width=True)
-                        else:
-                            st.info("Nenhuma ocorrência para esta cidade.")
-                            
+                        st.markdown(f"**Tabela de Ocorrências - {cidade_sel}**")
+                        df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
+                        st.dataframe(df_mapa_agrup, hide_index=True, use_container_width=True)
+                        
                     with col_grafico_cidade:
                         st.markdown("**Gráfico de OCs por Cidade**")
-                        df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
-                        
                         chart = alt.Chart(df_mapa_agrup).mark_bar(color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
                             x=alt.X('Cidade:N', sort='-y', title='Cidade'),
                             y=alt.Y('Total Ocorrências:Q', title='Qtd Ocorrências'),
                             tooltip=['Cidade', 'Total Ocorrências']
-                        ).properties(height=300)
+                        ).properties(height=280)
                         st.altair_chart(chart, use_container_width=True)
                         
-                    st.stop() # Interrompe o fluxo padrão para mostrar apenas a visão dividida de cidades
+                    st.stop()
                 else:
                     st.subheader("2. Agenda Geral de Visitas Pendentes")
 
@@ -1487,7 +1482,17 @@ with aba_agenda:
                 st.caption(f"Filtro ativo de status: **{st.session_state.filtro_dashboard_ativo}**")
                 st.divider()
 
-                # Aplicar filtro interativo baseado no botão clicado
+                # --- OPÇÕES DE FILTRO POR CIDADE E CLASSIFICAÇÃO EM "TODAS OCORRÊNCIAS" ---
+                col_fc1, col_fc2 = st.columns(2)
+                lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
+                lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
+
+                with col_fc1:
+                    cidade_filtro_sel = st.selectbox("Filtrar por Cidade:", lista_cidades_filtro)
+                with col_fc2:
+                    class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
+
+                # Aplicar filtro interativo de status e seleções adicionais
                 df_filtrado = df_base_visao.copy()
                 if st.session_state.filtro_dashboard_ativo == "Vencidas":
                     df_filtrado = df_filtrado[df_filtrado['SLA'] < 0]
@@ -1498,10 +1503,15 @@ with aba_agenda:
                 elif st.session_state.filtro_dashboard_ativo == "05 Dias":
                     df_filtrado = df_filtrado[(df_filtrado['SLA'] >= 2) & (df_filtrado['SLA'] <= 5)]
 
+                if cidade_filtro_sel != "Todas":
+                    df_filtrado = df_filtrado[df_filtrado['Cidade'] == cidade_filtro_sel]
+                if class_filtro_sel != "Todas":
+                    df_filtrado = df_filtrado[df_filtrado['Classificação Limpa'] == class_filtro_sel]
+
                 df_filtrado['Prazo'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
 
                 if df_filtrado.empty:
-                    st.success("✅ Excelente! Não há nenhuma ocorrência pendente para o filtro selecionado.")
+                    st.success("✅ Excelente! Não há nenhuma ocorrência pendente para os filtros selecionados.")
                 else:
                     df_exibicao = df_filtrado[[
                         'Status Geral',
@@ -1513,7 +1523,6 @@ with aba_agenda:
                         'Prazo'
                     ]].copy()
                     
-                    # Renomeando para a ordem e nomenclaturas exatas solicitadas
                     df_exibicao.columns = ['Status', 'SLA', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
                     df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str)
                     
