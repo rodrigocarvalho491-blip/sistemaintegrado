@@ -206,10 +206,8 @@ class RelatorioPDF(FPDF):
                 self.set_x(60)
                 self.cell(140, 6, info_cabecalho, align="C", ln=1)
             
-            # Margem superior segura para o conteúdo da 1ª página
             self.set_y(35)
         else:
-            # Nas páginas seguintes, reservamos o espaço para o logo, garantindo o início perfeito
             self.set_y(30)
 
     def footer(self):
@@ -788,7 +786,6 @@ Obs.: {observacoes}"""
                         for categoria, arquivos in dic_fotos_final.items():
                             if arquivos:
                                 pdf.add_page()
-                                # Título da categoria alinhado à esquerda no topo de cada página, logo abaixo da logo
                                 pdf.set_font("Arial", "B", 11)
                                 pdf.cell(0, 6, categoria.upper(), ln=1, align="L")
                                 pdf.ln(4)
@@ -819,7 +816,6 @@ Obs.: {observacoes}"""
                                             pdf.add_page()
                                         
                                         pdf.image(temp_path, x=pos_x_centro, y=pdf.get_y(), w=w_alvo, h=h_alvo)
-                                        # Distanciamento exato de 1 quebra de linha (espaço) entre as fotos
                                         pdf.set_y(pdf.get_y() + h_alvo + 10)
                                     except Exception:
                                         pass
@@ -1283,7 +1279,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS
+# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD CORRIGIDO)
 # =====================================================================
 with aba_agenda:
     col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
@@ -1293,21 +1289,20 @@ with aba_agenda:
         arquivo_excel = st.file_uploader("📂 Importar Planilha Excel", type=["xlsx", "xls"], key="uploader_agenda_excel")
         
         if arquivo_excel is not None:
-            if st.session_state.df_excel_agenda is None:
-                try:
-                    df_raw = pd.read_excel(arquivo_excel, header=None)
-                    header_row = None
-                    for i, row in df_raw.iterrows():
-                        row_str = " ".join([str(val) for val in row.values])
-                        if "Número da ocorrência" in row_str:
-                            header_row = i
-                            break
-                    
-                    df = pd.read_excel(arquivo_excel, header=header_row if header_row is not None else 11)
-                    df.columns = [str(c).strip() for c in df.columns]
-                    st.session_state.df_excel_agenda = df
-                except Exception as e:
-                    st.error(f"Erro ao ler arquivo: {e}")
+            try:
+                df_raw = pd.read_excel(arquivo_excel, header=None)
+                header_row = None
+                for i, row in df_raw.iterrows():
+                    row_str = " ".join([str(val) for val in row.values])
+                    if "Número da ocorrência" in row_str or "Ocorrência" in row_str or i > 25:
+                        header_row = i
+                        break
+                
+                df = pd.read_excel(arquivo_excel, header=header_row if header_row is not None else 0)
+                df.columns = [str(c).strip() for c in df.columns]
+                st.session_state.df_excel_agenda = df
+            except Exception as e:
+                st.error(f"Erro ao ler arquivo: {e}")
 
         st.divider()
         menu_agenda = st.radio(
@@ -1318,7 +1313,62 @@ with aba_agenda:
             
     with col_conteudo_agenda:
         cabecalho_pagina("Agenda de Ocorrências & Visitas", "Painel de organização de agenda ordenado por prazo de atendimento (Dias Úteis).")
-        st.info("ℹ️ Funcionalidade de agenda carregada com sucesso.")
+        
+        df_agenda = st.session_state.get("df_excel_agenda", None)
+        
+        if df_agenda is None or df_agenda.empty:
+            st.info("ℹ️ Por favor, importe uma planilha Excel na barra lateral para carregar o dashboard de ocorrências.")
+        else:
+            st.success(f"✅ Planilha carregada com sucesso! Total de registros: {len(df_agenda)}")
+            
+            # Métricas rápidas no topo
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.metric("Total de Ocorrências", len(df_agenda))
+            with col_m2:
+                col_status_possiveis = [c for c in df_agenda.columns if "status" in c.lower() or "situação" in c.lower()]
+                if col_status_possiveis:
+                    st.metric("Status Principal", str(df_agenda[col_status_possiveis[0]].mode()[0] if not df_agenda[col_status_possiveis[0]].empty else "N/A"))
+                else:
+                    st.metric("Colunas", len(df_agenda.columns))
+            with col_m3:
+                col_cidade_possiveis = [c for c in df_agenda.columns if "cidade" in c.lower() or "município" in c.lower()]
+                if col_cidade_possiveis:
+                    st.metric("Cidades Atendidas", df_agenda[col_cidade_possiveis[0]].nunique())
+                else:
+                    st.metric("Registros Filtrados", len(df_agenda))
+
+            st.divider()
+            
+            # Lógica dos filtros selecionados no menu lateral
+            if menu_agenda == "Todas as Ocorrências":
+                st.subheader("📋 Todas as Ocorrências")
+                st.dataframe(df_agenda, use_container_width=True, hide_index=True)
+                
+            elif menu_agenda == "Comodato Inativo":
+                st.subheader("⚠️ Ocorrências de Comodato Inativo")
+                col_comodato = [c for c in df_agenda.columns if "comodato" in c.lower() or "equipamento" in c.lower()]
+                if col_comodato:
+                    df_comodato = df_agenda[df_agenda[col_comodato[0]].astype(str).str.contains("inativ|baixo|não|off", case=False, na=False)]
+                    if not df_comodato.empty:
+                        st.dataframe(df_comodato, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Nenhum registro de comodato inativo encontrado com base nos filtros textuais.")
+                        st.dataframe(df_agenda.head(20), use_container_width=True, hide_index=True)
+                else:
+                    st.dataframe(df_agenda, use_container_width=True, hide_index=True)
+                    
+            elif menu_agenda == "Ocorrências por Cidade":
+                st.subheader("🏙️ Ocorrências Agrupadas por Cidade")
+                col_cidade_possiveis = [c for c in df_agenda.columns if "cidade" in c.lower() or "município" in c.lower()]
+                if col_cidade_possiveis:
+                    cidade_sel = st.selectbox("Selecione a Cidade:", sorted(df_agenda[col_cidade_possiveis[0]].dropna().unique()))
+                    df_filtrado_cidade = df_agenda[df_agenda[col_cidade_possiveis[0]] == cidade_sel]
+                    st.markdown(f"Exibindo ocorrências para: **{cidade_sel}** (Total: {len(df_filtrado_cidade)})")
+                    st.dataframe(df_filtrado_cidade, use_container_width=True, hide_index=True)
+                else:
+                    st.warning("Coluna de cidade/município não identificada automaticamente na planilha.")
+                    st.dataframe(df_agenda, use_container_width=True, hide_index=True)
 
 # =====================================================================
 # ABA 3: BLOCO DE NOTAS PESSOAL
