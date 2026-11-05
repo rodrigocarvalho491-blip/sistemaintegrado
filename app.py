@@ -377,7 +377,6 @@ if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
-if "tratadas_manualmente" not in st.session_state: st.session_state.tratadas_manualmente = set()
 if "filtro_dashboard_ativo" not in st.session_state: st.session_state.filtro_dashboard_ativo = "Todas"
 if "ultimo_usuario_logado" not in st.session_state: st.session_state.ultimo_usuario_logado = ""
 if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None
@@ -418,7 +417,6 @@ if not st.session_state.autenticado:
                 if st.session_state.ultimo_usuario_logado != usuario_input:
                     st.session_state.df_excel_agenda = None
                     st.session_state.ultimo_usuario_logado = usuario_input
-                    st.session_state.tratadas_manualmente = set()
                 st.rerun()
             else:
                 st.error("❌ Usuário ou senha incorretos!")
@@ -1290,7 +1288,7 @@ Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD VISUAL COM 5 BOTÕES E 5 DIAS ÚTEIS)
+# ABA 2: AGENDA DE OCORRÊNCIAS (DASHBOARD ATUALIZADO)
 # =====================================================================
 with aba_agenda:
     COL_OCORRENCIA = "Número da ocorrência"
@@ -1313,6 +1311,13 @@ with aba_agenda:
                 cidade = partes[-3].strip()
             return cidade.title()
         return s.title()
+
+    def limpar_classificacao(texto):
+        if pd.isna(texto):
+            return "-"
+        # Remove tudo que estiver entre colchetes, ex: [NEGÓCIOS]
+        texto_limpo = re.sub(r'\[.*?\]', '', str(texto)).strip()
+        return texto_limpo if texto_limpo else str(texto)
 
     def calcular_dias_uteis(data_inicio, data_fim):
         h = pd.Timestamp(data_inicio).normalize().date()
@@ -1394,43 +1399,73 @@ with aba_agenda:
                 df_pendentes = df_pendentes.dropna(subset=[COL_OCORRENCIA])
                 df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
                 
-                df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.tratadas_manualmente)]
-                
                 df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
                 df_pendentes['Abertura_DT'] = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
                 df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
                 
                 df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
-                df_pendentes[COL_SUB_CLASSIF] = df_pendentes[COL_SUB_CLASSIF].fillna("-").astype(str)
+                df_pendentes['Classificação Limpa'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_classificacao)
                 
                 hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                df_pendentes['Dias Úteis Restantes'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
+                df_pendentes['SLA'] = df_pendentes['Prazo_DT'].apply(lambda x: calcular_dias_uteis(hoje, x))
                 
-                df_pendentes['Status Geral'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_geral)
-                df_pendentes['Status Comodato'] = df_pendentes['Dias Úteis Restantes'].apply(classificar_status_comodato)
+                df_pendentes['Status Geral'] = df_pendentes['SLA'].apply(classificar_status_geral)
+                df_pendentes['Status Comodato'] = df_pendentes['SLA'].apply(classificar_status_comodato)
                 df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
 
                 # Tratamento para o menu lateral "Comodato Inativo" ou "Ocorrências por Cidade"
                 df_base_visao = df_pendentes.copy()
                 if tipo_visao_agenda == "Comodato Inativo":
-                    df_base_visao = df_base_visao[df_base_visao[COL_SUB_CLASSIF].str.contains("Comodato Inativo", case=False, na=False)]
+                    df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
                     st.subheader("⚠️ Relatório Específico: Comodato Inativo")
                 elif tipo_visao_agenda == "Ocorrências por Cidade":
                     st.subheader("🏙️ Ocorrências por Cidade")
+                    
+                    # Exibição em meia tela: Tabela de OCs por cidade na metade e Gráfico na outra metade
                     cidades_unicas = sorted(list(df_base_visao['Cidade'].unique()))
                     cidade_sel = st.selectbox("Selecione a Cidade:", cidades_unicas)
-                    df_base_visao = df_base_visao[df_base_visao['Cidade'] == cidade_sel]
+                    
+                    df_cidade_filtrada = df_base_visao[df_base_visao['Cidade'] == cidade_sel].copy()
+                    df_cidade_filtrada['Prazo'] = df_cidade_filtrada['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                    
+                    col_tabela_cidade, col_grafico_cidade = st.columns(2)
+                    
+                    with col_tabela_cidade:
+                        st.markdown(f"**Ocorrências para: {cidade_sel}**")
+                        if not df_cidade_filtrada.empty:
+                            df_exib_cidade = df_cidade_filtrada[[
+                                'Status Geral', 'SLA', COL_OCORRENCIA, COL_CLIENTE, 'Cidade', 'Classificação Limpa', 'Prazo'
+                            ]].copy()
+                            df_exib_cidade.columns = ['Status', 'SLA', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
+                            df_exib_cidade['Nº OC'] = df_exib_cidade['Nº OC'].astype(str)
+                            
+                            st.dataframe(df_exib_cidade, hide_index=True, use_container_width=True)
+                        else:
+                            st.info("Nenhuma ocorrência para esta cidade.")
+                            
+                    with col_grafico_cidade:
+                        st.markdown("**Gráfico de OCs por Cidade**")
+                        df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
+                        
+                        chart = alt.Chart(df_mapa_agrup).mark_bar(color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+                            x=alt.X('Cidade:N', sort='-y', title='Cidade'),
+                            y=alt.Y('Total Ocorrências:Q', title='Qtd Ocorrências'),
+                            tooltip=['Cidade', 'Total Ocorrências']
+                        ).properties(height=300)
+                        st.altair_chart(chart, use_container_width=True)
+                        
+                    st.stop() # Interrompe o fluxo padrão para mostrar apenas a visão dividida de cidades
                 else:
                     st.subheader("2. Agenda Geral de Visitas Pendentes")
 
-                # --- 5 BOTÕES DE FILTRO RÁPIDO SUPERIORES (MAIORES E VISÍVEIS) ---
+                # --- 5 BOTÕES DE FILTRO RÁPIDO SUPERIORES ---
                 st.markdown("### Filtros por Status e Prazos")
                 
                 total_visitas = len(df_base_visao)
-                vencidas_qt = len(df_base_visao[df_base_visao['Dias Úteis Restantes'] < 0])
-                hoje_qt = len(df_base_visao[df_base_visao['Dias Úteis Restantes'] == 0])
-                amanha_qt = len(df_base_visao[df_base_visao['Dias Úteis Restantes'] == 1])
-                cinco_dias_qt = len(df_base_visao[(df_base_visao['Dias Úteis Restantes'] >= 2) & (df_base_visao['Dias Úteis Restantes'] <= 5)])
+                vencidas_qt = len(df_base_visao[df_base_visao['SLA'] < 0])
+                hoje_qt = len(df_base_visao[df_base_visao['SLA'] == 0])
+                amanha_qt = len(df_base_visao[df_base_visao['SLA'] == 1])
+                cinco_dias_qt = len(df_base_visao[(df_base_visao['SLA'] >= 2) & (df_base_visao['SLA'] <= 5)])
 
                 c1, c2, c3, c4, c5 = st.columns(5)
                 with c1:
@@ -1455,64 +1490,38 @@ with aba_agenda:
                 # Aplicar filtro interativo baseado no botão clicado
                 df_filtrado = df_base_visao.copy()
                 if st.session_state.filtro_dashboard_ativo == "Vencidas":
-                    df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] < 0]
+                    df_filtrado = df_filtrado[df_filtrado['SLA'] < 0]
                 elif st.session_state.filtro_dashboard_ativo == "Hoje":
-                    df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 0]
+                    df_filtrado = df_filtrado[df_filtrado['SLA'] == 0]
                 elif st.session_state.filtro_dashboard_ativo == "Amanhã":
-                    df_filtrado = df_filtrado[df_filtrado['Dias Úteis Restantes'] == 1]
+                    df_filtrado = df_filtrado[df_filtrado['SLA'] == 1]
                 elif st.session_state.filtro_dashboard_ativo == "05 Dias":
-                    df_filtrado = df_filtrado[(df_filtrado['Dias Úteis Restantes'] >= 2) & (df_filtrado['Dias Úteis Restantes'] <= 5)]
+                    df_filtrado = df_filtrado[(df_filtrado['SLA'] >= 2) & (df_filtrado['SLA'] <= 5)]
 
-                df_filtrado['Data Atendimento'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
+                df_filtrado['Prazo'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
 
                 if df_filtrado.empty:
                     st.success("✅ Excelente! Não há nenhuma ocorrência pendente para o filtro selecionado.")
                 else:
                     df_exibicao = df_filtrado[[
                         'Status Geral',
-                        'Dias Úteis Restantes',
+                        'SLA',
                         COL_OCORRENCIA, 
                         COL_CLIENTE, 
                         'Cidade', 
-                        COL_SUB_CLASSIF,
-                        'Data Atendimento'
+                        'Classificação Limpa',
+                        'Prazo'
                     ]].copy()
-                    df_exibicao[COL_OCORRENCIA] = df_exibicao[COL_OCORRENCIA].astype(str)
                     
-                    edited_df = st.data_editor(
-                        df_exibicao.assign(Tratar=False),
-                        column_config={
-                            "Tratar": st.column_config.CheckboxColumn("✅ Marcar Tratada?", required=True),
-                            'Status Geral': st.column_config.TextColumn("Status", width="small", disabled=True),
-                            'Dias Úteis Restantes': st.column_config.NumberColumn("Dias Úteis Restantes", width="small", disabled=True),
-                            COL_OCORRENCIA: st.column_config.TextColumn("Nº Ocorrência", width="small", disabled=True),
-                            COL_CLIENTE: st.column_config.TextColumn("Nome do Cliente", width="large", disabled=True),
-                            'Cidade': st.column_config.TextColumn("Cidade", width="small", disabled=True),
-                            COL_SUB_CLASSIF: st.column_config.TextColumn("Sub-Classificação", width="medium", disabled=True),
-                            'Data Atendimento': st.column_config.TextColumn("Data de Atendimento", width="medium", disabled=True),
-                        },
+                    # Renomeando para a ordem e nomenclaturas exatas solicitadas
+                    df_exibicao.columns = ['Status', 'SLA', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
+                    df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str)
+                    
+                    st.dataframe(
+                        df_exibicao,
                         hide_index=True,
-                        use_container_width=True,
-                        key="editor_dashboard_geral"
+                        use_container_width=True
                     )
-                    
-                    ocorrencias_para_tratar = edited_df[edited_df["Tratar"] == True][COL_OCORRENCIA].tolist()
-                    
-                    if ocorrencias_para_tratar:
-                        st.warning(f"⚠️ Você selecionou **{len(ocorrencias_para_tratar)}** ocorrência(s) para marcar como tratada(s).")
-                        if st.button("🔒 Confirmar e Remover do Painel", type="primary", key="btn_conf_tratada_geral"):
-                            for oc in ocorrencias_para_tratar:
-                                st.session_state.tratadas_manualmente.add(int(oc))
-                            st.success("✅ Ocorrência(s) tratada(s) com sucesso e removida(s) do painel!")
-                            st.rerun()
-
-                # Seção de resumo por cidade no final da aba de agenda
-                st.divider()
-                st.subheader("📊 Resumo de Ocorrências por Cidade")
-                if not df_base_visao.empty:
-                    df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
-                    df_mapa_agrup = df_mapa_agrup.sort_values(by='Total Ocorrências', ascending=False)
-                    st.dataframe(df_mapa_agrup[['Cidade', 'Total Ocorrências']], hide_index=True, use_container_width=True)
 
             except Exception as e:
                 st.error(f"⚠️ Ocorreu um erro ao processar o ficheiro. Certifique-se de ser o relatório padrão do sistema. Erro técnico: {e}")
@@ -1646,5 +1655,4 @@ if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
     st.session_state.e_admin = False
     st.session_state.troca_obrigatoria = False
     st.session_state.df_excel_agenda = None
-    st.session_state.tratadas_manualmente = set()
     st.rerun()
