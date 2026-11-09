@@ -184,28 +184,21 @@ def formatar_ci_num(ci_str):
 # --- LEITOR ROBUSTO DE ARQUIVOS (EXCEL / HTML) ---
 def ler_arquivo_excel_robusto(uploaded_file):
     bytes_data = uploaded_file.getvalue()
-    
-    # 1. Tentativa primária: Ler como arquivo Excel nativo (XLSX/XLS)
     try:
         return pd.read_excel(BytesIO(bytes_data))
     except Exception:
         pass
-        
-    # 2. Fallback Seguro: Parsear HTML disfarçado de XLS (comum em exports de sistemas)
     try:
         try:
             html_text = bytes_data.decode('utf-8')
         except UnicodeDecodeError:
             html_text = bytes_data.decode('ISO-8859-1', errors='ignore')
-            
         import re
         table_match = re.search(r'<table[^>]*>(.*?)</table>', html_text, re.DOTALL | re.IGNORECASE)
         if not table_match:
             raise ValueError("Nenhuma tabela HTML encontrada.")
-            
         table_content = table_match.group(1)
         rows = []
-        
         for row_match in re.finditer(r'<tr[^>]*>(.*?)</tr>', table_content, re.DOTALL | re.IGNORECASE):
             row_content = row_match.group(1)
             cells = []
@@ -214,18 +207,14 @@ def ler_arquivo_excel_robusto(uploaded_file):
                 cell_text = re.sub(r'<[^>]+>', '', cell_text)
                 cell_text = cell_text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
                 cells.append(cell_text.strip())
-            
             if cells:
                 rows.append(cells)
-                
         if not rows:
             raise ValueError("Tabela HTML extraída está vazia.")
-            
         max_cols = max(len(r) for r in rows)
         header = rows[0]
         if len(header) < max_cols:
             header.extend([f"Col_{i}" for i in range(len(header), max_cols)])
-            
         data_rows = []
         for r in rows[1:]:
             if len(r) < max_cols:
@@ -233,10 +222,8 @@ def ler_arquivo_excel_robusto(uploaded_file):
             elif len(r) > max_cols:
                 r = r[:max_cols]
             data_rows.append(r)
-            
         df = pd.DataFrame(data_rows, columns=header)
         return df
-        
     except Exception as e:
         raise ValueError(f"Formato de arquivo não suportado ou corrompido. Erro interno: {e}")
 
@@ -1158,7 +1145,7 @@ Obs.: {observacoes}"""
                     botao_copiar_customizado(texto_padrao_contrato, "contrato_txt")
 
             # -------------------------------------------------------------
-            # 3. APROVAÇÃO DE CONTRATO
+            # 3. APROVAÇÃO DE CONTRATO (REFORMULADA CONFORME ORDEM DO PROMPT)
             # -------------------------------------------------------------
             elif menu_tratativa == "📋 Aprovação de Contrato":
                 rcap = st.session_state.reset_counter
@@ -1169,18 +1156,29 @@ Obs.: {observacoes}"""
                     st.rerun()
 
                 st.divider()
-                st.subheader("1. Motivo e Dados Principais")
+
+                # BLOCO 01 - Motivo
+                st.subheader("1. Motivo")
                 motivo_reg = st.text_input("Motivo da regularização *", key=f"ap_motivo_{rcap}")
                 
+                st.divider()
+
+                # BLOCO 02 - Contato
+                st.subheader("2. Informações de Contato")
                 c_ap1, c_ap2, c_ap3 = st.columns(3)
                 with c_ap1: contato_ap = st.text_input("Contato *", key=f"ap_cont_{rcap}")
                 with c_ap2: telefone_ap = st.text_input("Telefone *", key=f"ap_tel_{rcap}")
                 with c_ap3: email_ap = st.text_input("E-mail *", key=f"ap_email_{rcap}")
+                
+                atualizar_email = st.radio("Atualizar E-mail?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_atu_email_{rcap}")
 
-                c_ap4, c_ap5, c_ap6 = st.columns(3)
-                with c_ap4: atualizar_email = st.radio("Atualizar E-mail?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_atu_email_{rcap}")
-                with c_ap5: contrato_adit = st.radio("Contrato / Aditamento", ["Contrato", "Aditamento"], horizontal=True, index=None, key=f"ap_tp_cont_{rcap}")
-                with c_ap6: vigencia_ap = st.text_input("Vigência", key=f"ap_vig_{rcap}")
+                st.divider()
+
+                # BLOCO 03 - Contrato / Equipamentos
+                st.subheader("3. Dados do Contrato")
+                c_ap4, c_ap5 = st.columns(2)
+                with c_ap4: contrato_adit = st.radio("Contrato / Aditamento", ["Contrato", "Aditamento"], horizontal=True, index=None, key=f"ap_tp_cont_{rcap}")
+                with c_ap5: vigencia_ap = st.text_input("Vigência", key=f"ap_vig_{rcap}")
 
                 qtd_entregas_ap = st.number_input("Quantidade de endereços/centrais", min_value=1, value=1, step=1, key=f"qtd_ent_ap_{rcap}")
                 equipamentos_ap = ""
@@ -1188,16 +1186,23 @@ Obs.: {observacoes}"""
                 if qtd_entregas_ap == 1:
                     equipamentos_ap = st.text_input("Equipamentos", key=f"ap_eq_{rcap}")
                 else:
+                    st.markdown("**Equipamentos por Endereço de Entrega:**")
                     for i in range(1, int(qtd_entregas_ap) + 1):
                         eq_dict_ap[i] = st.text_input(f"Equipamentos - [Entrega {i}]", key=f"ap_eq_ent_{i}_{rcap}")
 
-                especificidade_ap = st.text_input("Existe especificidade sobre a solicitação?", key=f"ap_esp_{rcap}")
+                especificidade_ap = st.text_input("Existe especificidade sobre a solicitação:", key=f"ap_esp_{rcap}")
 
                 st.divider()
-                st.subheader("2. Redimensionamento")
+
+                # BLOCO 04 - Redimensionamento e Projetos Iniciais
+                st.subheader("4. Redimensionamento")
                 redim = st.radio("Redimensionamento:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_redim_{rcap}")
+                projeto_num_bloco4 = ""
                 comodato_de, comodato_para, inc_tanques, env_pecas = "", "", "Não", "Não"
+                
                 if redim == "Sim":
+                    projeto_num_bloco4 = st.text_input("Projeto (Informe o número completo do projeto) - Ref. Redimensionamento:", key=f"ap_proj4_{rcap}")
+                    
                     c_p1, c_p2 = st.columns(2)
                     with c_p1: comodato_de = st.text_input("Comodato passou de:", key=f"ap_com_de_{rcap}")
                     with c_p2: comodato_para = st.text_input("Para:", key=f"ap_com_para_{rcap}")
@@ -1207,73 +1212,121 @@ Obs.: {observacoes}"""
                     with c_p4: env_pecas = st.radio("Necessário lista de peças?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_env_pec_{rcap}")
 
                 st.divider()
-                st.subheader("3. Condomínio Conta Sim & Portaria")
+
+                # BLOCO 05 - Conta Sim e Portaria
+                st.subheader("5. Condomínio Conta Sim & Portaria")
                 implantacao_csim = st.radio("Implantação de conta sim:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_{rcap}")
                 env_pecas_ficha, env_ficha_cliente, tp_portaria, contato_resp_port, part_local, contato_sindico = "Não", "Não", "", "", "", ""
+                
                 if implantacao_csim == "Sim":
                     c_cs1, c_cs2 = st.columns(2)
-                    with c_cs1: env_pecas_ficha = st.radio("Foi enviado lista de peças?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_pec_{rcap}")
-                    with c_cs2: env_ficha_cliente = st.radio("Foi enviado ficha de clientes?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_ficha_{rcap}")
+                    with c_cs1: env_pecas_ficha = st.radio("Foi enviado lista de peças e ficha de clientes?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_pec_ficha_{rcap}")
+                    
                     tp_portaria = st.text_input("Tipo de portaria", key=f"ap_tp_port_{rcap}")
-                    contato_resp_port = st.text_input("Contato responsável (portaria remota)", key=f"ap_cont_resp_{rcap}")
+                    contato_resp_port = st.text_input("Contato do responsável (nº ap ou contato remota)", key=f"ap_cont_resp_{rcap}")
                     part_local = st.text_input("Particularidades do local", key=f"ap_part_local_{rcap}")
                     contato_sindico = st.text_input("Contato atualizado do síndico", key=f"ap_cont_sind_{rcap}")
 
                 st.divider()
-                st.subheader("4. Alteração de CNPJ & Títulos em Aberto")
+
+                # BLOCO 06 - Alteração de CNPJ / Títulos em Aberto
+                st.subheader("6. Alteração de CNPJ & Títulos em Aberto")
                 alt_cnpj = st.radio("Alteração de CNPJ ou razão social?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_alt_cnpj_{rcap}")
                 mesmo_prop_opt = st.radio("Se trata do mesmo proprietário:", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_mesmo_prop_{rcap}")
                 possui_titulos_aberto = st.radio("Possui títulos em aberto?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_tit_aberto_{rcap}")
+                
                 neg_tit_input = ""
                 if possui_titulos_aberto == "Sim":
-                    neg_tit_input = st.text_input("Negociação dos títulos em aberto:", key=f"ap_neg_tit_{rcap}")
+                    neg_tit_input = st.text_input("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", key=f"ap_neg_tit_{rcap}")
 
                 st.divider()
-                st.subheader("5. Redução de Vigência & Projeto Padrão")
+
+                # BLOCO 07 - Projeto Geral
+                st.subheader("7. Projeto")
+                projeto_num_bloco7 = st.text_input("Projeto (Informe o número completo do projeto):", key=f"ap_proj7_{rcap}")
+
+                st.divider()
+                
+                # BLOCO 08 - Redução de Vigência
+                st.subheader("8. Redução de Vigência")
                 red_vig = st.radio("Redução de vigência?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_red_vig_{rcap}")
                 motivo_red_vig = ""
                 if red_vig == "Sim":
-                    motivo_red_vig = st.text_input("Motivo da redução de vigência:", key=f"ap_mot_red_{rcap}")
-
-                col_proj1, col_proj2 = st.columns([3, 1])
-                with col_proj1: projeto_num = st.text_input("Projeto (Número completo)", key=f"ap_proj_{rcap}")
-                with col_proj2:
-                    st.write(""); st.write("")
-                    is_cilindros = st.checkbox("Cilindros", key=f"ap_cil_{rcap}")
+                    motivo_red_vig = st.text_input("(Se sim, descreva o motivo):", key=f"ap_mot_red_{rcap}")
 
                 st.divider()
+
                 if st.button("📝 Gerar Texto de Aprovação de Contrato", type="primary"):
-                    if not is_cilindros and not projeto_num.strip():
-                        st.error("⚠️ O campo 'Projeto' é obrigatório, a menos que a opção 'Cilindros' esteja marcada.")
+                    
+                    if qtd_entregas_ap == 1:
+                        eq_ap_texto = equipamentos_ap
                     else:
-                        proj_final = "N/A" if is_cilindros else projeto_num.strip()
-                        
-                        if qtd_entregas_ap == 1:
-                            eq_ap_texto = equipamentos_ap
-                        else:
-                            eq_ap_linhas = [f"[Entrega {i}] {eq_dict_ap[i].strip()}" for i in range(1, int(qtd_entregas_ap) + 1) if eq_dict_ap[i].strip()]
-                            eq_ap_texto = "\n" + "\n".join(eq_ap_linhas)
+                        eq_ap_linhas = [f"[Entrega {i}] {eq_dict_ap[i].strip()}" for i in range(1, int(qtd_entregas_ap) + 1) if eq_dict_ap[i].strip()]
+                        eq_ap_texto = " ".join(eq_ap_linhas)
 
-                        conta_sim_bloco = f"Implantação de conta sim: [ {'x' if implantacao_csim == 'Sim' else ' '} ] sim [ {'x' if implantacao_csim == 'Não' else ' '} ] não"
-                        if implantacao_csim == "Sim":
-                            conta_sim_bloco += f"\nFoi enviado lista de peças? [ {'x' if env_pecas_ficha == 'Sim' else ' '} ] sim [ {'x' if env_pecas_ficha == 'Não' else ' '} ] não\nFoi enviado ficha de clientes? [ {'x' if env_ficha_cliente == 'Sim' else ' '} ] sim [ {'x' if env_ficha_cliente == 'Não' else ' '} ] não\nTipo de portaria: {tp_portaria}\nContato do responsável: {contato_resp_port}\nParticularidades: {part_local}\nContato síndico: {contato_sindico}"
+                    # Formatação de Seletores Sim/Não (com "x" para preenchido e vazio para não preenchido)
+                    def sim_nao_box(val):
+                        if val == "Sim":
+                            return "[ x ] sim [   ] não"
+                        elif val == "Não":
+                            return "[   ] sim [ x ] não"
+                        return "[   ] sim [   ] não"
 
-                        texto_aprovacao = f"""Motivo da regularização: {motivo_reg}
-Contato: {contato_ap} Telefone: {telefone_ap} E-mail: {email_ap}
-Atualizar E-mail? {atualizar_email or ''} Contrato / Aditamento: {contrato_adit or ''} Vigência: {vigencia_ap} Equipamentos: {eq_ap_texto}
+                    def sim_nao_parentheses(val):
+                        if val == "Sim":
+                            return "( X ) SIM (   ) NÃO"
+                        elif val == "Não":
+                            return "(   ) SIM ( X ) NÃO"
+                        return "(   ) SIM (   ) NÃO"
+
+                    def sim_nao_parentheses_lower(val):
+                        if val == "Sim":
+                            return "( x ) sim (   ) não"
+                        elif val == "Não":
+                            return "(   ) sim ( x ) não"
+                        return "(   ) sim (   ) não"
+
+                    # Montagem exata do texto final com quebras de linha
+                    texto_aprovacao = f"""Motivo da regularização: {motivo_reg}
+
+Contato: {contato_ap}
+Telefone: {telefone_ap}
+E-mail: {email_ap}
+Atualizar E-mail? {atualizar_email or ''}
+
+Contrato / Aditamento: {contrato_adit or ''}
+Vigência: {vigencia_ap}
+Equipamentos: {eq_ap_texto}
+
 Existe especificidade sobre a solicitação: {especificidade_ap}
-Redimensionamento: [ {'x' if redim == 'Sim' else ' '} ] sim [ {'x' if redim == 'Não' else ' '} ] não Projeto: {proj_final} Comodato passou de: {comodato_de} Para: {comodato_para}
-Inclusão de tanques? [ {'x' if inc_tanques == 'Sim' else ' '} ] sim [ {'x' if inc_tanques == 'Não' else ' '} ] não
-Necessário lista de peças? [ {'x' if env_pecas == 'Sim' else ' '} ] sim [ {'x' if env_pecas == 'Não' else ' '} ] não
-{conta_sim_bloco}
-Alteração de CNPJ ou razão social? [ {'x' if alt_cnpj == 'Sim' else ' '} ] sim [ {'x' if alt_cnpj == 'Não' else ' '} ] não
-Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'Sim' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'Não' else ' '} ) NÃO
-Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: {neg_tit_input or 'n/a'}
-Redução de vigência? [ {'x' if red_vig == 'Sim' else ' '} ] sim [ {'x' if red_vig == 'Não' else ' '} ] não (Se sim, descreva o motivo): {motivo_red_vig}"""
 
-                        st.success("✅ Texto de Aprovação gerado com sucesso!")
-                        st.text_area("Texto Gerado:", value=texto_aprovacao, height=350, key=f"txt_area_aprov_{rcap}")
-                        botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
+Redimensionamento: {sim_nao_box(redim)}
+Projeto (Informe o número completo do projeto): {projeto_num_bloco4}
+Comodato passou de: {comodato_de}
+Para: {comodato_para}
+Inclusão de tanques? {sim_nao_box(inc_tanques)} (se sim, enviar informações para a ficha)
+Necessário lista de peças? {sim_nao_box(env_pecas)} (se sim, enviar lista de peças):
+
+Implantação de conta sim: {sim_nao_box(implantacao_csim)}
+Foi enviado lista de peças e ficha de clientes ? {sim_nao_box(env_pecas_ficha)}
+Tipo de portaria: {tp_portaria}
+Contato do responsável (em caso de portaria remota, informar o número do apartamento ou a forma de contato do responsável): {contato_resp_port}
+Particularidades do local: {part_local}
+Contato atualizado do síndico: {contato_sindico}
+
+Alteração de CNPJ ou razão social? {sim_nao_box(alt_cnpj)}
+Se trata do mesmo proprietário: {sim_nao_parentheses(mesmo_prop_opt)}
+Possui títulos em aberto {sim_nao_parentheses_lower(possui_titulos_aberto)}
+Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: {neg_tit_input}
+
+Projeto (Informe o número completo do projeto): {projeto_num_bloco7}
+
+Redução de vigência? {sim_nao_box(red_vig)}
+(Se sim, descreva o motivo): {motivo_red_vig}"""
+
+                    st.success("✅ Texto de Aprovação gerado com sucesso!")
+                    st.text_area("Texto Gerado:", value=texto_aprovacao, height=500, key=f"txt_area_aprov_{rcap}")
+                    botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
 
             # -------------------------------------------------------------
             # 4. ANIVERSÁRIO DE CONTRATO
