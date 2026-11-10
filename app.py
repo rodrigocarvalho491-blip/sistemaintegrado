@@ -963,13 +963,13 @@ Obs.: {observacoes}"""
                 st.divider()
 
                 # Motivo da Elaboração / Regularização
-                st.subheader("01. Motivo da Elaboração / Regularização")
+                st.subheader("1. Motivo da Elaboração / Regularização")
                 motivo_solicitacao = st.text_area("Descreva claramente o motivo da regularização do contrato:", key=f"motivo_{rcc}")
 
                 st.divider()
 
                 # Dados do Contrato
-                st.subheader("02. Dados do Contrato")
+                st.subheader("2. Dados do Contrato")
                 col_b2_1, col_b2_2 = st.columns(2)
                 
                 with col_b2_1:
@@ -1007,7 +1007,7 @@ Obs.: {observacoes}"""
                 st.divider()
 
                 # Endereço / Equipamentos
-                st.subheader("03. Endereço / Equipamentos")
+                st.subheader("3. Endereço / Equipamentos")
                 col_b3_1, col_b3_2 = st.columns(2)
                 with col_b3_1:
                     endereco_padrao = st.text_input("Endereço padrão ou entrega?:", key=f"end_padrao_{rcc}")
@@ -1028,7 +1028,7 @@ Obs.: {observacoes}"""
                 st.divider()
 
                 # Condições Comerciais
-                st.subheader("04. Condições Comerciais")
+                st.subheader("4. Condições Comerciais")
                 tipo_fornecimento = st.radio("Tipo de Fornecimento:", ["Granel", "Cilindro", "Ambos"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
                 
                 preco_granel, consumo_granel_input = "", ""
@@ -1076,7 +1076,7 @@ Obs.: {observacoes}"""
                 st.divider()
 
                 # Financeiro
-                st.subheader("05. Financeiro")
+                st.subheader("5. Financeiro")
                 col_fin1, col_fin2 = st.columns(2)
                 with col_fin1:
                     possui_debito_fin = st.radio("Possui NF's Pendentes?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
@@ -1113,7 +1113,7 @@ Obs.: {observacoes}"""
                 st.divider()
 
                 # Condomínio
-                st.subheader("06. Condomínio")
+                st.subheader("6. Condomínio")
                 conta_sim = st.radio("Condomínio:", ["Não", "Coletivo", "CONTA.SIM"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
                 num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
 
