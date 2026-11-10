@@ -954,50 +954,47 @@ Obs.: {observacoes}"""
             # -------------------------------------------------------------
             elif menu_tratativa == "📝 Elaboração de Contrato":
                 rcc = st.session_state.reset_counter
-                cabecalho_pagina("Elaboração de Contrato", "Formulário completo para geração do padrão de solicitação de contrato.")
+                cabecalho_pagina("Elaboração de Contrato", "Formulário de preenchimento e geração do padrão de solicitação de contrato.")
                 
                 if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_limp_elab_{rcc}"):
                     st.session_state.reset_counter += 1
                     st.rerun()
 
-                tipo_fluxo = st.radio("Objetivo da solicitação:", ["Gerar Minuta", "Enviar para Assinatura"], horizontal=True, index=None, key=f"fluxo_c_{rcc}")
                 st.divider()
 
-                st.subheader("1. Motivo")
-                motivo_solicitacao = st.text_input("Motivo da solicitação", key=f"motivo_{rcc}")
+                # [BLOCO 01] Motivo da Elaboração / Regularização
+                st.subheader("[BLOCO 01] Motivo da Elaboração / Regularização")
+                motivo_solicitacao = st.text_area("Descreva claramente o motivo da regularização do contrato:", key=f"motivo_{rcc}")
+
                 st.divider()
 
-                st.subheader("2. Dados do Cliente")
-                col_cli1, col_cli2, col_cli3 = st.columns(3)
-                with col_cli1: contato_contrato = st.text_input("Contato", key=f"contato_c_{rcc}")
-                with col_cli2: telefone_contrato = st.text_input("Telefone", key=f"tel_c_{rcc}")
-                with col_cli3: email_contrato = st.text_input("E-mail", key=f"email_c_{rcc}")
-                st.divider()
+                # [BLOCO 02] Dados do Contrato
+                st.subheader("[BLOCO 02] Dados do Contrato")
+                col_b2_1, col_b2_2 = st.columns(2)
+                
+                with col_b2_1:
+                    tipo_contrato = st.radio("Contrato / Aditamento / Distrato:", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
+                    requisicao_opt = st.radio("Requisição:", ["Permanente", "Provisório"], horizontal=True, index=None, key=f"req_opt_{rcc}")
 
-                st.subheader("3. Solicitação")
-                tipo_contrato = st.radio("Tipo", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
-                st.divider()
+                with col_b2_2:
+                    mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_prop_{rcc}")
 
-                st.subheader("4. Dados do Contrato")
-                col_con1, col_con2 = st.columns(2)
                 cnpj_campo_val, ie_campo_val = "", ""
                 status_cnpj_txt, razao_social_txt = "", ""
-                email_novo_prop = "n/a"
 
-                with col_con1:
-                    endereco_padrao = st.text_input("Endereço padrão ou entrega?", key=f"end_padrao_{rcc}")
-                    mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_prop_{rcc}")
-                    if mesmo_prop_opt == "Não":
-                        email_novo_prop = st.text_input("E-mail do novo proprietário", key=f"email_novo_{rcc}")
+                col_b2_3, col_b2_4 = st.columns(2)
+                with col_b2_3:
+                    if mesmo_prop_opt == "Sim":
+                        cnpj_campo_val = st.text_input("Novo CNPJ:", key=f"novo_cnpj_val_{rcc}")
+                        ie_campo_val = st.text_input("Nova I.E.:", key=f"nova_ie_val_{rcc}")
+                    elif mesmo_prop_opt == "Não":
+                        cnpj_campo_val = st.text_input("CNPJ:", key=f"cnpj_val_{rcc}")
+                        ie_campo_val = st.text_input("I.E.:", key=f"ie_val_{rcc}")
+                    else:
+                        cnpj_campo_val = st.text_input("CNPJ / Novo CNPJ:", key=f"cnpj_gen_{rcc}")
+                        ie_campo_val = st.text_input("I.E. / Nova I.E.:", key=f"ie_gen_{rcc}")
 
-                    mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_cnpj_{rcc}")
-                    if mesmo_cnpj_opt == "Sim":
-                        cnpj_campo_val = st.text_input("CNPJ", key=f"cnpj_val_{rcc}")
-                        ie_campo_val = st.text_input("I.E.", key=f"ie_val_{rcc}")
-                    elif mesmo_cnpj_opt == "Não":
-                        cnpj_campo_val = st.text_input("Novo CNPJ", key=f"novo_cnpj_val_{rcc}")
-                        ie_campo_val = st.text_input("Nova I.E.", key=f"nova_ie_val_{rcc}")
-
+                with col_b2_4:
                     if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
                         dados_api = consultar_cnpj_api(cnpj_campo_val)
                         if dados_api:
@@ -1007,141 +1004,288 @@ Obs.: {observacoes}"""
                             st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
                             st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
 
-                with col_con2:
-                    cond_pagamento = st.text_input("Condição de pagamento", key=f"cond_pag_{rcc}")
-                    vigencia = st.text_input("Vigência", key=f"vigencia_{rcc}")
-                    qtd_entregas_c = st.number_input("Quantidade de endereços/centrais", min_value=1, value=1, step=1, key=f"qtd_ent_c_{rcc}")
-                    
-                    equipamentos_contrato = ""
-                    eq_dict_c = {}
-                    if qtd_entregas_c == 1:
-                        equipamentos_contrato = st.text_input("Equipamentos", key=f"eq_contrato_c_{rcc}")
-                    else:
-                        for i in range(1, int(qtd_entregas_c) + 1):
-                            eq_dict_c[i] = st.text_input(f"Equipamentos - [Entrega {i}]", key=f"eq_ent_{i}_{rcc}")
+                st.divider()
+
+                # [BLOCO 03] Endereço / Equipamentos
+                st.subheader("[BLOCO 03] Endereço / Equipamentos")
+                col_b3_1, col_b3_2 = st.columns(2)
+                with col_b3_1:
+                    endereco_padrao = st.text_input("Endereço padrão ou entrega?:", key=f"end_padrao_{rcc}")
+                with col_b3_2:
+                    qtd_entregas_c = st.number_input("Quantidade de centrais / endereços:", min_value=1, value=1, step=1, key=f"qtd_ent_c_{rcc}")
+
+                eq_dict_c = {}
+                if qtd_entregas_c == 1:
+                    eq_dict_c[1] = st.text_input("Equipamentos Central 01:", key=f"eq_ent_1_{rcc}")
+                else:
+                    st.markdown("**Equipamentos por Central / Endereço:**")
+                    cols_eq_b3 = st.columns(min(int(qtd_entregas_c), 3))
+                    for i in range(1, int(qtd_entregas_c) + 1):
+                        c_idx = (i - 1) % len(cols_eq_b3)
+                        with cols_eq_b3[c_idx]:
+                            eq_dict_c[i] = st.text_input(f"Equipamentos Central {i:02d}:", key=f"eq_ent_{i}_{rcc}")
 
                 st.divider()
-                st.subheader("5. Comodato / Fornecimento")
-                tipo_fornecimento = st.radio("Tipo de Fornecimento", ["Granel", "Cilindro"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
+
+                # [BLOCO 04] Condições Comerciais
+                st.subheader("[BLOCO 04] Condições Comerciais")
+                tipo_fornecimento = st.radio("Tipo de Fornecimento:", ["Granel", "Cilindro", "Ambos"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
                 
-                preco_granel, consumo_granel = "", ""
+                preco_granel, consumo_granel_input = "", ""
                 p13_val, p20_val, p45_val = "", "", ""
                 p13_qtd, p20_qtd, p45_qtd = 0, 0, 0
-                consumo_cilindro_total = 0
+                consumo_cilindro_input_kg = ""
+                consumo_cilindro_total_calc = 0
 
-                if tipo_fornecimento == "Granel":
+                if tipo_fornecimento in ["Granel", "Ambos"]:
+                    st.markdown("**Preço e Consumo Granel:**")
                     col_g1, col_g2 = st.columns(2)
-                    with col_g1: preco_granel = st.text_input("Preço Granel", key=f"preco_granel_{rcc}")
-                    with col_g2: consumo_granel = st.text_input("Consumo mensal previsto (kgs)", key=f"cons_granel_{rcc}")
-                elif tipo_fornecimento == "Cilindro":
-                    col_cp1, col_cp2, col_cp3 = st.columns(3)
-                    with col_cp1: p13_val = st.text_input("Preço P13 (/und)", key=f"p13_v_{rcc}")
-                    with col_cp2: p20_val = st.text_input("Preço P20 (/und)", key=f"p20_v_{rcc}")
-                    with col_cp3: p45_val = st.text_input("Preço P45 (/und)", key=f"p45_v_{rcc}")
+                    with col_g1:
+                        preco_granel = st.text_input("Preço Granel (R$/kg):", key=f"preco_granel_{rcc}")
+                    with col_g2:
+                        consumo_granel_input = st.text_input("Consumo previsto (Granel) mensal:", placeholder="Ex: 100 ou 100 kgs", key=f"cons_granel_{rcc}")
 
-                    col_cc1, col_cc2, col_cc3 = st.columns(3)
-                    with col_cc1: p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1, key=f"p13_q_{rcc}")
-                    with col_cc2: p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1, key=f"p20_q_{rcc}")
-                    with col_cc3: p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1, key=f"p45_q_{rcc}")
-                    consumo_cilindro_total = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
+                if tipo_fornecimento in ["Cilindro", "Ambos"]:
+                    st.markdown("**Preço Cilindro por Modelo:**")
+                    col_cp1, col_cp2, col_cp3 = st.columns(3)
+                    with col_cp1: p13_val = st.text_input("Preço P13 (R$):", key=f"p13_v_{rcc}")
+                    with col_cp2: p20_val = st.text_input("Preço P20 (R$):", key=f"p20_v_{rcc}")
+                    with col_cp3: p45_val = st.text_input("Preço P45 (R$):", key=f"p45_v_{rcc}")
+
+                    st.markdown("**Consumo previsto (Cilindro) mensal:**")
+                    tab_c1, tab_c2 = st.tabs(["Preenchimento por Quantidade de Cilindros", "Preenchimento Direto em KGs"])
+                    with tab_c1:
+                        col_cc1, col_cc2, col_cc3 = st.columns(3)
+                        with col_cc1: p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1, key=f"p13_q_{rcc}")
+                        with col_cc2: p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1, key=f"p20_q_{rcc}")
+                        with col_cc3: p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1, key=f"p45_q_{rcc}")
+                        
+                        consumo_cilindro_total_calc = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
+                        if consumo_cilindro_total_calc > 0:
+                            st.info(f"💡 Consumo Calculado em KGs: **{consumo_cilindro_total_calc} kgs** (P13={p13_qtd}*13 + P20={p20_qtd}*20 + P45={p45_qtd}*45)")
+
+                    with tab_c2:
+                        consumo_cilindro_input_kg = st.text_input("Qual consumo previsto (Cilindro) mensal em kgs:", placeholder="Ex: 130 kgs", key=f"cons_cil_kg_{rcc}")
+
+                col_cc_out1, col_cc_out2 = st.columns(2)
+                with col_cc_out1:
+                    cond_pagamento = st.text_input("Condição de pagamento:", key=f"cond_pag_{rcc}")
+                with col_cc_out2:
+                    vigencia = st.text_input("Vigência:", key=f"vigencia_{rcc}")
 
                 st.divider()
-                st.subheader("6. Financeiro")
+
+                # [BLOCO 05] Financeiro
+                st.subheader("[BLOCO 05] Financeiro")
                 col_fin1, col_fin2 = st.columns(2)
                 with col_fin1:
-                    possui_debito_fin = st.radio("Cliente possui débitos?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
-                    resp_pendentes = "n/a"
+                    possui_debito_fin = st.radio("Possui NF's Pendentes?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
+                    resp_pendentes = ""
                     if possui_debito_fin == "Sim":
-                        resp_pendentes = st.text_input("Responsável pelas NF's pendentes?", key=f"resp_pend_{rcc}")
+                        resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", key=f"resp_pend_{rcc}")
 
-                responsaveis_dados = []
+                with col_fin2:
+                    tipo_fluxo = st.radio("Objetivo da solicitação:", ["Gerar Minuta", "Enviar para Assinatura"], horizontal=True, index=None, key=f"fluxo_c_{rcc}")
+
+                email_novo_prop = ""
                 nome_testemunha, email_testemunha = "", ""
+                responsaveis_dados = []
 
-                if tipo_fluxo == "Enviar para Assinatura":
+                if tipo_fluxo == "Gerar Minuta":
                     st.markdown("---")
-                    st.subheader("Dados de Assinatura e Testemunhas")
-                    col_t1, col_t2 = st.columns(2)
-                    with col_t1: nome_testemunha = st.text_input("Nome da Testemunha", key=f"nome_test_{rcc}")
-                    with col_t2: email_testemunha = st.text_input("E-mail da Testemunha", key=f"email_test_{rcc}")
+                    st.markdown("**Dados para Minuta:**")
+                    email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato:", key=f"email_novo_{rcc}")
 
-                    qtd_responsaveis = st.selectbox("Quantidade de Responsáveis", [1, 2, 3, 4], index=0, key=f"qtd_resp_{rcc}")
+                elif tipo_fluxo == "Enviar para Assinatura":
+                    st.markdown("---")
+                    st.markdown("**Dados para Assinatura:**")
+                    col_t1, col_t2 = st.columns(2)
+                    with col_t1: nome_testemunha = st.text_input("Nome da Testemunha:", key=f"nome_test_{rcc}")
+                    with col_t2: email_testemunha = st.text_input("E-mail da Testemunha:", key=f"email_test_{rcc}")
+
+                    qtd_responsaveis = st.selectbox("Quantidade de Responsáveis pela Assinatura:", [1, 2, 3, 4], index=0, key=f"qtd_resp_{rcc}")
                     for i in range(1, qtd_responsaveis + 1):
                         col_r1, col_r2 = st.columns(2)
-                        with col_r1: n_r = st.text_input(f"Nome Responsável {i}", key=f"nome_resp_{i}_{rcc}")
-                        with col_r2: e_r = st.text_input(f"E-mail Responsável {i}", key=f"email_resp_{i}_{rcc}")
+                        with col_r1: n_r = st.text_input(f"Nome do Responsável pela assinatura {i:02d}:", key=f"nome_resp_{i}_{rcc}")
+                        with col_r2: e_r = st.text_input(f"E-mail do Responsável pela assinatura {i:02d}:", key=f"email_resp_{i}_{rcc}")
                         responsaveis_dados.append({"nome": n_r, "email": e_r})
 
                 st.divider()
-                st.subheader("7. Condomínio CONTA SIM")
-                conta_sim = st.radio("Condomínio CONTA SIM?", ["Sim", "Não"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
+
+                # [BLOCO 06] Condomínio
+                st.subheader("[BLOCO 06] Condomínio")
+                conta_sim = st.radio("Condomínio:", ["Não", "Coletivo", "CONTA.SIM"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
                 num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
 
-                if conta_sim == "Sim":
+                if conta_sim == "CONTA.SIM":
                     col_cs1, col_cs2, col_cs3 = st.columns(3)
                     with col_cs1:
-                        num_unidades = st.text_input("N° Unidades Autônomas", key=f"num_unid_{rcc}")
-                        qtd_torres = st.text_input("Qtd Torres", key=f"qtd_torres_{rcc}")
+                        num_unidades = st.text_input("N° Unid autônomas (Aptos + áreas comuns/zeladoria):", key=f"num_unid_{rcc}")
+                        qtd_torres = st.text_input("Qtd Torres:", key=f"qtd_torres_{rcc}")
                     with col_cs2:
-                        qtd_blocos = st.text_input("Qtd Blocos", key=f"qtd_blocos_{rcc}")
-                        preco_religue = st.text_input("Preço de Religue", key=f"preco_rel_{rcc}")
+                        qtd_blocos = st.text_input("Qtd Blocos:", key=f"qtd_blocos_{rcc}")
+                        preco_religue = st.text_input("Valor preço de religue: R$", key=f"preco_rel_{rcc}")
                     with col_cs3:
-                        preco_servico = st.text_input("Preço de Serviço", key=f"preco_serv_{rcc}")
+                        preco_servico = st.text_input("Valor preço de serviço: R$", key=f"preco_serv_{rcc}")
 
-                observacoes_contrato = st.text_area("Observações Gerais", key=f"obs_c_{rcc}")
                 st.divider()
 
                 if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
-                    sel_granel = "[x]" if tipo_fornecimento == "Granel" else "[ ]"
-                    sel_cilindro = "[x]" if tipo_fornecimento == "Cilindro" else "[ ]"
+                    lines_out = []
 
-                    texto_padrao_contrato = f"Motivo da solicitação: {motivo_solicitacao}"
+                    # Orientações finais (Minuta)
                     if tipo_fluxo == "Gerar Minuta":
-                        texto_padrao_contrato += "\n\n** FAVOR GERAR MINUTA EM PDF PARA ENVIO AO CLIENTE **"
+                        lines_out.append("**FAVOR GERAR MINUTA PARA ENVIO AO CLIENTE**\n")
 
-                    texto_padrao_contrato += f"\nContato: {contato_contrato} Telefone: {telefone_contrato} E-mail: {email_contrato}\nContrato / Aditamento / Distrato: {tipo_contrato or ''}\nMesmo proprietário?: {mesmo_prop_opt or ''}\nE-mail do novo proprietário: {email_novo_prop}\nMesmo CNPJ?: {mesmo_cnpj_opt or ''}"
+                    # BLOCO 01
+                    if motivo_solicitacao.strip():
+                        lines_out.append("[BLOCO 01] Motivo da Elaboração / Regularização")
+                        lines_out.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}\n")
 
-                    if mesmo_cnpj_opt == "Sim":
-                        texto_padrao_contrato += f"\nCNPJ: {cnpj_campo_val} I.E.: {ie_campo_val}"
-                    elif mesmo_cnpj_opt == "Não":
-                        texto_padrao_contrato += f"\nNovo CNPJ: {cnpj_campo_val} Nova I.E.: {ie_campo_val}"
-
-                    if razao_social_txt: texto_padrao_contrato += f"\nRazão Social (Consultada): {razao_social_txt}"
-                    if status_cnpj_txt: texto_padrao_contrato += f"\nStatus CNPJ: {status_cnpj_txt}"
-
-                    texto_padrao_contrato += f"\nEndereço padrão ou entrega?: {endereco_padrao}\nTipo de Fornecimento: {sel_granel} Granel  {sel_cilindro} Cilindro"
-
-                    if tipo_fornecimento == "Granel":
-                        texto_padrao_contrato += f"\nPreço Granel: {preco_granel} /kg\nConsumo mensal previsto: {consumo_granel}"
-                    elif tipo_fornecimento == "Cilindro":
-                        partes_cil = []
-                        if p13_val.strip(): partes_cil.append(f"[P13 = {p13_val.strip()} / und]")
-                        if p20_val.strip(): partes_cil.append(f"[P20 = {p20_val.strip()} / und]")
-                        if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()} / und]")
-                        texto_padrao_contrato += f"\nPreço Cilindro: {' '.join(partes_cil)}\nConsumo mensal previsto: {consumo_cilindro_total} KGs"
-
-                    texto_padrao_contrato += f"\nCondição de pagamento: {cond_pagamento}\nVigência: {vigencia}"
-
-                    if qtd_entregas_c == 1:
-                        texto_padrao_contrato += f"\nEquipamentos: {equipamentos_contrato}"
+                    # BLOCO 02
+                    b2_lines = []
+                    if tipo_contrato:
+                        b2_lines.append(f"Contrato / Aditamento / Distrato: {tipo_contrato}")
+                    if requisicao_opt:
+                        b2_lines.append(f"Requisição: {requisicao_opt}")
+                    if mesmo_prop_opt:
+                        b2_lines.append(f"Mesmo proprietário?: {mesmo_prop_opt}")
+                        if mesmo_prop_opt == "Sim":
+                            if cnpj_campo_val.strip(): b2_lines.append(f"Novo CNPJ: {cnpj_campo_val.strip()}")
+                            if ie_campo_val.strip(): b2_lines.append(f"Nova I.E.: {ie_campo_val.strip()}")
+                        elif mesmo_prop_opt == "Não":
+                            if cnpj_campo_val.strip(): b2_lines.append(f"CNPJ: {cnpj_campo_val.strip()}")
+                            if ie_campo_val.strip(): b2_lines.append(f"I.E.: {ie_campo_val.strip()}")
                     else:
-                        eq_linhas = [f"[Entrega {i}] {eq_dict_c[i].strip()}" for i in range(1, int(qtd_entregas_c) + 1) if eq_dict_c[i].strip()]
-                        texto_padrao_contrato += "\nEquipamentos:\n" + "\n".join(eq_linhas)
+                        if cnpj_campo_val.strip(): b2_lines.append(f"CNPJ: {cnpj_campo_val.strip()}")
+                        if ie_campo_val.strip(): b2_lines.append(f"I.E.: {ie_campo_val.strip()}")
 
-                    texto_padrao_contrato += f"\nCliente possui débitos?: {possui_debito_fin or ''}\nResponsável pelas NF's pendentes: {resp_pendentes}"
+                    if razao_social_txt:
+                        b2_lines.append(f"Razão Social (Consultada): {razao_social_txt}")
+                    if status_cnpj_txt:
+                        b2_lines.append(f"Status CNPJ: {status_cnpj_txt}")
 
-                    if tipo_fluxo == "Enviar para Assinatura":
-                        texto_padrao_contrato += f"\nNome da Testemunha: {nome_testemunha}\nE-mail da Testemunha: {email_testemunha}"
+                    if b2_lines:
+                        lines_out.append("[BLOCO 02] Dados do Contrato")
+                        lines_out.extend(b2_lines)
+                        lines_out.append("")
+
+                    # BLOCO 03
+                    b3_lines = []
+                    if endereco_padrao.strip():
+                        b3_lines.append(f"Endereço padrão ou entrega?: {endereco_padrao.strip()}")
+                    b3_lines.append(f"Quantidade de centrais / endereços: {qtd_entregas_c}")
+                    
+                    eq_filled = []
+                    for i in range(1, int(qtd_entregas_c) + 1):
+                        val_eq = eq_dict_c.get(i, "").strip()
+                        if val_eq:
+                            if qtd_entregas_c == 1:
+                                eq_filled.append(f"Equipamentos: {val_eq}")
+                            else:
+                                eq_filled.append(f"Equipamentos Central {i:02d}: {val_eq}")
+
+                    if eq_filled:
+                        b3_lines.extend(eq_filled)
+
+                    if b3_lines:
+                        lines_out.append("[BLOCO 03] Endereço / Equipamentos")
+                        lines_out.extend(b3_lines)
+                        lines_out.append("")
+
+                    # BLOCO 04
+                    b4_lines = []
+                    if tipo_fornecimento:
+                        b4_lines.append(f"Tipo de Fornecimento: {tipo_fornecimento}")
+
+                    if tipo_fornecimento in ["Granel", "Ambos"]:
+                        if preco_granel.strip():
+                            b4_lines.append(f"Preço Granel: {preco_granel.strip()}")
+                        if consumo_granel_input.strip():
+                            val_g_fmt = consumo_granel_input.strip()
+                            if not re.search(r'(?i)\bkgs?\b', val_g_fmt):
+                                val_g_fmt += " kgs"
+                            b4_lines.append(f"Consumo previsto (Granel) mensal: {val_g_fmt}")
+
+                    if tipo_fornecimento in ["Cilindro", "Ambos"]:
+                        partes_cil = []
+                        if p13_val.strip(): partes_cil.append(f"[P13 = {p13_val.strip()}]")
+                        if p20_val.strip(): partes_cil.append(f"[P20 = {p20_val.strip()}]")
+                        if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()}]")
+                        if partes_cil:
+                            b4_lines.append(f"Preço Cilindro: {' '.join(partes_cil)}")
+
+                        # Cilindro consumption
+                        if consumo_cilindro_input_kg.strip():
+                            val_c_fmt = consumo_cilindro_input_kg.strip()
+                            if not re.search(r'(?i)\bkgs?\b', val_c_fmt):
+                                val_c_fmt += " kgs"
+                            b4_lines.append(f"Qual consumo previsto (Cilindro) mensal: {val_c_fmt}")
+                        elif consumo_cilindro_total_calc > 0:
+                            b4_lines.append(f"Qual consumo previsto (Cilindro) mensal: {consumo_cilindro_total_calc} kgs")
+
+                    if cond_pagamento.strip():
+                        b4_lines.append(f"Condição de pagamento: {cond_pagamento.strip()}")
+                    if vigencia.strip():
+                        b4_lines.append(f"Vigência: {vigencia.strip()}")
+
+                    if b4_lines:
+                        lines_out.append("[BLOCO 04] Condições Comerciais")
+                        lines_out.extend(b4_lines)
+                        lines_out.append("")
+
+                    # BLOCO 05
+                    b5_lines = []
+                    if possui_debito_fin:
+                        b5_lines.append(f"Possui NF's Pendentes: {possui_debito_fin}")
+                        if possui_debito_fin == "Sim" and resp_pendentes.strip():
+                            b5_lines.append(f"Quem será o responsável pelas NF's pendentes?: {resp_pendentes.strip()}")
+
+                    if tipo_fluxo == "Gerar Minuta":
+                        if email_novo_prop.strip():
+                            b5_lines.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop.strip()}")
+                    elif tipo_fluxo == "Enviar para Assinatura":
+                        if nome_testemunha.strip():
+                            b5_lines.append(f"Nome da Testemunha: {nome_testemunha.strip()}")
+                        if email_testemunha.strip():
+                            b5_lines.append(f"E-mail da Testemunha: {email_testemunha.strip()}")
+
                         for idx, resp in enumerate(responsaveis_dados, 1):
-                            texto_padrao_contrato += f"\nNome do Responsável {idx}: {resp['nome']}\nE-mail do Responsável {idx}: {resp['email']}"
+                            if resp["nome"].strip():
+                                if len(responsaveis_dados) == 1:
+                                    b5_lines.append(f"Nome do Responsável pela assinatura: {resp['nome'].strip()}")
+                                else:
+                                    b5_lines.append(f"Nome do Responsável pela assinatura {idx:02d}: {resp['nome'].strip()}")
+                            if resp["email"].strip():
+                                if len(responsaveis_dados) == 1:
+                                    b5_lines.append(f"E-mail do Responsável pela assinatura: {resp['email'].strip()}")
+                                else:
+                                    b5_lines.append(f"E-mail do Responsável pela assinatura {idx:02d}: {resp['email'].strip()}")
 
-                    texto_padrao_contrato += f"\nCondomínio CONTA SIM?: {conta_sim or ''}"
-                    if conta_sim == "Sim":
-                        texto_padrao_contrato += f"\nN° Unid autônomas: {num_unidades}\nQtd Torres: {qtd_torres}\nQtd Blocos: {qtd_blocos}\nPreço Religue: {preco_religue}\nPreço Serviço: {preco_servico}"
+                    if b5_lines:
+                        lines_out.append("[BLOCO 05] Financeiro")
+                        lines_out.extend(b5_lines)
+                        lines_out.append("")
 
-                    texto_padrao_contrato += f"\nObs.: {observacoes_contrato}"
+                    # BLOCO 06
+                    b6_lines = []
+                    if conta_sim:
+                        b6_lines.append(f"Condomínio: {conta_sim}")
+                        if conta_sim == "CONTA.SIM":
+                            if num_unidades.strip(): b6_lines.append(f"N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades.strip()}")
+                            if qtd_torres.strip(): b6_lines.append(f"Qtd Torres: {qtd_torres.strip()}")
+                            if qtd_blocos.strip(): b6_lines.append(f"Qtd Blocos: {qtd_blocos.strip()}")
+                            if preco_religue.strip(): b6_lines.append(f"Valor preço de religue: R$ {preco_religue.strip()}")
+                            if preco_servico.strip(): b6_lines.append(f"Valor preço de serviço: R$ {preco_servico.strip()}")
 
-                    st.success("✅ Texto gerado com sucesso!")
-                    st.text_area("Texto Gerado:", value=texto_padrao_contrato, height=300, key=f"txt_area_contrato_{rcc}")
+                    if b6_lines:
+                        lines_out.append("[BLOCO 06] Condomínio")
+                        lines_out.extend(b6_lines)
+
+                    texto_padrao_contrato = "\n".join(lines_out).strip()
+
+                    st.success("✅ Texto padrão gerado com sucesso!")
+                    st.text_area("Texto Gerado:", value=texto_padrao_contrato, height=350, key=f"txt_area_contrato_{rcc}")
                     botao_copiar_customizado(texto_padrao_contrato, "contrato_txt")
 
             # -------------------------------------------------------------
