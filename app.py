@@ -962,13 +962,13 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # [BLOCO 01] Motivo da Elaboração / Regularização
+                # Motivo da Elaboração / Regularização
                 st.subheader("[BLOCO 01] Motivo da Elaboração / Regularização")
                 motivo_solicitacao = st.text_area("Descreva claramente o motivo da regularização do contrato:", key=f"motivo_{rcc}")
 
                 st.divider()
 
-                # [BLOCO 02] Dados do Contrato
+                # Dados do Contrato
                 st.subheader("[BLOCO 02] Dados do Contrato")
                 col_b2_1, col_b2_2 = st.columns(2)
                 
@@ -1006,7 +1006,7 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # [BLOCO 03] Endereço / Equipamentos
+                # Endereço / Equipamentos
                 st.subheader("[BLOCO 03] Endereço / Equipamentos")
                 col_b3_1, col_b3_2 = st.columns(2)
                 with col_b3_1:
@@ -1027,7 +1027,7 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # [BLOCO 04] Condições Comerciais
+                # Condições Comerciais
                 st.subheader("[BLOCO 04] Condições Comerciais")
                 tipo_fornecimento = st.radio("Tipo de Fornecimento:", ["Granel", "Cilindro", "Ambos"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
                 
@@ -1075,7 +1075,7 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # [BLOCO 05] Financeiro
+                # Financeiro
                 st.subheader("[BLOCO 05] Financeiro")
                 col_fin1, col_fin2 = st.columns(2)
                 with col_fin1:
@@ -1112,7 +1112,7 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # [BLOCO 06] Condomínio
+                # Condomínio
                 st.subheader("[BLOCO 06] Condomínio")
                 conta_sim = st.radio("Condomínio:", ["Não", "Coletivo", "CONTA.SIM"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
                 num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
