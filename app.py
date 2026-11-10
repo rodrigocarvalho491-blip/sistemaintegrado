@@ -1138,37 +1138,55 @@ Obs.: {observacoes}"""
                     if tipo_fluxo == "Gerar Minuta":
                         lines_out.append("**FAVOR GERAR MINUTA PARA ENVIO AO CLIENTE**\n")
 
-                    lines_out.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}\n")
+                    if motivo_solicitacao and motivo_solicitacao.strip():
+                        lines_out.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}\n")
 
-                    lines_out.append(f"Contrato / Aditamento / Distrato: {tipo_contrato if tipo_contrato else ''}")
-                    lines_out.append(f"Requisição ( ) Permanente ( )Provisório: {requisicao_opt if requisicao_opt else ''}")
-                    lines_out.append(f"Mesmo proprietário?(sim/não): {mesmo_prop_opt if mesmo_prop_opt else ''}")
-                    lines_out.append(f"Novo CNPJ: {cnpj_campo_val.strip()}")
-                    lines_out.append(f"Nova I.E.: {ie_campo_val.strip()}")
-                    lines_out.append(f"Endereço padrão ou entrega?: {endereco_padrao.strip()}")
+                    if tipo_contrato:
+                        lines_out.append(f"Contrato / Aditamento / Distrato: {tipo_contrato}")
+                    if requisicao_opt:
+                        lines_out.append(f"Requisição: {requisicao_opt}")
+                    if mesmo_prop_opt:
+                        lines_out.append(f"Mesmo proprietário?(sim/não): {mesmo_prop_opt}")
+                    if cnpj_campo_val and cnpj_campo_val.strip():
+                        label_cnpj = "Novo CNPJ" if mesmo_prop_opt == "Sim" else "CNPJ"
+                        lines_out.append(f"{label_cnpj}: {cnpj_campo_val.strip()}")
+                    if ie_campo_val and ie_campo_val.strip():
+                        label_ie = "Nova I.E." if mesmo_prop_opt == "Sim" else "I.E."
+                        lines_out.append(f"{label_ie}: {ie_campo_val.strip()}")
+                    if endereco_padrao and endereco_padrao.strip():
+                        lines_out.append(f"Endereço padrão ou entrega?: {endereco_padrao.strip()}")
                     
-                    preco_g_out = preco_granel.strip() if tipo_fornecimento in ["Granel", "Ambos"] else ""
-                    lines_out.append(f"Preço Granel: {preco_g_out}")
+                    if tipo_fornecimento in ["Granel", "Ambos"] and preco_granel and preco_granel.strip():
+                        lines_out.append(f"Preço Granel: {preco_granel.strip()}")
 
                     partes_cil = []
                     if tipo_fornecimento in ["Cilindro", "Ambos"]:
                         if p13_val.strip(): partes_cil.append(f"[P13 = {p13_val.strip()}]")
                         if p20_val.strip(): partes_cil.append(f"[P20 = {p20_val.strip()}]")
                         if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()}]")
-                    lines_out.append(f"Preço Cilindro: {' '.join(partes_cil)}")
+                    if partes_cil:
+                        lines_out.append(f"Preço Cilindro: {' '.join(partes_cil)}")
                     
-                    lines_out.append(f"Condição de pagamento: {cond_pagamento.strip()}")
+                    if cond_pagamento and cond_pagamento.strip():
+                        lines_out.append(f"Condição de pagamento: {cond_pagamento.strip()}")
                     
-                    val_g_fmt = consumo_granel_input.strip() if tipo_fornecimento in ["Granel", "Ambos"] else ""
-                    if val_g_fmt and not re.search(r'(?i)\bkgs?\b', val_g_fmt): val_g_fmt += " kgs"
-                    lines_out.append(f"Consumo previsto (Granel) mensal: {val_g_fmt}")
+                    if tipo_fornecimento in ["Granel", "Ambos"] and consumo_granel_input and consumo_granel_input.strip():
+                        val_g_fmt = consumo_granel_input.strip()
+                        if not re.search(r'(?i)\bkgs?\b', val_g_fmt): val_g_fmt += " kgs"
+                        lines_out.append(f"Consumo previsto (Granel) mensal: {val_g_fmt}")
                     
-                    val_c_fmt = consumo_cilindro_input_kg.strip() if tipo_fornecimento in ["Cilindro", "Ambos"] else ""
-                    if val_c_fmt and not re.search(r'(?i)\bkgs?\b', val_c_fmt): val_c_fmt += " kgs"
-                    elif consumo_cilindro_total_calc > 0 and tipo_fornecimento in ["Cilindro", "Ambos"]: val_c_fmt = f"{consumo_cilindro_total_calc} kgs"
-                    lines_out.append(f"Qual consumo previsto (Cilindro) mensal: {val_c_fmt}")
+                    val_c_fmt = ""
+                    if tipo_fornecimento in ["Cilindro", "Ambos"]:
+                        if consumo_cilindro_input_kg and consumo_cilindro_input_kg.strip():
+                            val_c_fmt = consumo_cilindro_input_kg.strip()
+                            if not re.search(r'(?i)\bkgs?\b', val_c_fmt): val_c_fmt += " kgs"
+                        elif consumo_cilindro_total_calc > 0:
+                            val_c_fmt = f"{consumo_cilindro_total_calc} kgs"
+                    if val_c_fmt:
+                        lines_out.append(f"Qual consumo previsto (Cilindro) mensal: {val_c_fmt}")
                     
-                    lines_out.append(f"Vigência: {vigencia.strip()}")
+                    if vigencia and vigencia.strip():
+                        lines_out.append(f"Vigência: {vigencia.strip()}")
                     
                     eq_filled = []
                     for i in range(1, int(qtd_entregas_c) + 1):
@@ -1176,35 +1194,46 @@ Obs.: {observacoes}"""
                         if val_eq:
                             if qtd_entregas_c == 1: eq_filled.append(val_eq)
                             else: eq_filled.append(f"[Entrega {i:02d}] {val_eq}")
-                    lines_out.append(f"Equipamentos: {' '.join(eq_filled)}")
+                    if eq_filled:
+                        lines_out.append(f"Equipamentos: {' '.join(eq_filled)}")
                     
-                    resp_p = resp_pendentes.strip() if possui_debito_fin == "Sim" else "N/A"
-                    lines_out.append(f"Quem será o responsável pelas NF's pendentes? {resp_p}")
+                    if possui_debito_fin == "Sim" and resp_pendentes and resp_pendentes.strip():
+                        lines_out.append(f"Quem será o responsável pelas NF's pendentes? {resp_pendentes.strip()}")
+                    elif possui_debito_fin == "Não":
+                        lines_out.append("Quem será o responsável pelas NF's pendentes? N/A")
                     
-                    email_np = email_novo_prop.strip() if tipo_fluxo == "Gerar Minuta" else ""
-                    lines_out.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_np}")
+                    if tipo_fluxo == "Gerar Minuta" and email_novo_prop and email_novo_prop.strip():
+                        lines_out.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop.strip()}")
                     
-                    n_testemunha = nome_testemunha.strip() if tipo_fluxo == "Enviar para Assinatura" else ""
-                    e_testemunha = email_testemunha.strip() if tipo_fluxo == "Enviar para Assinatura" else ""
-                    lines_out.append(f"Nome da Testemunha: {n_testemunha}")
-                    lines_out.append(f"E-mail da Testemunha: {e_testemunha}")
+                    if tipo_fluxo == "Enviar para Assinatura":
+                        if nome_testemunha and nome_testemunha.strip():
+                            lines_out.append(f"Nome da Testemunha: {nome_testemunha.strip()}")
+                        if email_testemunha and email_testemunha.strip():
+                            lines_out.append(f"E-mail da Testemunha: {email_testemunha.strip()}")
+                        
+                        if responsaveis_dados:
+                            for idx, resp in enumerate(responsaveis_dados, 1):
+                                if resp['nome'].strip() or resp['email'].strip():
+                                    sfx = f" {idx:02d}" if len(responsaveis_dados) > 1 else ""
+                                    if resp['nome'].strip():
+                                        lines_out.append(f"Nome do Responsável pela assinatura{sfx}: {resp['nome'].strip()}")
+                                    if resp['email'].strip():
+                                        lines_out.append(f"E-mail do Responsável pela assinatura{sfx}: {resp['email'].strip()}")
                     
-                    if tipo_fluxo == "Enviar para Assinatura" and responsaveis_dados:
-                        for idx, resp in enumerate(responsaveis_dados, 1):
-                            sfx = f" {idx:02d}" if len(responsaveis_dados) > 1 else ""
-                            lines_out.append(f"Nome do Responsável pela assinatura{sfx}: {resp['nome'].strip()}")
-                            lines_out.append(f"E-mail do Responsável pela assinatura{sfx}: {resp['email'].strip()}")
-                    else:
-                        lines_out.append(f"Nome do Responsável pela assinatura: ")
-                        lines_out.append(f"E-mail do Responsável pela assinatura: ")
-                    
-                    lines_out.append("")
-                    lines_out.append(f"Condomínio CONTA SIM?: {conta_sim if conta_sim else ''}")
-                    lines_out.append(f"N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades.strip() if conta_sim == 'CONTA.SIM' else ''}")
-                    lines_out.append(f"Qtd Torres: {qtd_torres.strip() if conta_sim == 'CONTA.SIM' else ''}")
-                    lines_out.append(f"Qtd Blocos: {qtd_blocos.strip() if conta_sim == 'CONTA.SIM' else ''}")
-                    lines_out.append(f"Valor preço de religue: R$ {preco_religue.strip() if conta_sim == 'CONTA.SIM' else ''}")
-                    lines_out.append(f"Valor preço de serviço: R$ {preco_servico.strip() if conta_sim == 'CONTA.SIM' else ''}")
+                    if conta_sim and conta_sim != "Não":
+                        lines_out.append("")
+                        lines_out.append(f"Condomínio CONTA SIM?: {conta_sim}")
+                        if conta_sim == "CONTA.SIM":
+                            if num_unidades and num_unidades.strip():
+                                lines_out.append(f"N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades.strip()}")
+                            if qtd_torres and qtd_torres.strip():
+                                lines_out.append(f"Qtd Torres: {qtd_torres.strip()}")
+                            if qtd_blocos and qtd_blocos.strip():
+                                lines_out.append(f"Qtd Blocos: {qtd_blocos.strip()}")
+                            if preco_religue and preco_religue.strip():
+                                lines_out.append(f"Valor preço de religue: R$ {preco_religue.strip()}")
+                            if preco_servico and preco_servico.strip():
+                                lines_out.append(f"Valor preço de serviço: R$ {preco_servico.strip()}")
 
                     texto_padrao_contrato = "\n".join(lines_out).strip()
 
