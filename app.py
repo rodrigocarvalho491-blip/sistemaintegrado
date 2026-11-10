@@ -3,6 +3,7 @@ import re
 import uuid
 import base64
 import html as html_lib
+import json
 import pandas as pd
 import numpy as np
 import requests
@@ -368,8 +369,9 @@ div.stButton > button:hover {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# --- BOTÃO DE COPIAR REESTRUTURADO PARA PROTEGER AS QUEBRAS DE LINHAS ---
 def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Copiar Texto Completo"):
-    texto_seguro = str(texto_para_copiar).replace('`', '\\`').replace('$', '\\$').replace('\n', '\\n').replace('"', '\\"')
+    texto_js = json.dumps(str(texto_para_copiar))
     component_html = f"""
     <div style="margin-top: 5px; margin-bottom: 10px;">
         <button id="btn_{chave_unica}" onclick="copiarTexto_{chave_unica}()" style="
@@ -381,12 +383,12 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Cop
     </div>
     <script>
     function copiarTexto_{chave_unica}() {{
-        const texto = `{texto_seguro}`;
+        const texto = {texto_js};
         navigator.clipboard.writeText(texto).then(function() {{
             const msg = document.getElementById("msg_{chave_unica}");
             msg.style.display = "inline";
             setTimeout(function() {{ msg.style.display = "none"; }}, 2500);
-        }});
+        }}).catch(err => console.error('Erro ao copiar', err));
     }}
     </script>
     """
@@ -1133,159 +1135,81 @@ Obs.: {observacoes}"""
                 if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
                     lines_out = []
 
-                    # Orientações finais (Minuta)
                     if tipo_fluxo == "Gerar Minuta":
                         lines_out.append("**FAVOR GERAR MINUTA PARA ENVIO AO CLIENTE**\n")
 
-                    # BLOCO 01
-                    if motivo_solicitacao.strip():
-                        lines_out.append("[BLOCO 01] Motivo da Elaboração / Regularização")
-                        lines_out.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}\n")
+                    lines_out.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}\n")
 
-                    # BLOCO 02
-                    b2_lines = []
-                    if tipo_contrato:
-                        b2_lines.append(f"Contrato / Aditamento / Distrato: {tipo_contrato}")
-                    if requisicao_opt:
-                        b2_lines.append(f"Requisição: {requisicao_opt}")
-                    if mesmo_prop_opt:
-                        b2_lines.append(f"Mesmo proprietário?: {mesmo_prop_opt}")
-                        if mesmo_prop_opt == "Sim":
-                            if cnpj_campo_val.strip(): b2_lines.append(f"Novo CNPJ: {cnpj_campo_val.strip()}")
-                            if ie_campo_val.strip(): b2_lines.append(f"Nova I.E.: {ie_campo_val.strip()}")
-                        elif mesmo_prop_opt == "Não":
-                            if cnpj_campo_val.strip(): b2_lines.append(f"CNPJ: {cnpj_campo_val.strip()}")
-                            if ie_campo_val.strip(): b2_lines.append(f"I.E.: {ie_campo_val.strip()}")
-                    else:
-                        if cnpj_campo_val.strip(): b2_lines.append(f"CNPJ: {cnpj_campo_val.strip()}")
-                        if ie_campo_val.strip(): b2_lines.append(f"I.E.: {ie_campo_val.strip()}")
+                    lines_out.append(f"Contrato / Aditamento / Distrato: {tipo_contrato if tipo_contrato else ''}")
+                    lines_out.append(f"Requisição ( ) Permanente ( )Provisório: {requisicao_opt if requisicao_opt else ''}")
+                    lines_out.append(f"Mesmo proprietário?(sim/não): {mesmo_prop_opt if mesmo_prop_opt else ''}")
+                    lines_out.append(f"Novo CNPJ: {cnpj_campo_val.strip()}")
+                    lines_out.append(f"Nova I.E.: {ie_campo_val.strip()}")
+                    lines_out.append(f"Endereço padrão ou entrega?: {endereco_padrao.strip()}")
+                    
+                    preco_g_out = preco_granel.strip() if tipo_fornecimento in ["Granel", "Ambos"] else ""
+                    lines_out.append(f"Preço Granel: {preco_g_out}")
 
-                    if razao_social_txt:
-                        b2_lines.append(f"Razão Social (Consultada): {razao_social_txt}")
-                    if status_cnpj_txt:
-                        b2_lines.append(f"Status CNPJ: {status_cnpj_txt}")
-
-                    if b2_lines:
-                        lines_out.append("[BLOCO 02] Dados do Contrato")
-                        lines_out.extend(b2_lines)
-                        lines_out.append("")
-
-                    # BLOCO 03
-                    b3_lines = []
-                    if endereco_padrao.strip():
-                        b3_lines.append(f"Endereço padrão ou entrega?: {endereco_padrao.strip()}")
-                    b3_lines.append(f"Quantidade de centrais / endereços: {qtd_entregas_c}")
+                    partes_cil = []
+                    if tipo_fornecimento in ["Cilindro", "Ambos"]:
+                        if p13_val.strip(): partes_cil.append(f"[P13 = {p13_val.strip()}]")
+                        if p20_val.strip(): partes_cil.append(f"[P20 = {p20_val.strip()}]")
+                        if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()}]")
+                    lines_out.append(f"Preço Cilindro: {' '.join(partes_cil)}")
+                    
+                    lines_out.append(f"Condição de pagamento: {cond_pagamento.strip()}")
+                    
+                    val_g_fmt = consumo_granel_input.strip() if tipo_fornecimento in ["Granel", "Ambos"] else ""
+                    if val_g_fmt and not re.search(r'(?i)\bkgs?\b', val_g_fmt): val_g_fmt += " kgs"
+                    lines_out.append(f"Consumo previsto (Granel) mensal: {val_g_fmt}")
+                    
+                    val_c_fmt = consumo_cilindro_input_kg.strip() if tipo_fornecimento in ["Cilindro", "Ambos"] else ""
+                    if val_c_fmt and not re.search(r'(?i)\bkgs?\b', val_c_fmt): val_c_fmt += " kgs"
+                    elif consumo_cilindro_total_calc > 0 and tipo_fornecimento in ["Cilindro", "Ambos"]: val_c_fmt = f"{consumo_cilindro_total_calc} kgs"
+                    lines_out.append(f"Qual consumo previsto (Cilindro) mensal: {val_c_fmt}")
+                    
+                    lines_out.append(f"Vigência: {vigencia.strip()}")
                     
                     eq_filled = []
                     for i in range(1, int(qtd_entregas_c) + 1):
                         val_eq = eq_dict_c.get(i, "").strip()
                         if val_eq:
-                            if qtd_entregas_c == 1:
-                                eq_filled.append(f"Equipamentos: {val_eq}")
-                            else:
-                                eq_filled.append(f"Equipamentos Central {i:02d}: {val_eq}")
-
-                    if eq_filled:
-                        b3_lines.extend(eq_filled)
-
-                    if b3_lines:
-                        lines_out.append("[BLOCO 03] Endereço / Equipamentos")
-                        lines_out.extend(b3_lines)
-                        lines_out.append("")
-
-                    # BLOCO 04
-                    b4_lines = []
-                    if tipo_fornecimento:
-                        b4_lines.append(f"Tipo de Fornecimento: {tipo_fornecimento}")
-
-                    if tipo_fornecimento in ["Granel", "Ambos"]:
-                        if preco_granel.strip():
-                            b4_lines.append(f"Preço Granel: {preco_granel.strip()}")
-                        if consumo_granel_input.strip():
-                            val_g_fmt = consumo_granel_input.strip()
-                            if not re.search(r'(?i)\bkgs?\b', val_g_fmt):
-                                val_g_fmt += " kgs"
-                            b4_lines.append(f"Consumo previsto (Granel) mensal: {val_g_fmt}")
-
-                    if tipo_fornecimento in ["Cilindro", "Ambos"]:
-                        partes_cil = []
-                        if p13_val.strip(): partes_cil.append(f"[P13 = {p13_val.strip()}]")
-                        if p20_val.strip(): partes_cil.append(f"[P20 = {p20_val.strip()}]")
-                        if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()}]")
-                        if partes_cil:
-                            b4_lines.append(f"Preço Cilindro: {' '.join(partes_cil)}")
-
-                        # Cilindro consumption
-                        if consumo_cilindro_input_kg.strip():
-                            val_c_fmt = consumo_cilindro_input_kg.strip()
-                            if not re.search(r'(?i)\bkgs?\b', val_c_fmt):
-                                val_c_fmt += " kgs"
-                            b4_lines.append(f"Qual consumo previsto (Cilindro) mensal: {val_c_fmt}")
-                        elif consumo_cilindro_total_calc > 0:
-                            b4_lines.append(f"Qual consumo previsto (Cilindro) mensal: {consumo_cilindro_total_calc} kgs")
-
-                    if cond_pagamento.strip():
-                        b4_lines.append(f"Condição de pagamento: {cond_pagamento.strip()}")
-                    if vigencia.strip():
-                        b4_lines.append(f"Vigência: {vigencia.strip()}")
-
-                    if b4_lines:
-                        lines_out.append("[BLOCO 04] Condições Comerciais")
-                        lines_out.extend(b4_lines)
-                        lines_out.append("")
-
-                    # BLOCO 05
-                    b5_lines = []
-                    if possui_debito_fin:
-                        b5_lines.append(f"Possui NF's Pendentes: {possui_debito_fin}")
-                        if possui_debito_fin == "Sim" and resp_pendentes.strip():
-                            b5_lines.append(f"Quem será o responsável pelas NF's pendentes?: {resp_pendentes.strip()}")
-
-                    if tipo_fluxo == "Gerar Minuta":
-                        if email_novo_prop.strip():
-                            b5_lines.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop.strip()}")
-                    elif tipo_fluxo == "Enviar para Assinatura":
-                        if nome_testemunha.strip():
-                            b5_lines.append(f"Nome da Testemunha: {nome_testemunha.strip()}")
-                        if email_testemunha.strip():
-                            b5_lines.append(f"E-mail da Testemunha: {email_testemunha.strip()}")
-
+                            if qtd_entregas_c == 1: eq_filled.append(val_eq)
+                            else: eq_filled.append(f"[Entrega {i:02d}] {val_eq}")
+                    lines_out.append(f"Equipamentos: {' '.join(eq_filled)}")
+                    
+                    resp_p = resp_pendentes.strip() if possui_debito_fin == "Sim" else "N/A"
+                    lines_out.append(f"Quem será o responsável pelas NF's pendentes? {resp_p}")
+                    
+                    email_np = email_novo_prop.strip() if tipo_fluxo == "Gerar Minuta" else ""
+                    lines_out.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_np}")
+                    
+                    n_testemunha = nome_testemunha.strip() if tipo_fluxo == "Enviar para Assinatura" else ""
+                    e_testemunha = email_testemunha.strip() if tipo_fluxo == "Enviar para Assinatura" else ""
+                    lines_out.append(f"Nome da Testemunha: {n_testemunha}")
+                    lines_out.append(f"E-mail da Testemunha: {e_testemunha}")
+                    
+                    if tipo_fluxo == "Enviar para Assinatura" and responsaveis_dados:
                         for idx, resp in enumerate(responsaveis_dados, 1):
-                            if resp["nome"].strip():
-                                if len(responsaveis_dados) == 1:
-                                    b5_lines.append(f"Nome do Responsável pela assinatura: {resp['nome'].strip()}")
-                                else:
-                                    b5_lines.append(f"Nome do Responsável pela assinatura {idx:02d}: {resp['nome'].strip()}")
-                            if resp["email"].strip():
-                                if len(responsaveis_dados) == 1:
-                                    b5_lines.append(f"E-mail do Responsável pela assinatura: {resp['email'].strip()}")
-                                else:
-                                    b5_lines.append(f"E-mail do Responsável pela assinatura {idx:02d}: {resp['email'].strip()}")
-
-                    if b5_lines:
-                        lines_out.append("[BLOCO 05] Financeiro")
-                        lines_out.extend(b5_lines)
-                        lines_out.append("")
-
-                    # BLOCO 06
-                    b6_lines = []
-                    if conta_sim:
-                        b6_lines.append(f"Condomínio: {conta_sim}")
-                        if conta_sim == "CONTA.SIM":
-                            if num_unidades.strip(): b6_lines.append(f"N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades.strip()}")
-                            if qtd_torres.strip(): b6_lines.append(f"Qtd Torres: {qtd_torres.strip()}")
-                            if qtd_blocos.strip(): b6_lines.append(f"Qtd Blocos: {qtd_blocos.strip()}")
-                            if preco_religue.strip(): b6_lines.append(f"Valor preço de religue: R$ {preco_religue.strip()}")
-                            if preco_servico.strip(): b6_lines.append(f"Valor preço de serviço: R$ {preco_servico.strip()}")
-
-                    if b6_lines:
-                        lines_out.append("[BLOCO 06] Condomínio")
-                        lines_out.extend(b6_lines)
+                            sfx = f" {idx:02d}" if len(responsaveis_dados) > 1 else ""
+                            lines_out.append(f"Nome do Responsável pela assinatura{sfx}: {resp['nome'].strip()}")
+                            lines_out.append(f"E-mail do Responsável pela assinatura{sfx}: {resp['email'].strip()}")
+                    else:
+                        lines_out.append(f"Nome do Responsável pela assinatura: ")
+                        lines_out.append(f"E-mail do Responsável pela assinatura: ")
+                    
+                    lines_out.append("")
+                    lines_out.append(f"Condomínio CONTA SIM?: {conta_sim if conta_sim else ''}")
+                    lines_out.append(f"N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades.strip() if conta_sim == 'CONTA.SIM' else ''}")
+                    lines_out.append(f"Qtd Torres: {qtd_torres.strip() if conta_sim == 'CONTA.SIM' else ''}")
+                    lines_out.append(f"Qtd Blocos: {qtd_blocos.strip() if conta_sim == 'CONTA.SIM' else ''}")
+                    lines_out.append(f"Valor preço de religue: R$ {preco_religue.strip() if conta_sim == 'CONTA.SIM' else ''}")
+                    lines_out.append(f"Valor preço de serviço: R$ {preco_servico.strip() if conta_sim == 'CONTA.SIM' else ''}")
 
                     texto_padrao_contrato = "\n".join(lines_out).strip()
 
                     st.success("✅ Texto padrão gerado com sucesso!")
-                    st.text_area("Texto Gerado:", value=texto_padrao_contrato, height=350, key=f"txt_area_contrato_{rcc}")
+                    st.text_area("Texto Gerado:", value=texto_padrao_contrato, height=450, key=f"txt_area_contrato_{rcc}")
                     botao_copiar_customizado(texto_padrao_contrato, "contrato_txt")
 
             # -------------------------------------------------------------
