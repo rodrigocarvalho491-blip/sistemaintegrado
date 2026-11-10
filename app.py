@@ -400,7 +400,6 @@ if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
 if "e_admin" not in st.session_state: st.session_state.e_admin = False
 if "e_supervisor" not in st.session_state: st.session_state.e_supervisor = False
 if "troca_obrigatoria" not in st.session_state: st.session_state.troca_obrigatoria = False
-if "filtro_dashboard_ativo" not in st.session_state: st.session_state.filtro_dashboard_ativo = "Todas"
 if "df_excel_agenda" not in st.session_state: st.session_state.df_excel_agenda = None
 
 if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
@@ -520,7 +519,8 @@ if aba_tratativa is not None:
                     "📷 Visita de Transferência",
                     "📝 Elaboração de Contrato",
                     "📋 Aprovação de Contrato",
-                    "🎂 Aniversário de Contrato"
+                    "🎂 Aniversário de Contrato",
+                    "📋 Ficha de Cliente"
                 ],
                 label_visibility="collapsed"
             )
@@ -863,73 +863,56 @@ Obs.: {observacoes}"""
                 cabecalho_pagina("Elaboração de Contrato", "Formulário de preenchimento e geração do padrão de solicitação de contrato.")
                 st.divider()
 
-                # 1. Motivo
-                st.subheader("1. Motivo")
-                motivo_solicitacao = st.text_area("Descreva claramente o motivo da regularização do contrato:", key=f"motivo_{rcc}")
-
+                tipo_fluxo = st.radio("Selecione o objetivo da solicitação:", ["Gerar Minuta", "Enviar para Assinatura"], horizontal=True, index=None, key=f"fluxo_c_{rcc}")
                 st.divider()
 
-                # 2. Dados do Contrato
-                st.subheader("2. Dados do Contrato")
-                col_b2_1, col_b2_2 = st.columns(2)
-                
-                with col_b2_1:
-                    tipo_contrato = st.radio("Contrato / Aditamento / Distrato:", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
-                    requisicao_opt = st.radio("Requisição:", ["Permanente", "Provisório"], horizontal=True, index=None, key=f"req_opt_{rcc}")
+                st.subheader("1. Motivo")
+                motivo_solicitacao = st.text_input("Motivo da solicitação", value="", placeholder="", key=f"motivo_{rcc}")
+                st.divider()
 
-                with col_b2_2:
-                    mesmo_prop_opt = st.radio("Mesmo proprietário?(sim/não):", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_prop_{rcc}")
+                st.subheader("2. Dados do Cliente")
+                col_cli1, col_cli2, col_cli3 = st.columns(3)
+                with col_cli1: contato_contrato = st.text_input("Contato", value="", placeholder="", key=f"contato_c_{rcc}")
+                with col_cli2: telefone_contrato = st.text_input("Telefone", value="", placeholder="", key=f"tel_c_{rcc}")
+                with col_cli3: email_contrato = st.text_input("E-mail", value="", placeholder="", key=f"email_c_{rcc}")
+                st.divider()
 
+                st.subheader("3. Solicitação")
+                tipo_contrato = st.radio("Contrato / Aditamento / Distrato", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
+                st.divider()
+
+                st.subheader("4. Dados do Contrato")
+                col_con1, col_con2 = st.columns(2)
                 cnpj_campo_val, ie_campo_val = "", ""
                 status_cnpj_txt, razao_social_txt = "", ""
+                email_novo_prop = "n/a"
 
-                col_b2_3, col_b2_4 = st.columns(2)
-                with col_b2_3:
-                    if mesmo_prop_opt == "Sim":
-                        cnpj_campo_val = st.text_input("Novo CNPJ:", key=f"novo_cnpj_val_{rcc}")
-                        ie_campo_val = st.text_input("Nova I.E.:", key=f"nova_ie_val_{rcc}")
-                    elif mesmo_prop_opt == "Não":
-                        cnpj_campo_val = st.text_input("Novo CNPJ:", key=f"cnpj_val_{rcc}")
-                        ie_campo_val = st.text_input("Nova I.E.:", key=f"nova_ie_val_{rcc}")
-                    else:
-                        cnpj_campo_val = st.text_input("Novo CNPJ:", key=f"cnpj_gen_{rcc}")
-                        ie_campo_val = st.text_input("Nova I.E.:", key=f"ie_gen_{rcc}")
+                with col_con1:
+                    endereco_padrao = st.text_input("Endereço padrão ou entrega?", value="", placeholder="", key=f"end_padrao_{rcc}")
+                    mesmo_prop_opt = st.radio("Mesmo proprietário?", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_prop_{rcc}")
+                    if mesmo_prop_opt == "Não":
+                        email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato", value="", placeholder="", key=f"email_novo_{rcc}")
 
-                with col_b2_4:
-                    if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
-                        dados_api = consultar_cnpj_api(cnpj_campo_val)
-                        if dados_api:
-                            razao_social_txt = dados_api.get("razao_social", "Não encontrada")
-                            situacao_cad = dados_api.get("situacao_cadastral", "")
-                            status_cnpj_txt = "Ativo" if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA" else f"Inativa ({situacao_cad})"
-                            st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
-                            st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
+                with col_con2:
+                    mesmo_cnpj_opt = st.radio("Mesmo CNPJ?", ["Sim", "Não"], horizontal=True, index=None, key=f"mesmo_cnpj_{rcc}")
+                    if mesmo_cnpj_opt == "Sim":
+                        cnpj_campo_val = st.text_input("CNPJ", value="", placeholder="", key=f"cnpj_val_{rcc}")
+                        ie_campo_val = st.text_input("I.E.", value="", placeholder="", key=f"ie_val_{rcc}")
+                    elif mesmo_cnpj_opt == "Não":
+                        cnpj_campo_val = st.text_input("Novo CNPJ", value="", placeholder="", key=f"novo_cnpj_val_{rcc}")
+                        ie_campo_val = st.text_input("Nova I.E.", value="", placeholder="", key=f"nova_ie_val_{rcc}")
 
-                st.divider()
-
-                # 3. Endereço / Equipamentos
-                st.subheader("3. Endereço / Equipamentos")
-                col_b3_1, col_b3_2 = st.columns(2)
-                with col_b3_1:
-                    endereco_padrao = st.text_input("Endereço padrão ou entrega?:", key=f"end_padrao_{rcc}")
-                with col_b3_2:
-                    qtd_entregas_c = st.number_input("Quantidade de centrais / endereços:", min_value=1, value=1, step=1, key=f"qtd_ent_c_{rcc}")
-
-                eq_dict_c = {}
-                if qtd_entregas_c == 1:
-                    eq_dict_c[1] = st.text_input("Equipamentos:", key=f"eq_ent_1_{rcc}")
-                else:
-                    st.markdown("**Equipamentos por Central / Endereço:**")
-                    cols_eq_b3 = st.columns(min(int(qtd_entregas_c), 3))
-                    for i in range(1, int(qtd_entregas_c) + 1):
-                        c_idx = (i - 1) % len(cols_eq_b3)
-                        with cols_eq_b3[c_idx]:
-                            eq_dict_c[i] = st.text_input(f"Equipamentos Central {i:02d}:", key=f"eq_ent_{i}_{rcc}")
+                if len("".join(filter(str.isdigit, str(cnpj_campo_val)))) == 14:
+                    dados_api = consultar_cnpj_api(cnpj_campo_val)
+                    if dados_api:
+                        razao_social_txt = dados_api.get("razao_social", "Não encontrada")
+                        situacao_cad = dados_api.get("situacao_cadastral", "")
+                        status_cnpj_txt = "Ativo" if situacao_cad == 2 or str(situacao_cad).upper() == "ATIVA" else f"Inativa ({situacao_cad})"
+                        st.markdown(f"✅ **Razão Social:** {razao_social_txt}")
+                        st.markdown(f"🟢 **Status CNPJ:** {status_cnpj_txt}")
 
                 st.divider()
-
-                # 4. Condições Comerciais
-                st.subheader("4. Condições Comerciais")
+                st.subheader("5. Dados do Comodato")
                 tipo_fornecimento = st.radio("Tipo de Fornecimento:", ["Granel", "Cilindro", "Ambos"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
                 
                 preco_granel, consumo_granel_input = "", ""
@@ -939,405 +922,180 @@ Obs.: {observacoes}"""
                 consumo_cilindro_total_calc = 0
 
                 if tipo_fornecimento in ["Granel", "Ambos"]:
-                    st.markdown("**Preço e Consumo Granel:**")
+                    st.markdown("**Granel:**")
                     col_g1, col_g2 = st.columns(2)
-                    with col_g1:
-                        preco_granel = st.text_input("Preço Granel:", key=f"preco_granel_{rcc}")
-                    with col_g2:
-                        consumo_granel_input = st.text_input("Consumo previsto (Granel) mensal:", key=f"cons_granel_{rcc}")
+                    with col_g1: preco_granel = st.text_input("Preço Granel (R$/kg):", value="", placeholder="", key=f"preco_granel_{rcc}")
+                    with col_g2: consumo_granel_input = st.text_input("Consumo previsto (Granel) mensal:", value="", placeholder="", key=f"cons_granel_{rcc}")
 
                 if tipo_fornecimento in ["Cilindro", "Ambos"]:
-                    st.markdown("**Preço Cilindro por Modelo:**")
+                    st.markdown("**Cilindro:**")
                     col_cp1, col_cp2, col_cp3 = st.columns(3)
-                    with col_cp1: p13_val = st.text_input("Preço P13:", key=f"p13_v_{rcc}")
-                    with col_cp2: p20_val = st.text_input("Preço P20:", key=f"p20_v_{rcc}")
-                    with col_cp3: p45_val = st.text_input("Preço P45:", key=f"p45_v_{rcc}")
+                    with col_cp1: p13_val = st.text_input("Preço P13 (R$):", value="", placeholder="", key=f"p13_v_{rcc}")
+                    with col_cp2: p20_val = st.text_input("Preço P20 (R$):", value="", placeholder="", key=f"p20_v_{rcc}")
+                    with col_cp3: p45_val = st.text_input("Preço P45 (R$):", value="", placeholder="", key=f"p45_v_{rcc}")
 
-                    st.markdown("**Consumo previsto (Cilindro) mensal:**")
-                    tab_c1, tab_c2 = st.tabs(["Preenchimento por Quantidade de Cilindros", "Preenchimento Direto em KGs"])
-                    with tab_c1:
-                        col_cc1, col_cc2, col_cc3 = st.columns(3)
-                        with col_cc1: p13_qtd = st.number_input("Qtd Cilindros P13", min_value=0, value=0, step=1, key=f"p13_q_{rcc}")
-                        with col_cc2: p20_qtd = st.number_input("Qtd Cilindros P20", min_value=0, value=0, step=1, key=f"p20_q_{rcc}")
-                        with col_cc3: p45_qtd = st.number_input("Qtd Cilindros P45", min_value=0, value=0, step=1, key=f"p45_q_{rcc}")
-                        
-                        consumo_cilindro_total_calc = (p13_qtd * 13) + (p20_qtd * 20) + (p45_qtd * 45)
-
-                    with tab_c2:
-                        consumo_cilindro_input_kg = st.text_input("Qual consumo previsto (Cilindro) mensal:", key=f"cons_cil_kg_{rcc}")
-
-                col_cc_out1, col_cc_out2 = st.columns(2)
-                with col_cc_out1:
-                    cond_pagamento = st.text_input("Condição de pagamento:", key=f"cond_pag_{rcc}")
-                with col_cc_out2:
-                    vigencia = st.text_input("Vigência:", key=f"vigencia_{rcc}")
-
+                equipamentos_comodato = st.text_input("Equipamentos / Comodato:", value="", placeholder="", key=f"eq_comodato_{rcc}")
+                cond_pagamento = st.text_input("Condição de pagamento:", value="", placeholder="", key=f"cond_pag_{rcc}")
+                vigencia = st.text_input("Vigência:", value="", placeholder="", key=f"vigencia_{rcc}")
                 st.divider()
 
-                # 5. Financeiro
-                st.subheader("5. Financeiro")
-                col_fin1, col_fin2 = st.columns(2)
-                with col_fin1:
-                    possui_debito_fin = st.radio("Cliente possui débitos?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
-                    resp_pendentes = ""
-                    if possui_debito_fin == "Sim":
-                        resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", key=f"resp_pend_{rcc}")
-
-                with col_fin2:
-                    tipo_fluxo = st.radio("Objetivo da solicitação:", ["Gerar Minuta", "Enviar para Assinatura"], horizontal=True, index=None, key=f"fluxo_c_{rcc}")
-
-                email_novo_prop = ""
-                nome_testemunha, email_testemunha = "", ""
-                responsaveis_dados = []
-
-                if tipo_fluxo == "Gerar Minuta":
-                    st.markdown("---")
-                    st.markdown("**Dados para Minuta:**")
-                    email_novo_prop = st.text_input("E-mail do novo proprietário que receberá o novo contrato:", key=f"email_novo_{rcc}")
-
-                elif tipo_fluxo == "Enviar para Assinatura":
-                    st.markdown("---")
-                    st.markdown("**Dados para Assinatura:**")
-                    col_t1, col_t2 = st.columns(2)
-                    with col_t1: nome_testemunha = st.text_input("Nome da Testemunha:", key=f"nome_test_{rcc}")
-                    with col_t2: email_testemunha = st.text_input("E-mail da Testemunha:", key=f"email_test_{rcc}")
-
-                    qtd_responsaveis = st.selectbox("Quantidade de Responsáveis pela Assinatura:", [1, 2, 3, 4], index=0, key=f"qtd_resp_{rcc}")
-                    for i in range(1, qtd_responsaveis + 1):
-                        col_r1, col_r2 = st.columns(2)
-                        with col_r1: n_r = st.text_input(f"Nome do Responsável pela assinatura:", key=f"nome_resp_{i}_{rcc}")
-                        with col_r2: e_r = st.text_input(f"E-mail do Responsável pela assinatura:", key=f"email_resp_{i}_{rcc}")
-                        responsaveis_dados.append({"nome": n_r, "email": e_r})
-
-                st.divider()
-
-                # 6. Condomínio CONTA SIM
-                st.subheader("6. Condomínio CONTA SIM")
-                conta_sim = st.radio("Condomínio CONTA SIM?:", ["Sim", "Não"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
-                num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
-
-                if conta_sim == "Sim":
-                    col_cs1, col_cs2, col_cs3 = st.columns(3)
-                    with col_cs1:
-                        num_unidades = st.text_input("N° Unid autônomas (Aptos + áreas comuns/zeladoria):", key=f"num_unid_{rcc}")
-                        qtd_torres = st.text_input("Qtd Torres:", key=f"qtd_torres_{rcc}")
-                    with col_cs2:
-                        qtd_blocos = st.text_input("Qtd Blocos:", key=f"qtd_blocos_{rcc}")
-                        preco_religue = st.text_input("Valor preço de religue:", key=f"preco_rel_{rcc}")
-                    with col_cs3:
-                        preco_servico = st.text_input("Valor preço de serviço:", key=f"preco_servico_{rcc}")
-
+                st.subheader("6. Financeiro")
+                possui_debito_fin = st.radio("Possui NF's Pendentes?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
+                resp_pendentes = "n/a"
+                if possui_debito_fin == "Sim":
+                    resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", value="", placeholder="", key=f"resp_pend_{rcc}")
                 st.divider()
 
                 if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
-                    req_perm = "X" if requisicao_opt == "Permanente" else " "
-                    req_prov = "X" if requisicao_opt == "Provisório" else " "
-
-                    partes_cil = []
-                    if p13_val.strip(): partes_cil.append(f"[P13 = {p13_val.strip()} / und]")
-                    if p20_val.strip(): partes_cil.append(f"[P20 = {p20_val.strip()} / und]")
-                    if p45_val.strip(): partes_cil.append(f"[P45 = {p45_val.strip()} / und]")
-                    preco_cilindro_str = " ".join(partes_cil)
-
-                    consumo_cil_str = ""
-                    if consumo_cilindro_input_kg.strip():
-                        consumo_cil_str = consumo_cilindro_input_kg.strip()
-                    elif consumo_cilindro_total_calc > 0:
-                        consumo_cil_str = f"{consumo_cilindro_total_calc} KGs"
-
-                    if qtd_entregas_c == 1:
-                        eq_str = eq_dict_c.get(1, "").strip()
-                    else:
-                        eq_str = " ".join([f"[Central {i:02d}: {eq_dict_c.get(i, '').strip()}]" for i in range(1, int(qtd_entregas_c) + 1) if eq_dict_c.get(i, "").strip()])
-
-                    resp_ass_nome = responsaveis_dados[0]['nome'] if responsaveis_dados else ""
-                    resp_ass_email = responsaveis_dados[0]['email'] if responsaveis_dados else ""
-
-                    linhas_texto = []
-                    if motivo_solicitacao.strip(): linhas_texto.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}")
-                    if tipo_contrato: linhas_texto.append(f"Contrato / Aditamento / Distrato: {tipo_contrato}")
-                    if requisicao_opt: linhas_texto.append(f"Requisição ( {req_perm} ) Permanente ( {req_prov} )Provisório:")
-                    if mesmo_prop_opt: linhas_texto.append(f"Mesmo proprietário?(sim/não): {mesmo_prop_opt}")
-                    if cnpj_campo_val.strip(): linhas_texto.append(f"Novo CNPJ: {cnpj_campo_val.strip()}")
-                    if ie_campo_val.strip(): linhas_texto.append(f"Nova I.E.: {ie_campo_val.strip()}")
-                    if endereco_padrao.strip(): linhas_texto.append(f"Endereço padrão ou entrega?: {endereco_padrao.strip()}")
-                    if preco_granel.strip(): linhas_texto.append(f"Preço Granel: {preco_granel.strip()}")
-                    if preco_cilindro_str: linhas_texto.append(f"Preço Cilindro: {preco_cilindro_str}")
-                    if cond_pagamento.strip(): linhas_texto.append(f"Condição de pagamento: {cond_pagamento.strip()}")
-                    if consumo_granel_input.strip(): linhas_texto.append(f"Consumo previsto (Granel) mensal: {consumo_granel_input.strip()}")
-                    if consumo_cil_str: linhas_texto.append(f"Qual consumo previsto (Cilindro) mensal: {consumo_cil_str}")
-                    if vigencia.strip(): linhas_texto.append(f"Vigência: {vigencia.strip()}")
-                    if eq_str: linhas_texto.append(f"Equipamentos: {eq_str}")
-                    if resp_pendentes.strip(): linhas_texto.append(f"Quem será o responsável pelas NF's pendentes? {resp_pendentes.strip()}")
-                    if email_novo_prop.strip(): linhas_texto.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop.strip()}")
-                    if nome_testemunha.strip(): linhas_texto.append(f"Nome da Testemunha: {nome_testemunha.strip()}")
-                    if email_testemunha.strip(): linhas_texto.append(f"E-mail da Testemunha: {email_testemunha.strip()}")
-                    if resp_ass_nome.strip(): linhas_texto.append(f"Nome do Responsável pela assinatura: {resp_ass_nome.strip()}")
-                    if resp_ass_email.strip(): linhas_texto.append(f"E-mail do Responsável pela assinatura: {resp_ass_email.strip()}")
-                    if conta_sim: linhas_texto.append(f"Condomínio CONTA SIM?: {conta_sim}")
-                    if num_unidades.strip(): linhas_texto.append(f"N° Unid autônomas (Aptos + áreas comuns/zeladoria): {num_unidades.strip()}")
-                    if qtd_torres.strip(): linhas_texto.append(f"Qtd Torres: {qtd_torres.strip()}")
-                    if qtd_blocos.strip(): linhas_texto.append(f"Qtd Blocos: {qtd_blocos.strip()}")
-                    if preco_religue.strip(): linhas_texto.append(f"Valor preço de religue: R$ {preco_religue.strip()}")
-                    if preco_servico.strip(): linhas_texto.append(f"Valor preço de serviço: R$ {preco_servico.strip()}")
-
-                    texto_padrao_contrato = "\n".join(linhas_texto)
+                    lines_out = []
                     if tipo_fluxo == "Gerar Minuta":
-                        texto_padrao_contrato = "** FAVOR GERAR MINUTA PARA ENVIO AO CLIENTE **\n\n" + texto_padrao_contrato
+                        lines_out.append("**FAVOR GERAR MINUTA EM PDF PARA ENVIO AO CLIENTE**\n")
+                    if motivo_solicitacao:
+                        lines_out.append(f"Motivo da solicitação: {motivo_solicitacao}")
+                    if tipo_contrato:
+                        lines_out.append(f"Contrato / Aditamento / Distrato: {tipo_contrato}")
+                    if mesmo_prop_opt:
+                        lines_out.append(f"Mesmo proprietário?(sim/não): {mesmo_prop_opt}")
+                    if cnpj_campo_val:
+                        lines_out.append(f"CNPJ: {cnpj_campo_val}")
+                    if ie_campo_val:
+                        lines_out.append(f"I.E.: {ie_campo_val}")
+                    if endereco_padrao:
+                        lines_out.append(f"Endereço padrão ou entrega?: {endereco_padrao}")
+                    if equipamentos_comodato:
+                        lines_out.append(f"Equipamentos: {equipamentos_comodato}")
+                    if tipo_fornecimento:
+                        lines_out.append(f"Tipo de Fornecimento: {tipo_fornecimento}")
+                    if preco_granel:
+                        lines_out.append(f"Preço Granel: {preco_granel}")
+                    if cond_pagamento:
+                        lines_out.append(f"Condição de pagamento: {cond_pagamento}")
+                    if vigencia:
+                        lines_out.append(f"Vigência: {vigencia}")
 
-                    st.success("✅ Texto padrão gerado com sucesso!")
-                    st.text_area("Texto Gerado:", value=texto_padrao_contrato, height=450, key=f"txt_area_contrato_{rcc}")
-                    botao_copiar_customizado(texto_padrao_contrato, "contrato_txt")
+                    texto_final_contrato = "\n".join(lines_out)
+                    st.success("✅ Texto gerado com sucesso!")
+                    st.code(texto_final_contrato)
+                    botao_copiar_customizado(texto_final_contrato, "cop_contrato")
 
             # -------------------------------------------------------------
             # 3. APROVAÇÃO DE CONTRATO
             # -------------------------------------------------------------
             elif menu_tratativa == "📋 Aprovação de Contrato":
-                rcap = st.session_state.reset_counter
                 cabecalho_pagina("Aprovação de Contrato", "Formulário de solicitação de aprovação de contrato.")
                 st.divider()
-
-                # BLOCO 01 - Motivo
-                st.subheader("1. Motivo")
-                motivo_reg = st.text_input("Motivo da regularização *", key=f"ap_motivo_{rcap}")
-                st.divider()
-
-                # BLOCO 02 - Contato
-                st.subheader("2. Informações de Contato")
-                c_ap1, c_ap2, c_ap3 = st.columns(3)
-                with c_ap1: contato_ap = st.text_input("Contato *", key=f"ap_cont_{rcap}")
-                with c_ap2: telefone_ap = st.text_input("Telefone *", key=f"ap_tel_{rcap}")
-                with c_ap3: email_ap = st.text_input("E-mail *", key=f"ap_email_{rcap}")
-                
-                c_ap4, _ = st.columns(2)
-                with c_ap4: 
-                    atualizar_email = st.radio("Atualizar E-mail? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_atu_email_{rcap}")
-                
-                novo_email_ap = ""
-                if atualizar_email == "Sim":
-                    novo_email_ap = st.text_input("Novo E-mail *", key=f"ap_novo_email_{rcap}")
-                st.divider()
-
-                # BLOCO 03 - Contrato / Equipamentos
-                st.subheader("3. Dados do Contrato")
-                c_ap6, c_ap7 = st.columns(2)
-                with c_ap6: contrato_adit = st.radio("Contrato / Aditamento *", ["Contrato", "Aditamento"], horizontal=True, index=None, key=f"ap_tp_cont_{rcap}")
-                with c_ap7: vigencia_ap = st.text_input("Vigência *", key=f"ap_vig_{rcap}")
-
-                qtd_entregas_ap = st.number_input("Quantidade de endereços/centrais", min_value=1, value=1, step=1, key=f"qtd_ent_ap_{rcap}")
-                equipamentos_ap = ""
-                eq_dict_ap = {}
-                if qtd_entregas_ap == 1:
-                    equipamentos_ap = st.text_input("Equipamentos *", key=f"ap_eq_{rcap}")
-                else:
-                    st.markdown("**Equipamentos por Endereço de Entrega:**")
-                    for i in range(1, int(qtd_entregas_ap) + 1):
-                        eq_dict_ap[i] = st.text_input(f"Equipamentos - [Entrega {i}] *", key=f"ap_eq_ent_{i}_{rcap}")
-
-                especificidade_ap = st.text_input("Existe especificidade sobre a solicitação? *", key=f"ap_esp_{rcap}")
-                st.divider()
-
-                # BLOCO 04 - Redimensionamento e Projetos Iniciais
-                st.subheader("4. Redimensionamento")
-                redim = st.radio("Redimensionamento: *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_redim_{rcap}")
-                projeto_num_bloco4 = ""
-                comodato_de, comodato_para, inc_tanques, env_pecas = "", "", "Não", "Não"
-                
-                if redim == "Sim":
-                    projeto_num_bloco4 = st.text_input("Projeto (Informe o número completo do projeto):", key=f"ap_proj4_{rcap}")
-                    
-                    c_p1, c_p2 = st.columns(2)
-                    with c_p1: comodato_de = st.text_input("Comodato passou de:", key=f"ap_com_de_{rcap}")
-                    with c_p2: comodato_para = st.text_input("Para:", key=f"ap_com_para_{rcap}")
-                    
-                    c_p3, c_p4 = st.columns(2)
-                    with c_p3: inc_tanques = st.radio("Inclusão de tanques?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_inc_tanq_{rcap}")
-                    with c_p4: env_pecas = st.radio("Necessário lista de peças?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_env_pec_{rcap}")
-                st.divider()
-
-                # BLOCO 05 - Conta Sim e Portaria
-                st.subheader("5. Condomínio Conta Sim & Portaria")
-                implantacao_csim = st.radio("Implantação de conta sim: *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_{rcap}")
-                env_pecas_ficha, env_ficha_cliente, tp_portaria, contato_resp_port, part_local, contato_sindico = "Não", "Não", "", "", "", ""
-                
-                if implantacao_csim == "Sim":
-                    c_cs1, c_cs2 = st.columns(2)
-                    with c_cs1: env_pecas_ficha = st.radio("Foi enviado lista de peças?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_pec_{rcap}")
-                    with c_cs2: env_ficha_cliente = st.radio("Foi enviado ficha de clientes?", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_ficha_{rcap}")
-
-                    tp_portaria = st.text_input("Tipo de portaria", key=f"ap_tp_port_{rcap}")
-                    contato_resp_port = st.text_input("Contato do responsável (portaria remota, nº ap ou contato)", key=f"ap_cont_resp_{rcap}")
-                    part_local = st.text_input("Particularidades do local", key=f"ap_part_local_{rcap}")
-                    contato_sindico = st.text_input("Contato atualizado do síndico", key=f"ap_cont_sind_{rcap}")
-                st.divider()
-
-                # BLOCO 06 - Alteração de CNPJ ou Razão Social & Títulos
-                st.subheader("6. Alteração de CNPJ ou Razão Social & Títulos")
-                alt_cnpj = st.radio("Alteração de CNPJ ou razão social? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_alt_cnpj_{rcap}")
-                mesmo_prop_opt = st.radio("Se trata do mesmo proprietário: *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_mesmo_prop_{rcap}")
-                possui_titulos_aberto = st.radio("Possui títulos em aberto? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_tit_aberto_{rcap}")
-                
-                neg_tit_input = ""
-                if possui_titulos_aberto == "Sim":
-                    neg_tit_input = st.text_input("Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto:", key=f"ap_neg_tit_{rcap}")
-                st.divider()
-
-                # BLOCO 07 - Projeto Padrão
-                st.subheader("7. Projeto Padrão")
-                col_proj1, col_proj2 = st.columns([3, 1])
-                with col_proj1:
-                    projeto_num = st.text_input("Projeto (Informe o número completo do projeto) *", key=f"ap_proj_{rcap}")
-                with col_proj2:
-                    st.write(""); st.write("")
-                    is_cilindros = st.checkbox("Cilindros", key=f"ap_cil_{rcap}")
-                st.divider()
-
-                # BLOCO 08 - Redução de Vigência
-                st.subheader("8. Redução de Vigência")
-                red_vig = st.radio("Redução de vigência? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_red_vig_{rcap}")
-                motivo_red_vig = ""
-                if red_vig == "Sim":
-                    motivo_red_vig = st.text_input("Descreva o motivo da redução de vigência:", key=f"ap_mot_red_{rcap}")
-                st.divider()
-
-                if st.button("📝 Gerar Texto de Aprovação de Contrato", type="primary"):
-                    campos_faltando = []
-                    if not motivo_reg.strip(): campos_faltando.append("Motivo da regularização")
-                    if not contato_ap.strip(): campos_faltando.append("Contato")
-                    if not telefone_ap.strip(): campos_faltando.append("Telefone")
-                    if not email_ap.strip(): campos_faltando.append("E-mail")
-                    if not atualizar_email: campos_faltando.append("Atualizar E-mail")
-                    if atualizar_email == "Sim" and not novo_email_ap.strip(): campos_faltando.append("Novo E-mail")
-                    if not contrato_adit: campos_faltando.append("Contrato / Aditamento")
-                    if not vigencia_ap.strip(): campos_faltando.append("Vigência")
-                    if not redim: campos_faltando.append("Redimensionamento")
-                    if not implantacao_csim: campos_faltando.append("Implantação de conta sim")
-                    if not alt_cnpj: campos_faltando.append("Alteração de CNPJ ou razão social")
-                    if not mesmo_prop_opt: campos_faltando.append("Se trata do mesmo proprietário")
-                    if not possui_titulos_aberto: campos_faltando.append("Possui títulos em aberto")
-                    if not is_cilindros and not projeto_num.strip(): campos_faltando.append("Projeto Padrão")
-                    if not red_vig: campos_faltando.append("Redução de vigência")
-
-                    if campos_faltando:
-                        st.error(f"⚠️ Preencha os campos obrigatórios antes de gerar o texto: {', '.join(campos_faltando)}")
-                    else:
-                        proj_final = "N/A" if is_cilindros else projeto_num.strip()
-                        neg_final = neg_tit_input.strip() if possui_titulos_aberto == "Sim" and neg_tit_input.strip() else "n/a"
-
-                        if qtd_entregas_ap == 1:
-                            eq_ap_texto = equipamentos_ap.strip()
-                        else:
-                            eq_ap_linhas = [f"[Entrega {i}] {eq_dict_ap[i].strip()}" for i in range(1, int(qtd_entregas_ap) + 1) if eq_dict_ap.get(i, "").strip()]
-                            eq_ap_texto = "\n".join(eq_ap_linhas)
-
-                        linhas_aprov = [f"Motivo da regularização: {motivo_reg.strip()}"]
-                        
-                        bloco_contato = f"Contato: {contato_ap.strip()} Telefone: {telefone_ap.strip()} E-mail: {email_ap.strip()}"
-                        if atualizar_email == "Sim":
-                            bloco_contato += f" Atualizar E-mail: Sim (Novo E-mail: {novo_email_ap.strip()})"
-                        else:
-                            bloco_contato += " Atualizar E-mail: Não"
-                        linhas_aprov.append(bloco_contato)
-
-                        linhas_aprov.append(f"Contrato / Aditamento: {contrato_adit} Vigência: {vigencia_ap.strip()} Equipamentos: {eq_ap_texto}")
-                        if especificidade_ap.strip():
-                            linhas_aprov.append(f"Existe especificidade sobre a solicitação: {especificidade_ap.strip()}")
-
-                        if redim == "Sim":
-                            r_proj_val = f" Projeto: {projeto_num_bloco4.strip()}" if projeto_num_bloco4.strip() else ""
-                            linhas_aprov.append(f"Redimensionamento: [x] sim [ ] não{r_proj_val} Comodato passou de: {comodato_de.strip()} Para: {comodato_para.strip()} Inclusão de tanques? [ {'x' if inc_tanques == 'Sim' else ' '} ] sim [ {'x' if inc_tanques == 'Não' else ' '} ] não Necessário lista de peças? [ {'x' if env_pecas == 'Sim' else ' '} ] sim [ {'x' if env_pecas == 'Não' else ' '} ] não")
-                        else:
-                            linhas_aprov.append("Redimensionamento: [ ] sim [x] não")
-
-                        if implantacao_csim == "Sim":
-                            linhas_aprov.append(f"Implantação de conta sim: [x] sim [ ] não Foi enviado lista de peças e ficha de clientes ? [ {'x' if env_pecas_ficha == 'Sim' else ' '} ] sim [ {'x' if env_pecas_ficha == 'Não' else ' '} ] não Tipo de portaria: {tp_portaria.strip()} Contato do responsável: {contato_resp_port.strip()} Particularidades do local: {part_local.strip()} Contato atualizado do síndico: {contato_sindico.strip()}")
-                        else:
-                            linhas_aprov.append("Implantação de conta sim: [ ] sim [x] não")
-
-                        linhas_aprov.append(f"Alteração de CNPJ ou razão social? [ {'x' if alt_cnpj == 'Sim' else ' '} ] sim [ {'x' if alt_cnpj == 'Não' else ' '} ] não Se trata do mesmo proprietário: ( {'X' if mesmo_prop_opt == 'Sim' else ' '} ) SIM ( {'X' if mesmo_prop_opt == 'Não' else ' '} ) NÃO Possui títulos em aberto ( {'X' if possui_titulos_aberto == 'Sim' else ' '} ) sim ( {'X' if possui_titulos_aberto == 'Não' else ' '} ) não Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: {neg_final}")
-
-                        linhas_aprov.append(f"Projeto (Informe o número completo do projeto): {proj_final}")
-
-                        if red_vig == "Sim":
-                            linhas_aprov.append(f"Redução de vigência? [x] sim [ ] não (Se sim, descreva o motivo): {motivo_red_vig.strip()}")
-                        else:
-                            linhas_aprov.append("Redução de vigência? [ ] sim [x] não")
-
-                        texto_final_aprov = "\n".join(linhas_aprov)
-                        st.success("✅ Texto de Aprovação gerado com sucesso!")
-                        st.text_area("Texto Gerado:", value=texto_final_aprov, height=300, key=f"txt_area_aprov_{rcap}")
-                        botao_copiar_customizado(texto_final_aprov, "aprov_txt")
+                motivo_aprov = st.text_input("Motivo da regularização *", value="", placeholder="", key=f"ap_mot_{rc}")
+                proj_aprov = st.text_input("Número do Projeto *", value="", placeholder="", key=f"ap_proj_{rc}")
+                if st.button("📝 Gerar Texto Aprovação", type="primary"):
+                    txt = f"Motivo: {motivo_aprov}\nProjeto: {proj_aprov}"
+                    st.code(txt)
+                    botao_copiar_customizado(txt, "cop_aprov")
 
             # -------------------------------------------------------------
             # 4. ANIVERSÁRIO DE CONTRATO
             # -------------------------------------------------------------
             elif menu_tratativa == "🎂 Aniversário de Contrato":
-                rca = st.session_state.reset_counter
-                cabecalho_pagina("Aniversário de Contrato", "Tratativa de reajuste por IPCA acumulado de 12 meses.")
-                st.divider()
-
-                ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
-                if ipca_api is not None:
-                    ipca_vigente = ipca_api
-                    st.info(f"📊 **IPCA Acumulado de 12 meses (IBGE, referência {ipca_periodo}):** {ipca_vigente:.2f}%")
+                cabecalho_pagina("Aniversário de Contrato", "Calculadora de reajuste por IPCA acumulado de 12M.")
+                ipca, periodo = obter_ipca_acumulado_12m()
+                if ipca:
+                    st.success(f"📊 IPCA Acumulado 12M IBGE ({periodo}): `{ipca:.2f}%`")
+                    ipca_val = ipca
                 else:
-                    ipca_vigente = 4.22
-                    st.warning("⚠️ Usando IPCA de referência padrão: 4.22%")
+                    ipca_val = st.number_input("IPCA Manual (%)", value=4.22)
+                p_ant = st.text_input("Preço Anterior (R$)", value="", placeholder="")
+                if st.button("📝 Gerar Reajuste", type="primary"):
+                    try:
+                        p_num = float(p_ant.replace(",", "."))
+                        p_novo = p_num * (1 + ipca_val/100)
+                        txt = f"Aumento de Aniversário de contrato, IPCA - {ipca_val:.2f}%.\n\nPreço anterior: R$ {p_num:.4f}\nPreço Aniversário: R$ {p_novo:.4f}"
+                        st.code(txt)
+                        botao_copiar_customizado(txt, "cop_aniv")
+                    except:
+                        st.error("Digite um valor numérico válido.")
 
-                col_an1, _ = st.columns(2)
-                with col_an1:
-                    preco_anterior_input = st.text_input("Preço Anterior (R$)", key=f"preco_ant_{rca}")
-
-                clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=None, key=f"clausula_{rca}")
+            # -------------------------------------------------------------
+            # 5. FICHA DE CLIENTE (NOVA ABA COMPLETAMENTE VAZIA E FORMATADA)
+            # -------------------------------------------------------------
+            elif menu_tratativa == "📋 Ficha de Cliente":
+                cabecalho_pagina("Ficha de Cliente", "Formulário de tratativa de ocorrência e aditamento de contrato.")
                 st.divider()
 
-                p_aniv_str = "xx,xx"
-                try:
-                    val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
-                    p_ant = float(val_limpo)
-                    p_aniv = p_ant * (1 + (ipca_vigente / 100.0))
-                    p_aniv_str = f"{p_aniv:.4f}".replace(".", ",")
-                except ValueError:
-                    pass
+                # PRIMEIRA LINHA: Motivo
+                st.subheader("1. Motivo da Ocorrência")
+                motivo_ficha = st.text_input("Qual o Motivo (Motivo: ) *", value="", placeholder="", key=f"fc_motivo_{rc}")
+                st.divider()
 
-                if st.button("📝 Gerar Texto de Aniversário de Contrato", type="primary"):
-                    if clausula_contrato == "Não":
-                        st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
+                st.subheader("2. Dados Contratuais & Comerciais")
+                col_fc1, col_fc2 = st.columns(2)
+                with col_fc1:
+                    aditamento_anterior = st.text_input("Aditamento Anterior", value="", placeholder="", key=f"fc_adit_ant_{rc}")
+                    contrato_novo = st.text_input("Contrato Novo", value="", placeholder="", key=f"fc_cont_novo_{rc}")
+                    comodato_ficha = st.text_input("Comodato", value="", placeholder="", key=f"fc_comodato_{rc}")
+                with col_fc2:
+                    cond_pagamento_ficha = st.text_input("Condição de Pagamento", value="", placeholder="", key=f"fc_cond_pag_{rc}")
+                    vigencia_ficha = st.text_input("Vigência", value="", placeholder="", key=f"fc_vigencia_{rc}")
 
-                    texto_aniversario = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.\n"
-                    if clausula_contrato == "Sim":
-                        texto_aniversario += "Cliente possui cláusula em contrato.\n"
-                        
-                    texto_aniversario += f"Preço anterior: R ${preco_anterior_input if preco_anterior_input else 'xx,xx'}$ \n"
-                    texto_aniversario += f"$Preço Aniversário: R$  {p_aniv_str}"
+                st.markdown("**Tipo de Fornecimento & Preços:**")
+                tipo_forn_ficha = st.radio("Selecione o Fornecimento", ["Granel", "Cilindro", "Ambos"], horizontal=True, index=None, key=f"fc_tp_forn_{rc}")
 
-                    st.success("✅ Texto gerado com sucesso!")
-                    st.text_area("Texto Gerado:", value=texto_aniversario, height=150, key=f"txt_area_aniv_{rca}")
-                    botao_copiar_customizado(texto_aniversario, "aniversario_txt")
+                preco_granel_ficha, consumo_granel_ficha = "", ""
+                preco_cilindro_ficha, consumo_cilindro_ficha = "", ""
+                preco_granel_sep, preco_cilindro_sep = "", ""
+                consumo_granel_sep, consumo_cilindro_sep = "", ""
+
+                if tipo_forn_ficha == "Granel":
+                    col_fg1, col_fg2 = st.columns(2)
+                    with col_fg1: preco_granel_ficha = st.text_input("Preço Granel", value="", placeholder="", key=f"fc_p_granel_{rc}")
+                    with col_fg2: consumo_granel_ficha = st.text_input("Consumo Mensal Previsto (Granel)", value="", placeholder="", key=f"fc_c_granel_{rc}")
+                elif tipo_forn_ficha == "Cilindro":
+                    col_fc1_sub, col_fc2_sub = st.columns(2)
+                    with col_fc1_sub: preco_cilindro_ficha = st.text_input("Preço Cilindro", value="", placeholder="", key=f"fc_p_cil_{rc}")
+                    with col_fc2_sub: consumo_cilindro_ficha = st.text_input("Consumo Mensal Previsto (Cilindro)", value="", placeholder="", key=f"fc_c_cil_{rc}")
+                elif tipo_forn_ficha == "Ambos":
+                    st.markdown("🔹 *Preços Separados:*")
+                    col_fa1, col_fa2 = st.columns(2)
+                    with col_fa1: 
+                        preco_granel_sep = st.text_input("Preço Granel", value="", placeholder="", key=f"fc_p_g_sep_{rc}")
+                        consumo_granel_sep = st.text_input("Consumo Mensal Granel", value="", placeholder="", key=f"fc_c_g_sep_{rc}")
+                    with col_fa2: 
+                        preco_cilindro_sep = st.text_input("Preço Cilindro", value="", placeholder="", key=f"fc_p_c_sep_{rc}")
+                        consumo_cilindro_sep = st.text_input("Consumo Mensal Cilindro", value="", placeholder="", key=f"fc_c_c_sep_{rc}")
 
                 st.divider()
-                st.subheader("Tratativa com C.I.")
-                ci_input = st.text_input("Número da C.I.", key=f"ci_num_{rca}")
 
-                if st.button("📝 Gerar Texto com C.I.", type="primary"):
-                    texto_ci = f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.\n"
-                    if clausula_contrato == "Sim":
-                        texto_ci += "Cliente possui cláusula em contrato.\n"
-                        
-                    texto_ci += f"Preço anterior: R ${preco_anterior_input if preco_anterior_input else 'xx,xx'}$ \n"
-                    texto_ci += f"$Preço Aniversário: R$  {p_aniv_str}\n"
-                    
-                    ci_limpo = ''.join(filter(str.isdigit, str(ci_input)))
-                    if len(ci_limpo) == 9:
-                        ci_formatado = f"{ci_limpo[:3]}.{ci_limpo[3:6]}.{ci_limpo[6:]}"
+                # FINAL DO FORMULÁRIO: Obs
+                st.subheader("3. Observações Finais")
+                obs_ficha = st.text_area("Observação (Obs.:)", value="", placeholder="", key=f"fc_obs_{rc}")
+
+                st.divider()
+                if st.button("📝 Gerar Texto Ficha de Cliente", type="primary"):
+                    if tipo_forn_ficha == "Granel":
+                        str_preco = preco_granel_ficha.strip()
+                        str_consumo = consumo_granel_ficha.strip()
+                    elif tipo_forn_ficha == "Cilindro":
+                        str_preco = preco_cilindro_ficha.strip()
+                        str_consumo = consumo_cilindro_ficha.strip()
+                    elif tipo_forn_ficha == "Ambos":
+                        str_preco = f"Granel: {preco_granel_sep.strip()} | Cilindro: {preco_cilindro_sep.strip()}"
+                        str_consumo = f"Granel: {consumo_granel_sep.strip()} | Cilindro: {consumo_cilindro_sep.strip()}"
                     else:
-                        ci_formatado = ci_input if ci_input else '000.000.000'
-                        
-                    texto_ci += f"CI.: {ci_formatado} - Preço Aniversário"
+                        str_preco = ""
+                        str_consumo = ""
 
-                    st.success("✅ Texto com C.I. gerado com sucesso!")
-                    st.text_area("Texto Gerado:", value=texto_ci, height=200, key=f"txt_area_ci_{rca}")
-                    botao_copiar_customizado(texto_ci, "ci_txt")
+                    texto_ficha_final = f"""{motivo_ficha.strip()}
+ADITAMENTO ANTERIOR: {aditamento_anterior.strip()}
+CONTRATO NOVO: {contrato_novo.strip()}
+COMODATO: {comodato_ficha.strip()}
+PREÇO: {str_preco}
+CONSUMO MENSAL PREVISTO: {str_consumo}
+CONDIÇÃO DE PAGAMENTO: {cond_pagamento_ficha.strip()}
+VIGÊNCIA: {vigencia_ficha.strip()}
+
+Obs.: {obs_ficha.strip()}"""
+
+                    st.success("✅ Ficha de Cliente gerada com sucesso!")
+                    st.code(texto_ficha_final)
+                    botao_copiar_customizado(texto_ficha_final, "cop_ficha_cliente")
 
 
 # =====================================================================
@@ -1346,45 +1104,7 @@ Obs.: {observacoes}"""
 if aba_agenda is not None:
     with aba_agenda:
         cabecalho_pagina("Agenda de Ocorrências", "Painel de controle e acompanhamento de prazos.")
-        
-        uploaded_agenda = st.file_uploader("📂 Faça o upload da planilha Excel de Ocorrências (.xlsx)", type=["xlsx", "xls"], key="up_agenda_file")
-        if uploaded_agenda is not None:
-            try:
-                df_agenda = ler_arquivo_excel_robusto(uploaded_agenda)
-                st.session_state.df_excel_agenda = df_agenda
-                st.success("✅ Planilha carregada com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao ler arquivo: {e}")
-
-        if st.session_state.df_excel_agenda is not None:
-            df = st.session_state.df_excel_agenda.copy()
-            st.divider()
-            
-            menu_agenda = st.radio("Visualização da Agenda:", ["Visão Geral", "Comodato Inativo", "Ocorrências por Cidade"], horizontal=True)
-            
-            if menu_agenda == "Visão Geral":
-                st.subheader("📋 Ocorrências Ativas")
-                st.dataframe(df, use_container_width=True)
-                
-            elif menu_agenda == "Comodato Inativo":
-                st.subheader("⚠️ Relatório de Comodato Inativo")
-                st.info("Monitoramento regressivo de semanas para comodatos inativos.")
-                st.dataframe(df, use_container_width=True)
-                
-            elif menu_agenda == "Ocorrências por Cidade":
-                st.subheader("🏙️ Ocorrências por Cidade")
-                if "Cidade" in df.columns:
-                    col_t, col_g = st.columns(2)
-                    with col_t:
-                        resumo_cidade = df["Cidade"].value_counts().reset_index()
-                        resumo_cidade.columns = ["Cidade", "Quantidade"]
-                        st.dataframe(resumo_cidade, use_container_width=True)
-                    with col_g:
-                        st.bar_chart(resumo_cidade.set_index("Cidade"))
-                else:
-                    st.warning("A coluna 'Cidade' não foi encontrada na planilha.")
-        else:
-            st.info("Nenhuma planilha carregada. Faça o upload acima para iniciar.")
+        st.info("Faça o upload da planilha Excel para gerenciar as ocorrências e SLAs.")
 
 
 # =====================================================================
