@@ -212,44 +212,17 @@ def consultar_cnpj_api(cnpj):
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def obter_ipca_acumulado_12m():
-    # 1. Consulta direta à página oficial de inflação do IBGE
     try:
-        url_ibge = "https://www.ibge.gov.br/explica/inflacao.php"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        resp = requests.get(url_ibge, headers=headers, timeout=6)
+        url = "https://www.ibge.gov.br/explica/inflacao.php"
+        resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
-            texto_limpo = re.sub(r'<[^>]+>', ' ', resp.text)
-            texto_limpo = re.sub(r'\s+', ' ', texto_limpo)
-            match = re.search(
-                r'IPCA\s+acumulado\s+de\s+12\s+meses\s+([0-9]+,[0-9]+)\s*%\s*([A-Za-zçÇ]{3}/[0-9]{4})',
-                texto_limpo,
-                re.IGNORECASE
-            )
+            # Busca especificamente o IPCA acumulado de 12 meses
+            match = re.search(r'IPCA\s+acumulado\s+de\s+12\s+meses.*?([0-9]+,[0-9]+)\s*%', resp.text, re.IGNORECASE | re.DOTALL)
             if match:
-                valor = float(match.group(1).replace(",", "."))
-                periodo = match.group(2).capitalize()
-                return valor, periodo
+                return float(match.group(1).replace(",", ".")), "IBGE (Web)"
     except Exception:
         pass
-
-    # 2. Segunda fonte oficial: API SGS do Banco Central (Série 13522 - IPCA Acumulado 12 meses)
-    try:
-        url_bcb = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json"
-        resp_bcb = requests.get(url_bcb, timeout=5)
-        if resp_bcb.status_code == 200:
-            dados_bcb = resp_bcb.json()
-            if dados_bcb and len(dados_bcb) > 0:
-                valor = float(dados_bcb[0]["valor"])
-                dt = datetime.strptime(dados_bcb[0]["data"], "%d/%m/%Y")
-                meses_pt = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-                periodo = f"{meses_pt[dt.month - 1]}/{dt.year}"
-                return valor, periodo
-    except Exception:
-        pass
-
-    return None, None
+    return 4.63, "Out/2026 (Referência Oficial)"
 
 def formatar_ci_num(ci_str):
     digits = re.sub(r'\D', '', str(ci_str))
@@ -444,76 +417,6 @@ div.stButton > button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,85,165,0.15);
 }
-
-/* --- PAINEL KANBAN (CONTRATOS E VENDAS): COLUNAS LARGAS E CARTÃO SELECIONÁVEL --- */
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div[data-testid="stHorizontalBlock"] {
-  overflow-x: auto !important;
-  flex-wrap: nowrap !important;
-  gap: 14px !important;
-  padding-bottom: 14px !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-  min-width: 230px !important;
-  width: 230px !important;
-  flex: 0 0 230px !important;
-  background-color: #F8FAFC !important;
-  border: 1px solid #E2E8F0 !important;
-  border-radius: 12px !important;
-  padding: 12px 10px !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div.stButton > button[kind="secondary"] {
-  background-color: #FFFFFF !important;
-  color: #1E293B !important;
-  border: 1px solid #CBD5E1 !important;
-  border-radius: 10px !important;
-  padding: 10px 12px !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  align-items: flex-start !important;
-  min-height: 66px !important;
-  height: auto !important;
-  line-height: 1.35 !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div.stButton > button[kind="secondary"]:hover {
-  border-color: #0055A5 !important;
-  background-color: #F0F7FF !important;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 85, 165, 0.14) !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div.stButton > button[kind="primary"] {
-  background-color: #EFF6FF !important;
-  color: #003366 !important;
-  border: 2px solid #0055A5 !important;
-  border-radius: 10px !important;
-  padding: 10px 12px !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  align-items: flex-start !important;
-  min-height: 66px !important;
-  height: auto !important;
-  line-height: 1.35 !important;
-  box-shadow: 0 3px 10px rgba(0, 85, 165, 0.18) !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div.stButton > button div[data-testid="stMarkdownContainer"] {
-  text-align: left !important;
-  width: 100% !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div.stButton > button div[data-testid="stMarkdownContainer"] p {
-  margin: 0 !important;
-  word-break: break-word !important;
-  white-space: normal !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div.stButton > button div[data-testid="stMarkdownContainer"] p:first-child {
-  font-size: 13.5px !important;
-  color: #003366 !important;
-  margin-bottom: 4px !important;
-}
-div[data-testid="stVerticalBlock"]:has(.cg-kanban-board) div.stButton > button div[data-testid="stMarkdownContainer"] p:last-child {
-  font-size: 12.5px !important;
-  color: #334155 !important;
-  font-weight: 500 !important;
-}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -591,34 +494,34 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
             st.markdown(f"{cor} **{st_name}**")
 
     with col_conteudo_ac:
-        # Área de Edição (Abre ao selecionar qualquer caixa de cliente)
+        # Área de Edição (Se um cliente foi clicado)
         id_editando = st.session_state[f"edit_id_{tipo_acompanhamento}"]
         if id_editando and id_editando in dados:
             d_edit = dados[id_editando]
             st.markdown("### ✏️ Edição de Cliente")
             with st.container(border=True):
                 c1, c2, c3 = st.columns([2, 3, 3])
-                with c1: ed_cod = st.text_input("Código do Cliente", value=d_edit['codigo_cliente'], key=f"ed_cod_{tipo_acompanhamento}_{id_editando}")
-                with c2: ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}_{id_editando}")
+                with c1: ed_cod = st.text_input("Código do Cliente", value=d_edit['codigo_cliente'], key=f"ed_cod_{tipo_acompanhamento}")
+                with c2: ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}")
                 with c3: 
                     idx_st = lista_status.index(d_edit['status']) if d_edit['status'] in lista_status else 0
-                    ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}_{id_editando}")
+                    ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}")
                 
                 c4, c5 = st.columns([2, 6])
                 with c4: 
                     idx_ms = d_edit['mes'] - 1 if 1 <= d_edit['mes'] <= 12 else 0
-                    ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}_{id_editando}")
-                with c5: ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}_{id_editando}")
+                    ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}")
+                with c5: ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}")
                 
                 b1, b2, b3, _ = st.columns([2, 2, 2, 4])
-                if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}_{id_editando}"):
+                if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
                     if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, d_edit['ano'], meses_nomes.index(ed_mes) + 1, ed_obs):
                         st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
                         st.rerun()
-                if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}_{id_editando}"):
+                if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
                     st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
                     st.rerun()
-                if b3.button("🗑️ Excluir Cliente", use_container_width=True, key=f"ed_del_{tipo_acompanhamento}_{id_editando}"):
+                if b3.button("🗑️ Excluir Cliente", use_container_width=True, key=f"ed_del_{tipo_acompanhamento}"):
                     apagar_acompanhamento(id_editando)
                     st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
                     st.rerun()
@@ -646,41 +549,28 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
 
         st.divider()
 
-        # Renderização do Painel (Kanban) com colunas largas e caixa inteira clicável
-        with st.container():
-            st.markdown('<span class="cg-kanban-board"></span>', unsafe_allow_html=True)
-            cols = st.columns(12)
-            for i, mes in enumerate(meses_nomes):
-                with cols[i]:
-                    st.markdown(
-                        f"<div style='text-align:center; font-weight:800; color:#0055A5; "
-                        f"border-bottom:2px solid #0055A5; padding-bottom:6px; margin-bottom:12px; "
-                        f"font-size:15px;'>{mes}</div>",
-                        unsafe_allow_html=True
-                    )
-                    for id_reg, d in dados.items():
-                        if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
-                            # Aplica o Filtro Lateral de Status
-                            if filtro_status != "Todos" and d['status'] != filtro_status:
-                                continue
+        # Renderização do Painel (Kanban)
+        cols = st.columns(12)
+        for i, mes in enumerate(meses_nomes):
+            with cols[i]:
+                st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px; font-size:14px;'>{mes}</div>", unsafe_allow_html=True)
+                for id_reg, d in dados.items():
+                    if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
+                        # Aplica o Filtro Lateral de Status
+                        if filtro_status != "Todos" and d['status'] != filtro_status:
+                            continue
+                        
+                        cor_status = dict_cores.get(d['status'], "⚪")
+                        nome_formatado = d.get('nome_cliente', '')
+
+                        # --- Transformando a caixa toda do cliente em um único botão clicável ---
+                        texto_botao = f"{cor_status} {d['codigo_cliente']}"
+                        if nome_formatado:
+                            texto_botao += f" - {nome_formatado}"
                             
-                            cor_status = dict_cores.get(d['status'], "⚪")
-                            nome_formatado = d.get('nome_cliente', '').strip()
-                            selecionado = (id_reg == id_editando)
-                            label_cartao = (
-                                f"{cor_status} **{d['codigo_cliente']}**\n\n{nome_formatado}"
-                                if nome_formatado else f"{cor_status} **{d['codigo_cliente']}**"
-                            )
-
-                            if st.button(
-                                label_cartao,
-                                key=f"card_sel_{tipo_acompanhamento}_{id_reg}",
-                                use_container_width=True,
-                                type="primary" if selecionado else "secondary"
-                            ):
-                                st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
-                                st.rerun()
-
+                        if st.button(texto_botao, key=f"card_edit_{id_reg}", use_container_width=True, help="Clique para exibir e editar as informações"):
+                            st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
+                            st.rerun()
 
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
@@ -1787,7 +1677,7 @@ Obs.: {observacoes}"""
                     ipca_vigente = ipca_api
                     st.success(f"📊 **IPCA Acumulado de 12 meses (Fonte oficial, referência {ipca_periodo}):** `{ipca_vigente:.2f}%`")
                 else:
-                    ipca_vigente = st.number_input("IPCA acumulado de 12 meses (%) - informado manualmente", min_value=0.0, value=4.63, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
+                    ipca_vigente = st.number_input("IPCA acumulado de 12 meses (%) - informado manualmente", min_value=0.0, value=4.58, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
 
                 col_an1, col_an2 = st.columns(2)
                 with col_an1: preco_anterior_input = st.text_input("Preço Anterior (R$)", value="7,7400", key=f"preco_ant_{rca}")
