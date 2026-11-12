@@ -216,12 +216,13 @@ def obter_ipca_acumulado_12m():
         url = "https://www.ibge.gov.br/explica/inflacao.php"
         resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
-            match = re.search(r'([0-9]+,[0-9]+)\s*%', resp.text)
+            # Busca especificamente o IPCA acumulado de 12 meses
+            match = re.search(r'IPCA\s+acumulado\s+de\s+12\s+meses.*?([0-9]+,[0-9]+)\s*%', resp.text, re.IGNORECASE | re.DOTALL)
             if match:
                 return float(match.group(1).replace(",", ".")), "IBGE (Web)"
     except Exception:
         pass
-    return 4.58, "Set/2026 (Referência Oficial)"
+    return 4.63, "Out/2026 (Referência Oficial)"
 
 def formatar_ci_num(ci_str):
     digits = re.sub(r'\D', '', str(ci_str))
@@ -561,22 +562,15 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         
                         cor_status = dict_cores.get(d['status'], "⚪")
                         nome_formatado = d.get('nome_cliente', '')
-                        obs_formatado = d.get('observacoes', '')
 
-                        with st.container(border=True):
-                            st.markdown(f"<div style='font-size:13px; font-weight:800; color:#003366;'>{d['codigo_cliente']}</div>", unsafe_allow_html=True)
-                            if nome_formatado:
-                                st.markdown(f"<div style='font-size:12px; color:#1E293B; margin-bottom:4px; line-height:1.2;'>{nome_formatado}</div>", unsafe_allow_html=True)
+                        # --- Transformando a caixa toda do cliente em um único botão clicável ---
+                        texto_botao = f"{cor_status} {d['codigo_cliente']}"
+                        if nome_formatado:
+                            texto_botao += f" - {nome_formatado}"
                             
-                            st.markdown(f"<div style='font-size:11px; margin-bottom:6px;'>{cor_status} {d['status']}</div>", unsafe_allow_html=True)
-                            
-                            if obs_formatado.strip():
-                                st.caption(f"📝 {obs_formatado}")
-
-                            if st.button("⚙️ Editar", key=f"card_edit_{id_reg}", use_container_width=True):
-                                st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
-                                st.rerun()
-
+                        if st.button(texto_botao, key=f"card_edit_{id_reg}", use_container_width=True, help="Clique para exibir e editar as informações"):
+                            st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
+                            st.rerun()
 
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
@@ -592,6 +586,7 @@ if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
 if "last_central" not in st.session_state: st.session_state.last_central = "Central"
 if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 if "reset_counter_contrato" not in st.session_state: st.session_state.reset_counter_contrato = 0
+if "reset_counter_fc" not in st.session_state: st.session_state.reset_counter_fc = 0
 
 
 # =====================================================================
@@ -1757,11 +1752,11 @@ Obs.: {observacoes}"""
             # 5. FICHA DE CLIENTE
             # -------------------------------------------------------------
             elif menu_tratativa == "🗂️ Ficha de Cliente":
-                rcf = st.session_state.reset_counter
+                rcf = st.session_state.reset_counter_fc
                 cabecalho_pagina("Ficha de Cliente", "Preenchimento de condições contratuais e comerciais para ficha de cliente.")
 
                 if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_limp_fc_{rcf}"):
-                    st.session_state.reset_counter += 1
+                    st.session_state.reset_counter_fc += 1
                     st.rerun()
 
                 st.divider()
@@ -1858,11 +1853,11 @@ Obs.: {observacoes}"""
                     linhas_fc.append(f"CONDIÇÃO DE PAGAMENTO: {cond_pag_fc.strip()}".rstrip())
                     linhas_fc.append(f"VIGÊNCIA: {vigencia_fc.strip()}".rstrip())
                     linhas_fc.append("")
-                    linhas_fc.append(f"Obs.: {motivo_fc.strip()}".rstrip())
+                    linhas_fc.append(f"Motivo: {motivo_fc.strip()}".rstrip())
 
                     if obs_fc.strip():
                         linhas_fc.append("")
-                        linhas_fc.append(obs_fc.strip())
+                        linhas_fc.append(f"Obs.: {obs_fc.strip()}")
 
                     texto_ficha_cliente = "\n".join(linhas_fc)
 
