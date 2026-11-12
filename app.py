@@ -1826,7 +1826,7 @@ Obs.: {observacoes}"""
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (COM CORREÇÃO DE NORMALIZAÇÃO)
+# ABA 2: AGENDA DE OCORRÊNCIAS
 # =====================================================================
 if aba_agenda is not None:
     with aba_agenda:
@@ -1893,6 +1893,7 @@ if aba_agenda is not None:
             prazo_dia = pd.Timestamp(prazo).normalize()
             hoje = pd.Timestamp(hoje_ref).normalize()
             
+            amanha = hoje + timedelta(days=1)
             dias_para_sexta = (4 - hoje.weekday()) % 7
             sexta_semana = hoje + timedelta(days=dias_para_sexta)
             
@@ -1900,6 +1901,8 @@ if aba_agenda is not None:
                 return "🔴 Vencido"
             elif prazo_dia == hoje:
                 return "🔵 Vence Hoje"
+            elif prazo_dia == amanha:
+                return "🟠 Vence Amanhã"
             elif prazo_dia <= sexta_semana:
                 return "🟡 Vence na Semana"
             else:
@@ -1937,6 +1940,7 @@ if aba_agenda is not None:
             else:
                 st.markdown("🔴 **Vencido**")
                 st.markdown("🔵 **Vence Hoje**")
+                st.markdown("🟠 **Vence Amanhã**")
                 st.markdown("🟡 **Vence na Semana**")
                 st.markdown("🟢 **No Prazo**")
 
@@ -2048,7 +2052,8 @@ if aba_agenda is not None:
                     else:
                         vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 Vencido'])
                         hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔵 Vence Hoje'])
-                        amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 Vence na Semana'])
+                        amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟠 Vence Amanhã'])
+                        semana_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 Vence na Semana'])
                         cinco_dias_qt = len(df_base_visao[df_base_visao['Prazo_DT'] <= sexta_semana])
 
                         c1, c2, c3, c4, c5 = st.columns(5)
@@ -2062,11 +2067,11 @@ if aba_agenda is not None:
                             if st.button(f"**{hoje_qt}**\nVence Hoje", use_container_width=True):
                                 st.session_state.filtro_dashboard_ativo = "🔵 Vence Hoje"
                         with c4:
-                            if st.button(f"**{amanha_qt}**\nVence na Semana", use_container_width=True):
-                                st.session_state.filtro_dashboard_ativo = "🟡 Vence na Semana"
+                            if st.button(f"**{amanha_qt}**\nVence Amanhã", use_container_width=True):
+                                st.session_state.filtro_dashboard_ativo = "🟠 Vence Amanhã"
                         with c5:
-                            if st.button(f"**{cinco_dias_qt}**\nAcumulado Semana", use_container_width=True):
-                                st.session_state.filtro_dashboard_ativo = "Acumulado"
+                            if st.button(f"**{semana_qt}**\nVence na Semana", use_container_width=True):
+                                st.session_state.filtro_dashboard_ativo = "🟡 Vence na Semana"
 
                     st.divider()
 
@@ -2090,10 +2095,7 @@ if aba_agenda is not None:
                     df_filtrado = df_base_visao.copy()
                     
                     if st.session_state.filtro_dashboard_ativo != "Todas":
-                        if st.session_state.filtro_dashboard_ativo == "Acumulado":
-                            df_filtrado = df_filtrado[df_filtrado['Prazo_DT'] <= sexta_semana]
-                        else:
-                            df_filtrado = df_filtrado[df_filtrado['Status Geral'] == st.session_state.filtro_dashboard_ativo]
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == st.session_state.filtro_dashboard_ativo]
 
                     if st.session_state.e_supervisor and consultor_sel != "Todos":
                         df_filtrado = df_filtrado[df_filtrado['Consultor'] == consultor_sel]
