@@ -500,34 +500,43 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
         id_editando = st.session_state[f"edit_id_{tipo_acompanhamento}"]
         if id_editando and id_editando in dados:
             d_edit = dados[id_editando]
-            st.markdown("### ✏️ Edição de Cliente")
-            with st.container(border=True):
-                c1, c2, c3 = st.columns([2, 3, 3])
-                with c1: ed_cod = st.text_input("Código do Cliente", value=d_edit['codigo_cliente'], key=f"ed_cod_{tipo_acompanhamento}")
-                with c2: ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}")
-                with c3: 
-                    idx_st = lista_status.index(d_edit['status']) if d_edit['status'] in lista_status else 0
-                    ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}")
-                
-                c4, c5 = st.columns([2, 6])
-                with c4: 
-                    idx_ms = d_edit['mes'] - 1 if 1 <= d_edit['mes'] <= 12 else 0
-                    ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}")
-                with c5: ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}")
-                
-                b1, b2, b3, _ = st.columns([2, 2, 2, 4])
-                if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
-                    if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, d_edit['ano'], meses_nomes.index(ed_mes) + 1, ed_obs):
+            
+            # Trava de segurança para edição
+            if not isinstance(d_edit, dict):
+                st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                st.rerun()
+            else:
+                st.markdown("### ✏️ Edição de Cliente")
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([2, 3, 3])
+                    with c1: ed_cod = st.text_input("Código do Cliente", value=d_edit.get('codigo_cliente', ''), key=f"ed_cod_{tipo_acompanhamento}")
+                    with c2: ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}")
+                    with c3: 
+                        status_val = d_edit.get('status', lista_status[0])
+                        idx_st = lista_status.index(status_val) if status_val in lista_status else 0
+                        ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}")
+                    
+                    c4, c5 = st.columns([2, 6])
+                    with c4: 
+                        mes_val = d_edit.get('mes', 1)
+                        idx_ms = mes_val - 1 if isinstance(mes_val, int) and 1 <= mes_val <= 12 else 0
+                        ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}")
+                    with c5: ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}")
+                    
+                    b1, b2, b3, _ = st.columns([2, 2, 2, 4])
+                    if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
+                        ano_val = d_edit.get('ano', ano_selecionado)
+                        if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, ano_val, meses_nomes.index(ed_mes) + 1, ed_obs):
+                            st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                            st.rerun()
+                    if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
                         st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
                         st.rerun()
-                if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
-                    st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
-                    st.rerun()
-                if b3.button("🗑️ Excluir Cliente", use_container_width=True, key=f"ed_del_{tipo_acompanhamento}"):
-                    apagar_acompanhamento(id_editando)
-                    st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
-                    st.rerun()
-            st.divider()
+                    if b3.button("🗑️ Excluir Cliente", use_container_width=True, key=f"ed_del_{tipo_acompanhamento}"):
+                        apagar_acompanhamento(id_editando)
+                        st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                        st.rerun()
+                st.divider()
 
         # Formulário para Adicionar Novo Cliente
         with st.expander("➕ Adicionar Novo Cliente", expanded=False):
@@ -557,12 +566,18 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
             with cols[i]:
                 st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px; font-size:14px;'>{mes}</div>", unsafe_allow_html=True)
                 for id_reg, d in dados.items():
-                    if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
+                    
+                    # Trava de segurança para ignorar dados corrompidos (não dicionários) que travam o card
+                    if not isinstance(d, dict):
+                        continue
+                        
+                    # Uso do .get para prevenir KeyError
+                    if d.get('ano') == ano_selecionado and d.get('mes') == (i + 1):
                         # Aplica o Filtro Lateral de Status
-                        if filtro_status != "Todos" and d['status'] != filtro_status:
+                        if filtro_status != "Todos" and d.get('status') != filtro_status:
                             continue
                         
-                        cor_status = dict_cores.get(d['status'], "⚪")
+                        cor_status = dict_cores.get(d.get('status'), "⚪")
                         nome_formatado = d.get('nome_cliente', '').strip()
                         primeiro_nome = ""
 
@@ -576,7 +591,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                                     break
 
                         # --- Transformando a caixa toda do cliente em um único botão clicável (com quebra de linha) ---
-                        texto_botao = f"{cor_status} {d['codigo_cliente']}"
+                        texto_botao = f"{cor_status} {d.get('codigo_cliente', '')}"
                         if primeiro_nome:
                             texto_botao += f"\n{primeiro_nome}"
                             
