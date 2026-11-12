@@ -216,13 +216,12 @@ def obter_ipca_acumulado_12m():
         url = "https://www.ibge.gov.br/explica/inflacao.php"
         resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
-            # Busca especificamente o IPCA acumulado de 12 meses
-            match = re.search(r'IPCA\s+acumulado\s+de\s+12\s+meses.*?([0-9]+,[0-9]+)\s*%', resp.text, re.IGNORECASE | re.DOTALL)
+            match = re.search(r'([0-9]+,[0-9]+)\s*%', resp.text)
             if match:
                 return float(match.group(1).replace(",", ".")), "IBGE (Web)"
     except Exception:
         pass
-    return 4.63, "Out/2026 (Referência Oficial)"
+    return 4.58, "Set/2026 (Referência Oficial)"
 
 def formatar_ci_num(ci_str):
     digits = re.sub(r'\D', '', str(ci_str))
@@ -412,8 +411,6 @@ div.stButton > button {
   border-radius: 10px !important;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   transition: all 0.2s ease;
-  white-space: pre-wrap !important;
-  height: auto !important;
 }
 div.stButton > button:hover {
   transform: translateY(-2px);
@@ -500,43 +497,34 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
         id_editando = st.session_state[f"edit_id_{tipo_acompanhamento}"]
         if id_editando and id_editando in dados:
             d_edit = dados[id_editando]
-            
-            # Trava de segurança para edição
-            if not isinstance(d_edit, dict):
-                st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
-                st.rerun()
-            else:
-                st.markdown("### ✏️ Edição de Cliente")
-                with st.container(border=True):
-                    c1, c2, c3 = st.columns([2, 3, 3])
-                    with c1: ed_cod = st.text_input("Código do Cliente", value=d_edit.get('codigo_cliente', ''), key=f"ed_cod_{tipo_acompanhamento}")
-                    with c2: ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}")
-                    with c3: 
-                        status_val = d_edit.get('status', lista_status[0])
-                        idx_st = lista_status.index(status_val) if status_val in lista_status else 0
-                        ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}")
-                    
-                    c4, c5 = st.columns([2, 6])
-                    with c4: 
-                        mes_val = d_edit.get('mes', 1)
-                        idx_ms = mes_val - 1 if isinstance(mes_val, int) and 1 <= mes_val <= 12 else 0
-                        ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}")
-                    with c5: ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}")
-                    
-                    b1, b2, b3, _ = st.columns([2, 2, 2, 4])
-                    if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
-                        ano_val = d_edit.get('ano', ano_selecionado)
-                        if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, ano_val, meses_nomes.index(ed_mes) + 1, ed_obs):
-                            st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
-                            st.rerun()
-                    if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
+            st.markdown("### ✏️ Edição de Cliente")
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2, 3, 3])
+                with c1: ed_cod = st.text_input("Código do Cliente", value=d_edit['codigo_cliente'], key=f"ed_cod_{tipo_acompanhamento}")
+                with c2: ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}")
+                with c3: 
+                    idx_st = lista_status.index(d_edit['status']) if d_edit['status'] in lista_status else 0
+                    ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}")
+                
+                c4, c5 = st.columns([2, 6])
+                with c4: 
+                    idx_ms = d_edit['mes'] - 1 if 1 <= d_edit['mes'] <= 12 else 0
+                    ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}")
+                with c5: ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}")
+                
+                b1, b2, b3, _ = st.columns([2, 2, 2, 4])
+                if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
+                    if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, d_edit['ano'], meses_nomes.index(ed_mes) + 1, ed_obs):
                         st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
                         st.rerun()
-                    if b3.button("🗑️ Excluir Cliente", use_container_width=True, key=f"ed_del_{tipo_acompanhamento}"):
-                        apagar_acompanhamento(id_editando)
-                        st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
-                        st.rerun()
-                st.divider()
+                if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
+                    st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                    st.rerun()
+                if b3.button("🗑️ Excluir Cliente", use_container_width=True, key=f"ed_del_{tipo_acompanhamento}"):
+                    apagar_acompanhamento(id_editando)
+                    st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                    st.rerun()
+            st.divider()
 
         # Formulário para Adicionar Novo Cliente
         with st.expander("➕ Adicionar Novo Cliente", expanded=False):
@@ -566,38 +554,29 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
             with cols[i]:
                 st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px; font-size:14px;'>{mes}</div>", unsafe_allow_html=True)
                 for id_reg, d in dados.items():
-                    
-                    # Trava de segurança para ignorar dados corrompidos (não dicionários) que travam o card
-                    if not isinstance(d, dict):
-                        continue
-                        
-                    # Uso do .get para prevenir KeyError
-                    if d.get('ano') == ano_selecionado and d.get('mes') == (i + 1):
+                    if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
                         # Aplica o Filtro Lateral de Status
-                        if filtro_status != "Todos" and d.get('status') != filtro_status:
+                        if filtro_status != "Todos" and d['status'] != filtro_status:
                             continue
                         
-                        cor_status = dict_cores.get(d.get('status'), "⚪")
-                        nome_formatado = d.get('nome_cliente', '').strip()
-                        primeiro_nome = ""
+                        cor_status = dict_cores.get(d['status'], "⚪")
+                        nome_formatado = d.get('nome_cliente', '')
+                        obs_formatado = d.get('observacoes', '')
 
-                        if nome_formatado:
-                            for palavra in nome_formatado.split():
-                                # Remove caracteres de pontuação frequentemente usados em CNPJs ou códigos (pontos, vírgulas, traços, barras)
-                                limpo = re.sub(r'[\.\,\-\/]', '', palavra)
-                                # Se, após limpar, não for composto apenas de números, é a primeira palavra válida
-                                if not limpo.isdigit():
-                                    primeiro_nome = palavra
-                                    break
-
-                        # --- Transformando a caixa toda do cliente em um único botão clicável (com quebra de linha) ---
-                        texto_botao = f"{cor_status} {d.get('codigo_cliente', '')}"
-                        if primeiro_nome:
-                            texto_botao += f"\n{primeiro_nome}"
+                        with st.container(border=True):
+                            st.markdown(f"<div style='font-size:13px; font-weight:800; color:#003366;'>{d['codigo_cliente']}</div>", unsafe_allow_html=True)
+                            if nome_formatado:
+                                st.markdown(f"<div style='font-size:12px; color:#1E293B; margin-bottom:4px; line-height:1.2;'>{nome_formatado}</div>", unsafe_allow_html=True)
                             
-                        if st.button(texto_botao, key=f"card_edit_{id_reg}", use_container_width=True, help="Clique para exibir e editar as informações"):
-                            st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
-                            st.rerun()
+                            st.markdown(f"<div style='font-size:11px; margin-bottom:6px;'>{cor_status} {d['status']}</div>", unsafe_allow_html=True)
+                            
+                            if obs_formatado.strip():
+                                st.caption(f"📝 {obs_formatado}")
+
+                            if st.button("⚙️ Editar", key=f"card_edit_{id_reg}", use_container_width=True):
+                                st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
+                                st.rerun()
+
 
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
@@ -613,7 +592,6 @@ if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
 if "last_central" not in st.session_state: st.session_state.last_central = "Central"
 if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 if "reset_counter_contrato" not in st.session_state: st.session_state.reset_counter_contrato = 0
-if "reset_counter_fc" not in st.session_state: st.session_state.reset_counter_fc = 0
 
 
 # =====================================================================
@@ -1779,11 +1757,11 @@ Obs.: {observacoes}"""
             # 5. FICHA DE CLIENTE
             # -------------------------------------------------------------
             elif menu_tratativa == "🗂️ Ficha de Cliente":
-                rcf = st.session_state.reset_counter_fc
+                rcf = st.session_state.reset_counter
                 cabecalho_pagina("Ficha de Cliente", "Preenchimento de condições contratuais e comerciais para ficha de cliente.")
 
                 if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_limp_fc_{rcf}"):
-                    st.session_state.reset_counter_fc += 1
+                    st.session_state.reset_counter += 1
                     st.rerun()
 
                 st.divider()
@@ -1880,11 +1858,11 @@ Obs.: {observacoes}"""
                     linhas_fc.append(f"CONDIÇÃO DE PAGAMENTO: {cond_pag_fc.strip()}".rstrip())
                     linhas_fc.append(f"VIGÊNCIA: {vigencia_fc.strip()}".rstrip())
                     linhas_fc.append("")
-                    linhas_fc.append(f"Motivo: {motivo_fc.strip()}".rstrip())
+                    linhas_fc.append(f"Obs.: {motivo_fc.strip()}".rstrip())
 
                     if obs_fc.strip():
                         linhas_fc.append("")
-                        linhas_fc.append(f"Obs.: {obs_fc.strip()}")
+                        linhas_fc.append(obs_fc.strip())
 
                     texto_ficha_cliente = "\n".join(linhas_fc)
 
