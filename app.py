@@ -245,7 +245,6 @@ def ler_arquivo_excel_robusto(uploaded_file):
             html_text = bytes_data.decode('utf-8')
         except UnicodeDecodeError:
             html_text = bytes_data.decode('ISO-8859-1', errors='ignore')
-        import re
         table_match = re.search(r'<table[^>]*>(.*?)</table>', html_text, re.DOTALL | re.IGNORECASE)
         if not table_match:
             raise ValueError("Nenhuma tabela HTML encontrada.")
@@ -468,7 +467,7 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
-# --- GERENCIADOR DO PAINEL KANBAN (CONTRATOS E VENDAS) COM ESTILO VISUAL ---
+# --- GERENCIADOR DO PAINEL KANBAN (CONTRATOS E VENDAS) COM LARGURA AMPLIADA ---
 def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cores):
     usuario = st.session_state.usuario_atual
     dados = carregar_acompanhamento(usuario, tipo_acompanhamento)
@@ -487,8 +486,8 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                 return limpo if limpo else p
         return palavras[0] if palavras else ""
 
-    # Estrutura com Menu Lateral e Área Principal
-    col_menu_ac, col_conteudo_ac = st.columns([1, 4])
+    # Ajustado proporção para dar mais espaço às colunas do Kanban (1:5)
+    col_menu_ac, col_conteudo_ac = st.columns([1, 5])
     
     with col_menu_ac:
         st.markdown("### 📌 Filtros")
@@ -557,14 +556,13 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
 
         st.divider()
 
-        # Renderização do Painel (Kanban)
+        # Renderização do Painel (Kanban) com largura expandida
         cols = st.columns(12)
         for i, mes in enumerate(meses_nomes):
             with cols[i]:
-                st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px; font-size:14px;'>{mes}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px; font-size:13px;'>{mes}</div>", unsafe_allow_html=True)
                 for id_reg, d in dados.items():
                     if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
-                        # Aplica o Filtro Lateral de Status
                         if filtro_status != "Todos" and d['status'] != filtro_status:
                             continue
                         
@@ -572,9 +570,8 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         nome_formatado = d.get('nome_cliente', '')
                         primeiro_nome = obter_primeiro_nome(nome_formatado)
 
-                        # --- Transformando a caixa toda do cliente em um único botão clicável ---
-                        # Linha 1: Status e Código do Cliente
-                        # Linha 2: Apenas o primeiro nome do cliente
+                        # Linha 1: Status e Código
+                        # Linha 2: Primeiro nome do cliente
                         linha_1 = f"{cor_status} {d['status']} - {d['codigo_cliente']}"
                         linha_2 = primeiro_nome if primeiro_nome else "Cliente"
                         texto_botao = f"{linha_1}\n{linha_2}"
@@ -1029,10 +1026,22 @@ Obs.: {observacoes}"""
                             pdf.set_margins(10, 32, 10)
                             pdf.set_auto_page_break(auto=True, margin=20)
                             
+                            primeira_pagina = True
                             for categoria, arquivos in dic_fotos_final.items():
                                 if arquivos:
                                     pdf.add_page()
                                     pdf.set_font("Arial", "B", 11)
+                                    
+                                    # Título principal apenas na primeira folha
+                                    if primeira_pagina:
+                                        pdf.cell(0, 6, "RELATÓRIO FOTOGRÁFICO", ln=1, align="C")
+                                        info_cab = f"{pdf.cod_cliente} | {pdf.nome_cliente}".strip(" |")
+                                        if info_cab:
+                                            pdf.cell(0, 6, info_cab, ln=1, align="C")
+                                        pdf.ln(6)
+                                        primeira_pagina = False
+
+                                    # Título da categoria padronizado no início de cada página
                                     pdf.cell(0, 6, categoria.upper(), ln=1, align="L")
                                     pdf.ln(4)
                                     
@@ -1060,9 +1069,12 @@ Obs.: {observacoes}"""
                                             
                                             if pdf.get_y() + h_alvo > 270:
                                                 pdf.add_page()
+                                                pdf.set_font("Arial", "B", 11)
+                                                pdf.cell(0, 6, categoria.upper(), ln=1, align="L")
+                                                pdf.ln(4)
                                             
                                             pdf.image(temp_path, x=pos_x_centro, y=pdf.get_y(), w=w_alvo, h=h_alvo)
-                                            pdf.set_y(pdf.get_y() + h_alvo + 10)
+                                            pdf.set_y(pdf.get_y() + h_alvo + 10) # 1 quebra de linha de distanciamento
                                         except Exception:
                                             pass
                                         finally:
@@ -1125,7 +1137,7 @@ Obs.: {observacoes}"""
                             )
 
             # -------------------------------------------------------------
-            # 2. ELABORAÇÃO DE CONTRATO
+            # 2. ELABORAÇÃO DE CONTRATO (Com campos preenchidos apenas se informados)
             # -------------------------------------------------------------
             elif menu_tratativa == "📝 Elaboração de Contrato":
                 rcc = st.session_state.reset_counter_contrato
@@ -1137,10 +1149,11 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                motivo_solicitacao = st.text_area("Descreva claramente o motivo da regularização do contrato:", key=f"motivo_{rcc}")
+                motivo_solicitacao = st.text_area("1. Descreva claramente o motivo da regularização do contrato:", key=f"motivo_{rcc}")
 
                 st.divider()
 
+                st.markdown("### 2. Dados do Cliente")
                 col_cli1, col_cli2, col_cli3 = st.columns(3)
                 with col_cli1: contato_contrato = st.text_input("Contato", key=f"contato_c_{rcc}")
                 with col_cli2: telefone_contrato = st.text_input("Telefone", key=f"tel_c_{rcc}")
@@ -1148,11 +1161,12 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
+                st.markdown("### 3. Solicitação & Contrato")
                 col_sol1, col_sol2 = st.columns(2)
                 with col_sol1:
                     tipo_fluxo = st.radio("Selecione o objetivo da solicitação:", ["Gerar Minuta", "Enviar para Assinatura"], horizontal=True, index=None, key=f"fluxo_c_{rcc}")
                 with col_sol2:
-                    tipo_contrato = st.radio("Contrato / Aditamento / Distrato:", ["Contrato", "Aditamento", "Distrato"], horizontal=True, index=None, key=f"tp_cont_{rcc}")
+                    tipo_contrato = st.selectbox("Contrato / Aditamento / Distrato:", ["", "Contrato", "Aditamento", "Distrato"], key=f"tp_cont_{rcc}")
 
                 st.divider()
 
@@ -1164,7 +1178,7 @@ Obs.: {observacoes}"""
 
                 cnpj_campo_val, ie_campo_val = "", ""
                 status_cnpj_txt, razao_social_txt = "", ""
-                email_novo_prop = "N/A"
+                email_novo_prop = ""
 
                 col_b2_3, col_b2_4 = st.columns(2)
                 with col_b2_3:
@@ -1192,6 +1206,7 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
+                st.markdown("### 4. Endereço e Equipamentos")
                 col_b3_1, col_b3_2 = st.columns(2)
                 with col_b3_1:
                     endereco_padrao = st.text_input("Endereço padrão ou entrega?:", key=f"end_padrao_{rcc}")
@@ -1211,6 +1226,7 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
+                st.markdown("### 5. Fornecimento & Preços")
                 tipo_fornecimento = st.radio("Tipo de Fornecimento:", ["Granel", "Cilindro", "Ambos"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
                 
                 preco_granel, consumo_granel_input = "", ""
@@ -1224,7 +1240,7 @@ Obs.: {observacoes}"""
                     with col_g1:
                         preco_granel = st.text_input("Preço Granel (R$/kg):", key=f"preco_granel_{rcc}")
                     with col_g2:
-                        consumo_granel_input = st.text_input("Consumo previsto (Granel) mensal:", placeholder="Ex: 100 ou 100 kgs", key=f"cons_granel_{rcc}")
+                        consumo_granel_input = st.text_input("Consumo previsto (Granel) mensal:", placeholder="Ex: 100 kgs", key=f"cons_granel_{rcc}")
 
                 if tipo_fornecimento in ["Cilindro", "Ambos"]:
                     col_cp1, col_cp2, col_cp3 = st.columns(3)
@@ -1254,10 +1270,11 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
+                st.markdown("### 6. Financeiro & Assinaturas")
                 col_fin1, col_fin2 = st.columns(2)
                 with col_fin1:
                     possui_debito_fin = st.radio("Possui NF's Pendentes?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
-                    resp_pendentes = "N/A"
+                    resp_pendentes = ""
                     if possui_debito_fin == "Sim":
                         resp_pendentes = st.text_input("Quem será o responsável pelas NF's pendentes?", key=f"resp_pend_{rcc}")
                 with col_fin2:
@@ -1282,6 +1299,7 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
+                st.markdown("### 7. Condomínio CONTA SIM")
                 conta_sim = st.radio("Condomínio CONTA SIM?:", ["Sim", "Não"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
                 num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
 
@@ -1365,8 +1383,10 @@ Obs.: {observacoes}"""
                     if eq_filled:
                         lines_out.append(f"Equipamentos: {' '.join(eq_filled)}")
                     
-                    lines_out.append(f"Quem será o responsável pelas NF's pendentes? {resp_pendentes.strip()}")
-                    lines_out.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop.strip()}")
+                    if resp_pendentes and resp_pendentes.strip():
+                        lines_out.append(f"Quem será o responsável pelas NF's pendentes? {resp_pendentes.strip()}")
+                    if email_novo_prop and email_novo_prop.strip():
+                        lines_out.append(f"E-mail do novo proprietário que receberá o novo contrato: {email_novo_prop.strip()}")
                     
                     if tipo_fluxo == "Enviar para Assinatura":
                         if nome_testemunha and nome_testemunha.strip():
@@ -1711,7 +1731,7 @@ Obs.: {observacoes}"""
                     botao_copiar_customizado(texto_ci, "ci_txt")
 
             # -------------------------------------------------------------
-            # 5. FICHA DE CLIENTE
+            # 5. FICHA DE CLIENTE (Sem nenhuma informação preenchida)
             # -------------------------------------------------------------
             elif menu_tratativa == "🗂️ Ficha de Cliente":
                 rcf = st.session_state.reset_counter_fc
@@ -1723,15 +1743,15 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                motivo_fc = st.text_input("Motivo:", key=f"fc_motivo_{rcf}")
+                motivo_fc = st.text_input("Motivo:", value="", key=f"fc_motivo_{rcf}")
 
                 col_fc_c1, col_fc_c2 = st.columns(2)
                 with col_fc_c1:
-                    contrato_ant_fc = st.text_input("Contrato / Aditamento Anterior:", key=f"fc_cont_ant_{rcf}")
+                    contrato_ant_fc = st.text_input("Contrato / Aditamento Anterior:", value="", key=f"fc_cont_ant_{rcf}")
                 with col_fc_c2:
-                    contrato_novo_fc = st.text_input("Contrato Novo:", key=f"fc_cont_novo_{rcf}")
+                    contrato_novo_fc = st.text_input("Contrato Novo:", value="", key=f"fc_cont_novo_{rcf}")
 
-                comodato_fc = st.text_input("Comodato:", key=f"fc_comodato_{rcf}")
+                comodato_fc = st.text_input("Comodato:", value="", key=f"fc_comodato_{rcf}")
 
                 st.divider()
 
@@ -1752,30 +1772,30 @@ Obs.: {observacoes}"""
                     st.markdown("**Dados Granel:**")
                     col_fc_g1, col_fc_g2 = st.columns(2)
                     with col_fc_g1:
-                        preco_granel_fc = st.text_input("Preço Granel (/kg):", key=f"fc_preco_granel_{rcf}")
+                        preco_granel_fc = st.text_input("Preço Granel (/kg):", value="", key=f"fc_preco_granel_{rcf}")
                     with col_fc_g2:
-                        consumo_granel_fc = st.text_input("Consumo Mensal Previsto (Granel):", key=f"fc_cons_granel_{rcf}")
+                        consumo_granel_fc = st.text_input("Consumo Mensal Previsto (Granel):", value="", key=f"fc_cons_granel_{rcf}")
 
                 if tipo_forn_fc in ["Cilindro", "Ambos"]:
                     st.markdown("**Dados Cilindro:**")
                     col_fc_p1, col_fc_p2, col_fc_p3 = st.columns(3)
                     with col_fc_p1:
-                        p13_fc = st.text_input("Preço P13 (/und P13):", key=f"fc_p13_{rcf}")
+                        p13_fc = st.text_input("Preço P13 (/und P13):", value="", key=f"fc_p13_{rcf}")
                     with col_fc_p2:
-                        p20_fc = st.text_input("Preço P20 (/und P20):", key=f"fc_p20_{rcf}")
+                        p20_fc = st.text_input("Preço P20 (/und P20):", value="", key=f"fc_p20_{rcf}")
                     with col_fc_p3:
-                        p45_fc = st.text_input("Preço P45 (/und P45):", key=f"fc_p45_{rcf}")
-                    consumo_cil_fc = st.text_input("Consumo Mensal Previsto (Cilindro):", key=f"fc_cons_cil_{rcf}")
+                        p45_fc = st.text_input("Preço P45 (/und P45):", value="", key=f"fc_p45_{rcf}")
+                    consumo_cil_fc = st.text_input("Consumo Mensal Previsto (Cilindro):", value="", key=f"fc_cons_cil_{rcf}")
 
                 st.divider()
 
                 col_fc_v1, col_fc_v2 = st.columns(2)
                 with col_fc_v1:
-                    cond_pag_fc = st.text_input("Condição de Pagamento:", key=f"fc_cond_pag_{rcf}")
+                    cond_pag_fc = st.text_input("Condição de Pagamento:", value="", key=f"fc_cond_pag_{rcf}")
                 with col_fc_v2:
-                    vigencia_fc = st.text_input("Vigência:", key=f"fc_vigencia_{rcf}")
+                    vigencia_fc = st.text_input("Vigência:", value="", key=f"fc_vigencia_{rcf}")
 
-                obs_fc = st.text_area("Obs.:", key=f"fc_obs_{rcf}")
+                obs_fc = st.text_area("Obs.:", value="", key=f"fc_obs_{rcf}")
 
                 st.divider()
 
