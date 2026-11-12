@@ -94,6 +94,7 @@ def remover_usuario(usuario):
     try:
         supabase.table("usuarios").delete().eq("usuario", usuario).execute()
         supabase.table("notas").delete().eq("usuario", usuario).execute()
+        supabase.table("acompanhamento").delete().eq("usuario", usuario).execute()
         return True
     except Exception as e:
         st.error(f"Erro ao remover usuário: {e}")
@@ -139,6 +140,43 @@ def apagar_nota(nota_id):
     except Exception as e:
         st.error(f"Erro ao apagar nota: {e}")
         return False
+
+# --- FUNÇÕES DE PERSISTÊNCIA: CONTRATOS & VENDAS ---
+def carregar_acompanhamento(usuario, tipo):
+    try:
+        res = supabase.table("acompanhamento").select("*").eq("usuario", usuario).eq("tipo", tipo).execute()
+        dados = {}
+        for row in res.data:
+            dados[row["id"]] = row
+        return dados
+    except Exception as e:
+        return {}
+
+def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, status, ano, mes):
+    try:
+        payload = {
+            "id": id_reg,
+            "usuario": usuario,
+            "tipo": tipo,
+            "codigo_cliente": codigo_cliente,
+            "status": status,
+            "ano": ano,
+            "mes": mes,
+            "data_modificacao": datetime.now().strftime("%d/%m/%Y %H:%M")
+        }
+        supabase.table("acompanhamento").upsert(payload).execute()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar acompanhamento: {e}")
+        return False
+
+def apagar_acompanhamento(id_reg):
+    try:
+        supabase.table("acompanhamento").delete().eq("id", id_reg).execute()
+        return True
+    except Exception:
+        return False
+
 
 # --- CONSULTA CNPJ & IPCA ---
 @st.cache_data(ttl=3600)
@@ -277,7 +315,7 @@ html, body, [class*="css"], .stApp {
   color: #1B2A3A !important;
 }
 
-[data-testid="stHeader"] { background: transparent; }
+[data-testid="stHeader"] { background: transparent; visibility: hidden; position: hidden; }
 #MainMenu, footer { visibility: hidden; }
 
 div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
@@ -419,6 +457,62 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
+# --- GERENCIADOR DO PAINEL KANBAN (CONTRATOS E VENDAS) ---
+def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status):
+    usuario = st.session_state.usuario_atual
+    dados = carregar_acompanhamento(usuario, tipo_acompanhamento)
+    meses_nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
+    def wrapper_update(id_r, usr, tp, cod, st_val, ano_v, mes_v, trigger):
+        if trigger == "status":
+            s = st.session_state[st_val]
+            m = mes_v
+        else:
+            s = st_val
+            m = meses_nomes.index(st.session_state[mes_v]) + 1
+        salvar_acompanhamento(id_r, usr, tp, cod, s, ano_v, m)
+
+    c_ano, c_vazio = st.columns([1, 4])
+    with c_ano:
+        ano_selecionado = st.selectbox("📅 Selecione o Ano", [2024, 2025, 2026, 2027, 2028], index=2, key=f"ano_sel_{tipo_acompanhamento}")
+
+    with st.expander("➕ Adicionar Novo Cliente", expanded=False):
+        c_cod, c_st, c_mes, c_btn = st.columns([2, 3, 2, 1])
+        with c_cod: novo_cod = st.text_input("Código do Cliente", key=f"n_cod_{tipo_acompanhamento}")
+        with c_st: novo_st = st.selectbox("Status Inicial", lista_status, key=f"n_st_{tipo_acompanhamento}")
+        with c_mes: novo_ms = st.selectbox("Mês de Alocação", meses_nomes, key=f"n_ms_{tipo_acompanhamento}")
+        with c_btn:
+            st.write("")
+            st.write("")
+            if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}", use_container_width=True):
+                if novo_cod:
+                    novo_id = str(uuid.uuid4())
+                    salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1)
+                    st.rerun()
+
+    st.divider()
+
+    cols = st.columns(12)
+    for i, mes in enumerate(meses_nomes):
+        with cols[i]:
+            st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px;'>{mes}</div>", unsafe_allow_html=True)
+            for id_reg, d in dados.items():
+                if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
+                    with st.container(border=True):
+                        st.markdown(f"**{d['codigo_cliente']}**")
+                        
+                        k_st = f"st_{id_reg}"
+                        idx_st = lista_status.index(d['status']) if d['status'] in lista_status else 0
+                        st.selectbox("Status", lista_status, index=idx_st, key=k_st, label_visibility="collapsed", on_change=wrapper_update, args=(id_reg, usuario, tipo_acompanhamento, d['codigo_cliente'], k_st, d['ano'], d['mes'], "status"))
+
+                        k_ms = f"ms_{id_reg}"
+                        st.selectbox("Mover para Mês", meses_nomes, index=i, key=k_ms, label_visibility="collapsed", on_change=wrapper_update, args=(id_reg, usuario, tipo_acompanhamento, d['codigo_cliente'], d['status'], d['ano'], k_ms, "mes"))
+
+                        if st.button("🗑️", key=f"del_{id_reg}", use_container_width=True):
+                            apagar_acompanhamento(id_reg)
+                            st.rerun()
+
+
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_atual" not in st.session_state: st.session_state.usuario_atual = ""
@@ -518,7 +612,9 @@ if st.session_state.e_admin:
 else:
     lista_abas = [
         "🛠️ Tratativa de Ocorrências",
-        "📊 Agenda de Ocorrências", 
+        "📊 Agenda de Ocorrências",
+        "📄 Status de Contratos",
+        "💰 Status de Vendas",
         "📓 Bloco de Notas Pessoal"
     ]
     if st.session_state.e_supervisor:
@@ -530,12 +626,16 @@ if st.session_state.e_admin:
     aba_admin = abas_sistema[0]
     aba_tratativa = None
     aba_agenda = None
+    aba_contratos = None
+    aba_vendas = None
     aba_notas = None
 else:
     aba_tratativa = abas_sistema[0]
     aba_agenda = abas_sistema[1]
-    aba_notas = abas_sistema[2]
-    aba_admin = abas_sistema[3] if st.session_state.e_supervisor else None
+    aba_contratos = abas_sistema[2]
+    aba_vendas = abas_sistema[3]
+    aba_notas = abas_sistema[4]
+    aba_admin = abas_sistema[5] if st.session_state.e_supervisor else None
 
 if "nota_selecionada_id" not in st.session_state: st.session_state.nota_selecionada_id = None
 
@@ -1825,7 +1925,6 @@ if aba_agenda is not None:
 
                     df_base_visao = df_pendentes.copy()
 
-                    # --- DASHBOARD UNIFICADO DE GESTÃO (GRÁFICOS 02 POR LINHA) PARA SUPERVISOR ---
                     if st.session_state.e_supervisor and tipo_visao_agenda == "📊 Dashboard de Gestão (Gráficos)":
                         st.subheader("📊 Dashboard Executivo de Gestão - Indicadores por Consultor")
                         st.markdown("Visão consolidada, limpa e profissional dos prazos e SLAs por consultor.")
@@ -1882,7 +1981,6 @@ if aba_agenda is not None:
                             st.divider()
                         st.stop()
 
-                    # --- VISÃO: OCORRÊNCIAS POR CLASSIFICAÇÃO (SUPERVISOR) ---
                     elif tipo_visao_agenda == "📈 Ocorrências por Classificação":
                         st.subheader("📈 Gestão de Ocorrências por Classificação")
                         
@@ -1922,7 +2020,6 @@ if aba_agenda is not None:
                                 
                         st.stop()
 
-                    # --- VISÃO: OCORRÊNCIAS POR CIDADE ---
                     elif tipo_visao_agenda == "Ocorrências por Cidade":
                         st.subheader("🏙️ Ocorrências por Cidade")
                         cidades_unicas = sorted(list(df_base_visao['Cidade'].unique()))
@@ -1946,14 +2043,12 @@ if aba_agenda is not None:
                             
                         st.stop()
 
-                    # --- OUTRAS VISÕES ---
                     if tipo_visao_agenda == "Comodato Inativo":
                         df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
                         st.subheader("⚠️ Relatório Específico: Comodato Inativo")
                     else:
                         st.subheader("2. Agenda Geral de Visitas Pendentes")
 
-                    # --- BOTÕES DE FILTRO RÁPIDO SUPERIORES COM DESTAQUE NUMÉRICO ---
                     st.markdown("### Filtros por Status e Prazos")
                     
                     total_visitas = len(df_base_visao)
@@ -1982,7 +2077,6 @@ if aba_agenda is not None:
                     st.caption(f"Filtro ativo de status: **{st.session_state.filtro_dashboard_ativo}**")
                     st.divider()
 
-                    # --- FILTROS DE CONSULTOR, CIDADE E CLASSIFICAÇÃO ---
                     if st.session_state.e_supervisor:
                         col_fc1, col_fc2, col_fc3 = st.columns(3)
                         lista_consultores = ["Todos"] + sorted(list(df_base_visao['Consultor'].unique()))
@@ -2050,7 +2144,27 @@ if aba_agenda is not None:
 
 
 # =====================================================================
-# ABA 3: BLOCO DE NOTAS PESSOAL
+# ABA 3: STATUS DE CONTRATOS
+# =====================================================================
+if aba_contratos is not None:
+    with aba_contratos:
+        cabecalho_pagina("Status de Contratos", "Acompanhamento de clientes em processo de contrato.")
+        status_contratos = ["Elaboração de Contrato", "Aguardando Ass do Cliente", "Aguardando Ass do Gerente", "Processo Enviado"]
+        renderizar_painel_acompanhamento("contrato", status_contratos)
+
+
+# =====================================================================
+# ABA 4: STATUS DE VENDAS
+# =====================================================================
+if aba_vendas is not None:
+    with aba_vendas:
+        cabecalho_pagina("Status de Vendas", "Acompanhamento de clientes em negociação e venda.")
+        status_vendas = ["Negociação Criada", "Aguardando Ass Cliente", "Processo despachado", "OC Venda de peça externo aberta", "Instalação / Serviço executado"]
+        renderizar_painel_acompanhamento("venda", status_vendas)
+
+
+# =====================================================================
+# ABA 5: BLOCO DE NOTAS PESSOAL
 # =====================================================================
 if aba_notas is not None:
     with aba_notas:
