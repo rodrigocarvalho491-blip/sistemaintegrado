@@ -412,6 +412,8 @@ div.stButton > button {
   border-radius: 10px !important;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   transition: all 0.2s ease;
+  white-space: pre-wrap !important;
+  height: auto !important;
 }
 div.stButton > button:hover {
   transform: translateY(-2px);
@@ -561,12 +563,22 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                             continue
                         
                         cor_status = dict_cores.get(d['status'], "⚪")
-                        nome_formatado = d.get('nome_cliente', '')
+                        nome_formatado = d.get('nome_cliente', '').strip()
+                        primeiro_nome = ""
 
-                        # --- Transformando a caixa toda do cliente em um único botão clicável ---
-                        texto_botao = f"{cor_status} {d['codigo_cliente']}"
                         if nome_formatado:
-                            texto_botao += f" - {nome_formatado}"
+                            for palavra in nome_formatado.split():
+                                # Remove caracteres de pontuação frequentemente usados em CNPJs ou códigos (pontos, vírgulas, traços, barras)
+                                limpo = re.sub(r'[\.\,\-\/]', '', palavra)
+                                # Se, após limpar, não for composto apenas de números, é a primeira palavra válida
+                                if not limpo.isdigit():
+                                    primeiro_nome = palavra
+                                    break
+
+                        # --- Transformando a caixa toda do cliente em um único botão clicável (com quebra de linha) ---
+                        texto_botao = f"{cor_status} {d['codigo_cliente']}"
+                        if primeiro_nome:
+                            texto_botao += f"\n{primeiro_nome}"
                             
                         if st.button(texto_botao, key=f"card_edit_{id_reg}", use_container_width=True, help="Clique para exibir e editar as informações"):
                             st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
