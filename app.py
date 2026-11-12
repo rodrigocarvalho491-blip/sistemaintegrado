@@ -554,7 +554,8 @@ if aba_tratativa is not None:
                     "📷 Visita de Transferência",
                     "📝 Elaboração de Contrato",
                     "📋 Aprovação de Contrato",
-                    "🎂 Aniversário de Contrato"
+                    "🎂 Aniversário de Contrato",
+                    "🗂️ Ficha de Cliente"
                 ],
                 label_visibility="collapsed"
             )
@@ -1567,6 +1568,123 @@ Obs.: {observacoes}"""
                     st.success("✅ Texto com C.I. gerado com sucesso!")
                     st.text_area("Texto com C.I.:", value=texto_ci, height=220, key=f"txt_area_ci_{rca}")
                     botao_copiar_customizado(texto_ci, "ci_txt")
+
+            # -------------------------------------------------------------
+            # 5. FICHA DE CLIENTE
+            # -------------------------------------------------------------
+            elif menu_tratativa == "🗂️ Ficha de Cliente":
+                rcf = st.session_state.reset_counter
+                cabecalho_pagina("Ficha de Cliente", "Preenchimento de condições contratuais e comerciais para ficha de cliente.")
+
+                if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_limp_fc_{rcf}"):
+                    st.session_state.reset_counter += 1
+                    st.rerun()
+
+                st.divider()
+
+                motivo_fc = st.text_input("Motivo:", key=f"fc_motivo_{rcf}")
+
+                col_fc_c1, col_fc_c2 = st.columns(2)
+                with col_fc_c1:
+                    contrato_ant_fc = st.text_input("Contrato / Aditamento Anterior:", key=f"fc_cont_ant_{rcf}")
+                with col_fc_c2:
+                    contrato_novo_fc = st.text_input("Contrato Novo:", key=f"fc_cont_novo_{rcf}")
+
+                comodato_fc = st.text_input("Comodato:", key=f"fc_comodato_{rcf}")
+
+                st.divider()
+
+                tipo_forn_fc = st.radio(
+                    "Tipo de Fornecimento:",
+                    ["Granel", "Cilindro", "Ambos"],
+                    horizontal=True,
+                    index=None,
+                    key=f"fc_tp_forn_{rcf}"
+                )
+
+                preco_granel_fc = ""
+                p13_fc, p20_fc, p45_fc = "", "", ""
+                consumo_granel_fc = ""
+                consumo_cil_fc = ""
+
+                if tipo_forn_fc in ["Granel", "Ambos"]:
+                    st.markdown("**Dados Granel:**")
+                    col_fc_g1, col_fc_g2 = st.columns(2)
+                    with col_fc_g1:
+                        preco_granel_fc = st.text_input("Preço Granel (/kg):", key=f"fc_preco_granel_{rcf}")
+                    with col_fc_g2:
+                        consumo_granel_fc = st.text_input("Consumo Mensal Previsto (Granel):", key=f"fc_cons_granel_{rcf}")
+
+                if tipo_forn_fc in ["Cilindro", "Ambos"]:
+                    st.markdown("**Dados Cilindro:**")
+                    col_fc_p1, col_fc_p2, col_fc_p3 = st.columns(3)
+                    with col_fc_p1:
+                        p13_fc = st.text_input("Preço P13 (/und P13):", key=f"fc_p13_{rcf}")
+                    with col_fc_p2:
+                        p20_fc = st.text_input("Preço P20 (/und P20):", key=f"fc_p20_{rcf}")
+                    with col_fc_p3:
+                        p45_fc = st.text_input("Preço P45 (/und P45):", key=f"fc_p45_{rcf}")
+                    consumo_cil_fc = st.text_input("Consumo Mensal Previsto (Cilindro):", key=f"fc_cons_cil_{rcf}")
+
+                st.divider()
+
+                col_fc_v1, col_fc_v2 = st.columns(2)
+                with col_fc_v1:
+                    cond_pag_fc = st.text_input("Condição de Pagamento:", key=f"fc_cond_pag_{rcf}")
+                with col_fc_v2:
+                    vigencia_fc = st.text_input("Vigência:", key=f"fc_vigencia_{rcf}")
+
+                obs_fc = st.text_area("Obs.:", key=f"fc_obs_{rcf}")
+
+                st.divider()
+
+                if st.button("📝 Gerar Texto da Ficha de Cliente", type="primary", key=f"btn_gerar_fc_{rcf}"):
+                    linhas_fc = []
+                    linhas_fc.append(f"CONTRATO / ADITAMENTO ANTERIOR: {contrato_ant_fc.strip()}".rstrip())
+                    linhas_fc.append(f"CONTRATO NOVO: {contrato_novo_fc.strip()}".rstrip())
+                    linhas_fc.append(f"COMODATO: {comodato_fc.strip()}".rstrip())
+
+                    if tipo_forn_fc in ["Granel", "Ambos"]:
+                        p_g = preco_granel_fc.strip()
+                        if p_g:
+                            p_g_clean = re.sub(r'(?i)\s*/\s*kg\s*$', '', p_g).strip()
+                            linhas_fc.append(f"PREÇO GRANEL: {p_g_clean} /kg")
+                        else:
+                            linhas_fc.append("PREÇO GRANEL:")
+
+                    if tipo_forn_fc in ["Cilindro", "Ambos"]:
+                        partes_cil_fc = []
+                        if p13_fc.strip():
+                            p13_clean = re.sub(r'(?i)\s*/\s*und(\s*p13)?\s*$', '', p13_fc.strip()).strip()
+                            partes_cil_fc.append(f"{p13_clean} /und P13")
+                        if p20_fc.strip():
+                            p20_clean = re.sub(r'(?i)\s*/\s*und(\s*p20)?\s*$', '', p20_fc.strip()).strip()
+                            partes_cil_fc.append(f"{p20_clean} /und P20")
+                        if p45_fc.strip():
+                            p45_clean = re.sub(r'(?i)\s*/\s*und(\s*p45)?\s*$', '', p45_fc.strip()).strip()
+                            partes_cil_fc.append(f"{p45_clean} /und P45")
+                        linhas_fc.append(f"PREÇO CILINDRO: {' | '.join(partes_cil_fc)}".rstrip())
+
+                    if tipo_forn_fc in ["Granel", "Ambos"]:
+                        linhas_fc.append(f"CONSUMO MENSAL PREVISTO GRANEL: {consumo_granel_fc.strip()}".rstrip())
+
+                    if tipo_forn_fc in ["Cilindro", "Ambos"]:
+                        linhas_fc.append(f"CONSUMO MENSAL PREVISTO CILINDRO: {consumo_cil_fc.strip()}".rstrip())
+
+                    linhas_fc.append(f"CONDIÇÃO DE PAGAMENTO: {cond_pag_fc.strip()}".rstrip())
+                    linhas_fc.append(f"VIGÊNCIA: {vigencia_fc.strip()}".rstrip())
+                    linhas_fc.append("")
+                    linhas_fc.append(f"Obs.: {motivo_fc.strip()}".rstrip())
+
+                    if obs_fc.strip():
+                        linhas_fc.append("")
+                        linhas_fc.append(obs_fc.strip())
+
+                    texto_ficha_cliente = "\n".join(linhas_fc)
+
+                    st.success("✅ Texto da Ficha de Cliente gerado com sucesso!")
+                    st.text_area("Texto Gerado:", value=texto_ficha_cliente, height=320, key=f"txt_area_fc_{rcf}")
+                    botao_copiar_customizado(texto_ficha_cliente, "ficha_cliente_txt")
 
 
 # =====================================================================
