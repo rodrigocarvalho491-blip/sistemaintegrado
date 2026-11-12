@@ -586,6 +586,7 @@ if "equipamentos" not in st.session_state: st.session_state.equipamentos = []
 if "last_central" not in st.session_state: st.session_state.last_central = "Central"
 if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 if "reset_counter_contrato" not in st.session_state: st.session_state.reset_counter_contrato = 0
+if "reset_counter_fc" not in st.session_state: st.session_state.reset_counter_fc = 0
 
 
 # =====================================================================
@@ -1751,11 +1752,11 @@ Obs.: {observacoes}"""
             # 5. FICHA DE CLIENTE
             # -------------------------------------------------------------
             elif menu_tratativa == "🗂️ Ficha de Cliente":
-                rcf = st.session_state.reset_counter
+                rcf = st.session_state.reset_counter_fc
                 cabecalho_pagina("Ficha de Cliente", "Preenchimento de condições contratuais e comerciais para ficha de cliente.")
 
                 if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_limp_fc_{rcf}"):
-                    st.session_state.reset_counter += 1
+                    st.session_state.reset_counter_fc += 1
                     st.rerun()
 
                 st.divider()
@@ -1852,11 +1853,11 @@ Obs.: {observacoes}"""
                     linhas_fc.append(f"CONDIÇÃO DE PAGAMENTO: {cond_pag_fc.strip()}".rstrip())
                     linhas_fc.append(f"VIGÊNCIA: {vigencia_fc.strip()}".rstrip())
                     linhas_fc.append("")
-                    linhas_fc.append(f"Obs.: {motivo_fc.strip()}".rstrip())
+                    linhas_fc.append(f"Motivo: {motivo_fc.strip()}".rstrip())
 
                     if obs_fc.strip():
                         linhas_fc.append("")
-                        linhas_fc.append(obs_fc.strip())
+                        linhas_fc.append(f"Obs.: {obs_fc.strip()}")
 
                     texto_ficha_cliente = "\n".join(linhas_fc)
 
