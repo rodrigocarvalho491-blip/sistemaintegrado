@@ -2290,7 +2290,7 @@ if aba_admin is not None:
 
 # --- BARRA LATERAL LOGOUT ---
 st.sidebar.divider()
-if st.sidebar.button("🚪 Sair (Logout)", use_content_width=True):
+if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
     st.session_state.autenticado = False
     st.session_state.usuario_atual = ""
     st.session_state.e_admin = False
