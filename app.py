@@ -476,15 +476,19 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
     if f"edit_id_{tipo_acompanhamento}" not in st.session_state:
         st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
 
-    def obter_primeiro_nome(nome_str):
+    def obter_dois_primeiros_nomes(nome_str):
         if not nome_str:
             return ""
         palavras = str(nome_str).strip().split()
+        palavras_validas = []
         for p in palavras:
-            if any(c.isalpha() for c in p):
-                limpo = re.sub(r'^[^\w]+|[^\w]+$', '', p)
-                return limpo if limpo else p
-        return palavras[0] if palavras else ""
+            is_num = p.isdigit() or all(c.isdigit() or c in '.,-_' for c in p) and any(c.isdigit() for c in p)
+            if not palavras_validas and is_num:
+                continue
+            palavras_validas.append(p)
+            if len(palavras_validas) == 2:
+                break
+        return " ".join(palavras_validas) if palavras_validas else (palavras[0] if palavras else "")
 
     # Ajustado proporção para dar mais espaço às colunas do Kanban (1:5)
     col_menu_ac, col_conteudo_ac = st.columns([1, 5])
@@ -568,12 +572,12 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         
                         cor_status = dict_cores.get(d['status'], "⚪")
                         nome_formatado = d.get('nome_cliente', '')
-                        primeiro_nome = obter_primeiro_nome(nome_formatado)
+                        dois_nomes = obter_dois_primeiros_nomes(nome_formatado)
 
-                        # Linha 1: Status e Código
-                        # Linha 2: Primeiro nome do cliente
-                        linha_1 = f"{cor_status} {d['status']} - {d['codigo_cliente']}"
-                        linha_2 = primeiro_nome if primeiro_nome else "Cliente"
+                        # Linha 1: Status (Emoji) e Código
+                        # Linha 2: Dois primeiros nomes do cliente
+                        linha_1 = f"{cor_status} {d['codigo_cliente']}"
+                        linha_2 = dois_nomes if dois_nomes else "Cliente"
                         texto_botao = f"{linha_1}\n{linha_2}"
                             
                         if st.button(texto_botao, key=f"card_edit_{id_reg}", use_container_width=True, help="Clique para exibir e editar as informações"):
