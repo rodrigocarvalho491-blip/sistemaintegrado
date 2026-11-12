@@ -149,24 +149,39 @@ def carregar_acompanhamento(usuario, tipo):
         for row in res.data:
             dados[row["id"]] = row
         return dados
-    except Exception as e:
+    except Exception:
         return {}
 
-def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, status, ano, mes):
+def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, status, ano, mes, observacoes=""):
+    data_mod = datetime.now().strftime("%d/%m/%Y %H:%M")
+    payload = {
+        "id": id_reg,
+        "usuario": usuario,
+        "tipo": tipo,
+        "codigo_cliente": codigo_cliente,
+        "status": status,
+        "ano": ano,
+        "mes": mes,
+        "observacoes": observacoes,
+        "data_modificacao": data_mod
+    }
     try:
-        payload = {
-            "id": id_reg,
-            "usuario": usuario,
-            "tipo": tipo,
-            "codigo_cliente": codigo_cliente,
-            "status": status,
-            "ano": ano,
-            "mes": mes,
-            "data_modificacao": datetime.now().strftime("%d/%m/%Y %H:%M")
-        }
         supabase.table("acompanhamento").upsert(payload).execute()
         return True
     except Exception as e:
+        err_str = str(e)
+        if "42501" in err_str or "row-level security" in err_str.lower():
+            st.error("❌ Permissão bloqueada no Supabase (RLS ativo). Execute no SQL Editor do Supabase: `ALTER TABLE acompanhamento DISABLE ROW LEVEL SECURITY;`")
+            return False
+        if "observacoes" in err_str.lower() or "PGRST204" in err_str:
+            try:
+                payload_sem_obs = {k: v for k, v in payload.items() if k != "observacoes"}
+                supabase.table("acompanhamento").upsert(payload_sem_obs).execute()
+                st.warning("⚠️ Cliente salvo, mas a coluna 'observacoes' ainda não existe no Supabase. Rode: `ALTER TABLE acompanhamento ADD COLUMN IF NOT EXISTS observacoes TEXT;`")
+                return True
+            except Exception as e2:
+                st.error(f"Erro ao salvar acompanhamento: {e2}")
+                return False
         st.error(f"Erro ao salvar acompanhamento: {e}")
         return False
 
@@ -315,7 +330,7 @@ html, body, [class*="css"], .stApp {
   color: #1B2A3A !important;
 }
 
-[data-testid="stHeader"] { background: transparent; visibility: hidden; position: hidden; }
+[data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
 div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
@@ -463,32 +478,47 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status):
     dados = carregar_acompanhamento(usuario, tipo_acompanhamento)
     meses_nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
-    def wrapper_update(id_r, usr, tp, cod, st_val, ano_v, mes_v, trigger):
+    def wrapper_update(id_r, usr, tp, cod, st_val, ano_v, mes_v, obs_val, trigger):
         if trigger == "status":
             s = st.session_state[st_val]
             m = mes_v
-        else:
+            o = obs_val
+        elif trigger == "mes":
             s = st_val
             m = meses_nomes.index(st.session_state[mes_v]) + 1
-        salvar_acompanhamento(id_r, usr, tp, cod, s, ano_v, m)
+            o = obs_val
+        else:
+            s = st_val
+            m = mes_v
+            o = st.session_state[obs_val]
+        salvar_acompanhamento(id_r, usr, tp, cod, s, ano_v, m, o)
 
     c_ano, c_vazio = st.columns([1, 4])
     with c_ano:
         ano_selecionado = st.selectbox("📅 Selecione o Ano", [2024, 2025, 2026, 2027, 2028], index=2, key=f"ano_sel_{tipo_acompanhamento}")
 
     with st.expander("➕ Adicionar Novo Cliente", expanded=False):
-        c_cod, c_st, c_mes, c_btn = st.columns([2, 3, 2, 1])
-        with c_cod: novo_cod = st.text_input("Código do Cliente", key=f"n_cod_{tipo_acompanhamento}")
-        with c_st: novo_st = st.selectbox("Status Inicial", lista_status, key=f"n_st_{tipo_acompanhamento}")
-        with c_mes: novo_ms = st.selectbox("Mês de Alocação", meses_nomes, key=f"n_ms_{tipo_acompanhamento}")
+        c_cod, c_st, c_mes = st.columns([2, 3, 2])
+        with c_cod:
+            novo_cod = st.text_input("Código do Cliente", key=f"n_cod_{tipo_acompanhamento}")
+        with c_st:
+            novo_st = st.selectbox("Status Inicial", lista_status, key=f"n_st_{tipo_acompanhamento}")
+        with c_mes:
+            novo_ms = st.selectbox("Mês de Alocação", meses_nomes, key=f"n_ms_{tipo_acompanhamento}")
+
+        c_obs, c_btn = st.columns([5, 1])
+        with c_obs:
+            novo_obs = st.text_input("Observações", placeholder="Detalhes ou anotações do cliente...", key=f"n_obs_{tipo_acompanhamento}")
         with c_btn:
             st.write("")
             st.write("")
-            if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}", use_container_width=True):
-                if novo_cod:
+            if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}", type="primary", use_container_width=True):
+                if novo_cod.strip():
                     novo_id = str(uuid.uuid4())
-                    salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1)
-                    st.rerun()
+                    if salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1, novo_obs.strip()):
+                        st.rerun()
+                else:
+                    st.warning("⚠️ Informe o código do cliente.")
 
     st.divider()
 
@@ -498,15 +528,21 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status):
             st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px;'>{mes}</div>", unsafe_allow_html=True)
             for id_reg, d in dados.items():
                 if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
+                    obs_atual = d.get('observacoes') or ""
                     with st.container(border=True):
                         st.markdown(f"**{d['codigo_cliente']}**")
-                        
+                        if obs_atual.strip():
+                            st.caption(f"📝 {obs_atual}")
+
                         k_st = f"st_{id_reg}"
                         idx_st = lista_status.index(d['status']) if d['status'] in lista_status else 0
-                        st.selectbox("Status", lista_status, index=idx_st, key=k_st, label_visibility="collapsed", on_change=wrapper_update, args=(id_reg, usuario, tipo_acompanhamento, d['codigo_cliente'], k_st, d['ano'], d['mes'], "status"))
+                        st.selectbox("Status", lista_status, index=idx_st, key=k_st, label_visibility="collapsed", on_change=wrapper_update, args=(id_reg, usuario, tipo_acompanhamento, d['codigo_cliente'], k_st, d['ano'], d['mes'], obs_atual, "status"))
 
                         k_ms = f"ms_{id_reg}"
-                        st.selectbox("Mover para Mês", meses_nomes, index=i, key=k_ms, label_visibility="collapsed", on_change=wrapper_update, args=(id_reg, usuario, tipo_acompanhamento, d['codigo_cliente'], d['status'], d['ano'], k_ms, "mes"))
+                        st.selectbox("Mover para Mês", meses_nomes, index=i, key=k_ms, label_visibility="collapsed", on_change=wrapper_update, args=(id_reg, usuario, tipo_acompanhamento, d['codigo_cliente'], d['status'], d['ano'], k_ms, obs_atual, "mes"))
+
+                        k_obs = f"obs_card_{id_reg}"
+                        st.text_input("Observações", value=obs_atual, placeholder="Obs...", key=k_obs, label_visibility="collapsed", on_change=wrapper_update, args=(id_reg, usuario, tipo_acompanhamento, d['codigo_cliente'], d['status'], d['ano'], d['mes'], k_obs, "obs"))
 
                         if st.button("🗑️", key=f"del_{id_reg}", use_container_width=True):
                             apagar_acompanhamento(id_reg)
