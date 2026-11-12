@@ -174,7 +174,6 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
         if "42501" in err_str or "row-level security" in err_str.lower():
             st.error("❌ Permissão bloqueada no Supabase (RLS ativo). Execute no SQL Editor do Supabase: `ALTER TABLE acompanhamento DISABLE ROW LEVEL SECURITY;`")
             return False
-        # Fallback de compatibilidade se as colunas nome_cliente/observacoes não existirem no Supabase
         try:
             payload_fallback = {k: v for k, v in payload.items() if k not in ["observacoes", "nome_cliente"]}
             supabase.table("acompanhamento").upsert(payload_fallback).execute()
@@ -216,7 +215,6 @@ def obter_ipca_acumulado_12m():
         url = "https://www.ibge.gov.br/explica/inflacao.php"
         resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
-            # Busca especificamente o IPCA acumulado de 12 meses
             match = re.search(r'IPCA\s+acumulado\s+de\s+12\s+meses.*?([0-9]+,[0-9]+)\s*%', resp.text, re.IGNORECASE | re.DOTALL)
             if match:
                 return float(match.group(1).replace(",", ".")), "IBGE (Web)"
@@ -479,6 +477,16 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
     if f"edit_id_{tipo_acompanhamento}" not in st.session_state:
         st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
 
+    def obter_primeiro_nome(nome_str):
+        if not nome_str:
+            return ""
+        palavras = str(nome_str).strip().split()
+        for p in palavras:
+            if any(c.isalpha() for c in p):
+                limpo = re.sub(r'^[^\w]+|[^\w]+$', '', p)
+                return limpo if limpo else p
+        return palavras[0] if palavras else ""
+
     # Estrutura com Menu Lateral e Área Principal
     col_menu_ac, col_conteudo_ac = st.columns([1, 4])
     
@@ -562,11 +570,14 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         
                         cor_status = dict_cores.get(d['status'], "⚪")
                         nome_formatado = d.get('nome_cliente', '')
+                        primeiro_nome = obter_primeiro_nome(nome_formatado)
 
                         # --- Transformando a caixa toda do cliente em um único botão clicável ---
-                        texto_botao = f"{cor_status} {d['codigo_cliente']}"
-                        if nome_formatado:
-                            texto_botao += f" - {nome_formatado}"
+                        # Linha 1: Status e Código do Cliente
+                        # Linha 2: Apenas o primeiro nome do cliente
+                        linha_1 = f"{cor_status} {d['status']} - {d['codigo_cliente']}"
+                        linha_2 = primeiro_nome if primeiro_nome else "Cliente"
+                        texto_botao = f"{linha_1}\n{linha_2}"
                             
                         if st.button(texto_botao, key=f"card_edit_{id_reg}", use_container_width=True, help="Clique para exibir e editar as informações"):
                             st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
@@ -1126,14 +1137,10 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # Motivo da Elaboração / Regularização
-                st.subheader("1. Motivo")
                 motivo_solicitacao = st.text_area("Descreva claramente o motivo da regularização do contrato:", key=f"motivo_{rcc}")
 
                 st.divider()
 
-                # Dados do Cliente
-                st.subheader("2. Dados do Cliente")
                 col_cli1, col_cli2, col_cli3 = st.columns(3)
                 with col_cli1: contato_contrato = st.text_input("Contato", key=f"contato_c_{rcc}")
                 with col_cli2: telefone_contrato = st.text_input("Telefone", key=f"tel_c_{rcc}")
@@ -1141,8 +1148,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # Solicitação
-                st.subheader("3. Solicitação")
                 col_sol1, col_sol2 = st.columns(2)
                 with col_sol1:
                     tipo_fluxo = st.radio("Selecione o objetivo da solicitação:", ["Gerar Minuta", "Enviar para Assinatura"], horizontal=True, index=None, key=f"fluxo_c_{rcc}")
@@ -1151,9 +1156,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # Dados do Contrato
-                st.subheader("4. Dados do Contrato")
-                
                 col_b2_1, col_b2_2 = st.columns(2)
                 with col_b2_1:
                     requisicao_opt = st.radio("Requisição:", ["Permanente", "Provisório"], horizontal=True, index=None, key=f"req_opt_{rcc}")
@@ -1190,8 +1192,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # Endereço / Equipamentos
-                st.subheader("5. Endereço / Equipamentos")
                 col_b3_1, col_b3_2 = st.columns(2)
                 with col_b3_1:
                     endereco_padrao = st.text_input("Endereço padrão ou entrega?:", key=f"end_padrao_{rcc}")
@@ -1211,8 +1211,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # Condições Comerciais
-                st.subheader("6. Comodato / Fornecimento")
                 tipo_fornecimento = st.radio("Tipo de Fornecimento:", ["Granel", "Cilindro", "Ambos"], horizontal=True, index=None, key=f"tp_forn_{rcc}")
                 
                 preco_granel, consumo_granel_input = "", ""
@@ -1222,7 +1220,6 @@ Obs.: {observacoes}"""
                 consumo_cilindro_total_calc = 0
 
                 if tipo_fornecimento in ["Granel", "Ambos"]:
-                    st.markdown("**Preço e Consumo Granel:**")
                     col_g1, col_g2 = st.columns(2)
                     with col_g1:
                         preco_granel = st.text_input("Preço Granel (R$/kg):", key=f"preco_granel_{rcc}")
@@ -1230,13 +1227,11 @@ Obs.: {observacoes}"""
                         consumo_granel_input = st.text_input("Consumo previsto (Granel) mensal:", placeholder="Ex: 100 ou 100 kgs", key=f"cons_granel_{rcc}")
 
                 if tipo_fornecimento in ["Cilindro", "Ambos"]:
-                    st.markdown("**Preço Cilindro por Modelo:**")
                     col_cp1, col_cp2, col_cp3 = st.columns(3)
                     with col_cp1: p13_val = st.text_input("Preço P13 (R$):", key=f"p13_v_{rcc}")
                     with col_cp2: p20_val = st.text_input("Preço P20 (R$):", key=f"p20_v_{rcc}")
                     with col_cp3: p45_val = st.text_input("Preço P45 (R$):", key=f"p45_v_{rcc}")
 
-                    st.markdown("**Consumo previsto (Cilindro) mensal:**")
                     tab_c1, tab_c2 = st.tabs(["Preenchimento por Quantidade de Cilindros", "Preenchimento Direto em KGs"])
                     with tab_c1:
                         col_cc1, col_cc2, col_cc3 = st.columns(3)
@@ -1259,8 +1254,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # Financeiro e Assinaturas
-                st.subheader("7. Financeiro e Assinaturas")
                 col_fin1, col_fin2 = st.columns(2)
                 with col_fin1:
                     possui_debito_fin = st.radio("Possui NF's Pendentes?", ["Sim", "Não"], horizontal=True, index=None, key=f"possui_deb_{rcc}")
@@ -1289,8 +1282,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # Condomínio
-                st.subheader("8. Condomínio CONTA SIM")
                 conta_sim = st.radio("Condomínio CONTA SIM?:", ["Sim", "Não"], horizontal=True, index=None, key=f"conta_sim_{rcc}")
                 num_unidades, qtd_torres, qtd_blocos, preco_religue, preco_servico = "", "", "", "", ""
 
@@ -1314,7 +1305,7 @@ Obs.: {observacoes}"""
                         lines_out.append("** FAVOR GERAR MINUTA EM PDF PARA ENVIO AO CLIENTE **\n")
 
                     if motivo_solicitacao and motivo_solicitacao.strip():
-                        lines_out.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}\n")
+                        lines_out.append(f"Descreva claramente o motivo da regularização do contrato: {motivo_solicitacao.strip()}")
 
                     if tipo_contrato:
                         lines_out.append(f"Contrato / Aditamento / Distrato: {tipo_contrato}")
@@ -1393,7 +1384,6 @@ Obs.: {observacoes}"""
                                         lines_out.append(f"E-mail do Responsável pela assinatura{sfx}: {resp['email'].strip()}")
                     
                     if conta_sim:
-                        lines_out.append("")
                         lines_out.append(f"Condomínio CONTA SIM?: {conta_sim}")
                         if conta_sim == "Sim":
                             if num_unidades and num_unidades.strip():
@@ -1426,14 +1416,10 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # BLOCO 01 - Motivo
-                st.subheader("1. Motivo")
                 motivo_reg = st.text_input("Motivo da regularização *", key=f"ap_motivo_{rcap}")
                 
                 st.divider()
 
-                # BLOCO 02 - Contato
-                st.subheader("2. Informações de Contato")
                 c_ap1, c_ap2, c_ap3 = st.columns(3)
                 with c_ap1: contato_ap = st.text_input("Contato *", key=f"ap_cont_{rcap}")
                 with c_ap2: telefone_ap = st.text_input("Telefone *", key=f"ap_tel_{rcap}")
@@ -1449,8 +1435,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # BLOCO 03 - Contrato / Equipamentos
-                st.subheader("3. Dados do Contrato")
                 c_ap6, c_ap7 = st.columns(2)
                 with c_ap6: contrato_adit = st.radio("Contrato / Aditamento *", ["Contrato", "Aditamento"], horizontal=True, index=None, key=f"ap_tp_cont_{rcap}")
                 with c_ap7: vigencia_ap = st.text_input("Vigência *", key=f"ap_vig_{rcap}")
@@ -1469,8 +1453,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # BLOCO 04 - Redimensionamento e Projetos Iniciais
-                st.subheader("4. Redimensionamento")
                 redim = st.radio("Redimensionamento: *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_redim_{rcap}")
                 comodato_de, comodato_para, inc_tanques, env_pecas = "", "", "Não", "Não"
                 
@@ -1485,8 +1467,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # BLOCO 05 - Conta Sim e Portaria
-                st.subheader("5. Condomínio Conta Sim & Portaria")
                 implantacao_csim = st.radio("Implantação de conta sim: *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_csim_{rcap}")
                 env_pecas_ficha, env_ficha_cliente, tp_portaria, contato_resp_port, part_local, contato_sindico = "Não", "Não", "", "", "", ""
                 
@@ -1502,8 +1482,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # BLOCO 06 - Alteração de CNPJ / Títulos em Aberto
-                st.subheader("6. Alteração de CNPJ & Títulos em Aberto")
                 alt_cnpj = st.radio("Alteração de CNPJ ou razão social? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_alt_cnpj_{rcap}")
                 mesmo_prop_opt = st.radio("Se trata do mesmo proprietário: *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_mesmo_prop_{rcap}")
                 possui_titulos_aberto = st.radio("Possui títulos em aberto? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_tit_aberto_{rcap}")
@@ -1514,8 +1492,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
 
-                # BLOCO 07 - Redução de Vigência
-                st.subheader("7. Redução de Vigência")
                 red_vig = st.radio("Redução de vigência? *", ["Sim", "Não"], horizontal=True, index=None, key=f"ap_red_vig_{rcap}")
                 motivo_red_vig = ""
                 if red_vig == "Sim":
@@ -1523,8 +1499,6 @@ Obs.: {observacoes}"""
 
                 st.divider()
                 
-                # BLOCO 08 - Projeto Padrão
-                st.subheader("8. Projeto Padrão")
                 col_proj1, col_proj2 = st.columns([3, 1])
                 with col_proj1:
                     projeto_num_bloco7 = st.text_input("Projeto (Informe o número completo do projeto): *", key=f"ap_proj7_{rcap}")
@@ -1535,8 +1509,6 @@ Obs.: {observacoes}"""
                 st.divider()
 
                 if st.button("📝 Gerar Texto de Aprovação de Contrato", type="primary"):
-                    
-                    # ---------------- VALIDAÇÃO ----------------
                     campos_faltantes = []
                     if not motivo_reg.strip(): campos_faltantes.append("Motivo da regularização")
                     if not contato_ap.strip(): campos_faltantes.append("Contato")
@@ -1577,7 +1549,6 @@ Obs.: {observacoes}"""
                     if campos_faltantes:
                         st.error("⚠️ Não foi possível gerar o texto. Preencha as seguintes informações primárias obrigatórias:\n\n- " + "\n- ".join(campos_faltantes))
                     else:
-                        # ---------------- GERAÇÃO DO TEXTO DINÂMICO ----------------
                         def sim_nao_box(val):
                             if val == "Sim": return "[ x ] sim [   ] não"
                             elif val == "Não": return "[   ] sim [ x ] não"
@@ -1589,7 +1560,6 @@ Obs.: {observacoes}"""
                             return "(   ) SIM (   ) NÃO"
 
                         linhas_texto = []
-                        
                         proj_final = "N/A" if is_cilindros else projeto_num_bloco7.strip()
                         if possui_titulos_aberto == "Não":
                             neg_final = "n/a"
@@ -1598,11 +1568,9 @@ Obs.: {observacoes}"""
                         else:
                             neg_final = "n/a"
 
-                        # [BLOCO 01]
                         linhas_texto.append(f"Motivo da regularização: {motivo_reg.strip()}")
                         linhas_texto.append("")
                         
-                        # [BLOCO 02]
                         linhas_texto.append(f"Contato: {contato_ap.strip()}")
                         linhas_texto.append(f"Telefone: {telefone_ap.strip()}")
                         linhas_texto.append(f"E-mail: {email_ap.strip()}")
@@ -1612,14 +1580,12 @@ Obs.: {observacoes}"""
                             linhas_texto.append(f"Atualizar E-mail? {sim_nao_box(atualizar_email)}")
                         linhas_texto.append("")
                         
-                        # [BLOCO 03]
                         linhas_texto.append(f"Contrato / Aditamento: {contrato_adit}")
                         linhas_texto.append(f"Vigência: {vigencia_ap.strip()}")
                         linhas_texto.append(f"Equipamentos: {eq_ap_texto}")
                         linhas_texto.append(f"Existe especificidade sobre a solicitação: {especificidade_ap.strip()}")
                         linhas_texto.append("")
 
-                        # [BLOCO 04]
                         linhas_texto.append(f"Redimensionamento: {sim_nao_box(redim)}")
                         if redim == "Sim":
                             linhas_texto.append(f"Comodato passou de: {comodato_de.strip()}")
@@ -1628,7 +1594,6 @@ Obs.: {observacoes}"""
                             linhas_texto.append(f"Necessário lista de peças? {sim_nao_box(env_pecas)} (se sim, enviar lista de peças)")
                         linhas_texto.append("")
 
-                        # [BLOCO 05]
                         linhas_texto.append(f"Implantação de conta sim: {sim_nao_box(implantacao_csim)}")
                         if implantacao_csim == "Sim":
                             linhas_texto.append(f"Foi enviado lista de peças? {sim_nao_box(env_pecas_ficha)}")
@@ -1639,14 +1604,12 @@ Obs.: {observacoes}"""
                             linhas_texto.append(f"Contato atualizado do síndico: {contato_sindico.strip()}")
                         linhas_texto.append("")
 
-                        # [BLOCO 06]
                         linhas_texto.append(f"Alteração de CNPJ ou razão social? {sim_nao_box(alt_cnpj)}")
                         linhas_texto.append(f"Se trata do mesmo proprietário: {sim_nao_parentheses(mesmo_prop_opt)}")
                         linhas_texto.append(f"Possui títulos em aberto {sim_nao_box(possui_titulos_aberto)}")
                         linhas_texto.append(f"Descreva a negociação realizada com o novo proprietário relacionado aos títulos em aberto: {neg_final}")
                         linhas_texto.append("")
 
-                        # [BLOCO 07 & 08]
                         linhas_texto.append(f"Projeto (Informe o número completo do projeto): {proj_final}")
                         linhas_texto.append("")
 
@@ -1659,7 +1622,6 @@ Obs.: {observacoes}"""
                         st.success("✅ Texto de Aprovação gerado com sucesso!")
                         st.text_area("Texto Gerado:", value=texto_aprovacao, height=500, key=f"txt_area_aprov_{rcap}")
                         botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
-
 
             # -------------------------------------------------------------
             # 4. ANIVERSÁRIO DE CONTRATO
@@ -1867,7 +1829,7 @@ Obs.: {observacoes}"""
 
 
 # =====================================================================
-# ABA 2: AGENDA DE OCORRÊNCIAS (SEPARADA POR PERFIL)
+# ABA 2: AGENDA DE OCORRÊNCIAS
 # =====================================================================
 if aba_agenda is not None:
     with aba_agenda:
@@ -1902,21 +1864,16 @@ if aba_agenda is not None:
         def classificar_status_abertura(row, hoje_ref):
             prazo = row['Prazo_DT']
             abertura = row['Abertura_DT']
-            
             if pd.isna(prazo):
                 return "Normal"
-            
             prazo_dia = prazo.normalize()
             hoje = hoje_ref.normalize()
-            
             if prazo_dia == hoje:
                 return "🔵 Vence Hoje"
             elif prazo_dia < hoje:
                 return "🔴 Vencido"
-                
             if pd.isna(abertura):
                 return "🟢 1ª Semana"
-                
             abertura_dia = abertura.normalize()
             delta_dias = (prazo_dia - abertura_dia).days
             if delta_dias <= 7:
@@ -1930,10 +1887,8 @@ if aba_agenda is not None:
             prazo = row['Prazo_DT']
             if pd.isna(prazo):
                 return "Normal"
-            
             prazo_dia = prazo.normalize()
             hoje = hoje_ref.normalize()
-            
             dias_para_sexta = (4 - hoje.weekday()) % 7
             sexta_semana = hoje + timedelta(days=dias_para_sexta)
             
@@ -1987,7 +1942,6 @@ if aba_agenda is not None:
             if arquivo_excel is not None:
                 try:
                     df = ler_arquivo_excel_robusto(arquivo_excel)
-                        
                     df.columns = [str(c).strip() for c in df.columns]
                     
                     if COL_OCORRENCIA not in df.columns:
@@ -1999,7 +1953,7 @@ if aba_agenda is not None:
                                 break
 
                     if COL_OCORRENCIA not in df.columns:
-                        st.error(f"❌ A coluna obrigatória '{COL_OCORRENCIA}' não foi encontrada no arquivo. Verifique se o relatório está correto.")
+                        st.error(f"❌ A coluna obrigatória '{COL_OCORRENCIA}' não foi encontrada no arquivo.")
                         st.stop()
 
                     df = df.dropna(subset=[COL_OCORRENCIA])
@@ -2042,113 +1996,15 @@ if aba_agenda is not None:
                         df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, hoje), axis=1)
 
                     df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
-
                     df_base_visao = df_pendentes.copy()
 
-                    if st.session_state.e_supervisor and tipo_visao_agenda == "📊 Dashboard de Gestão (Gráficos)":
-                        st.subheader("📊 Dashboard Executivo de Gestão - Indicadores por Consultor")
-                        st.markdown("Visão consolidada, limpa e profissional dos prazos e SLAs por consultor.")
-                        st.write("")
-
-                        graficos_config = [
-                            ("🔴 Ocorrências Vencidas por Consultor", df_base_visao[df_base_visao['Status Geral'] == '🔴 Vencido'], "#D32F2F"),
-                            ("🔵 Vencimento Hoje por Consultor", df_base_visao[df_base_visao['Status Geral'] == '🔵 Vence Hoje'], "#1976D2"),
-                            ("🟡 Vencimento na Semana por Consultor", df_base_visao[df_base_visao['Status Geral'] == '🟡 Vence na Semana'], "#FBC02D"),
-                            ("🟢 No Prazo por Consultor", df_base_visao[df_base_visao['Status Geral'] == '🟢 No Prazo'], "#388E3C"),
-                        ]
-
-                        for i in range(0, len(graficos_config), 2):
-                            col_g1, col_g2 = st.columns(2)
-                            
-                            with col_g1:
-                                titulo_1, df_g1, cor_tema_1 = graficos_config[i]
-                                st.markdown(f"#### {titulo_1}")
-                                if not df_g1.empty:
-                                    df_ag_1 = df_g1.groupby('Consultor').size().reset_index(name='Total')
-                                    df_ag_1 = df_ag_1.sort_values(by='Total', ascending=False)
-                                    chart_1 = alt.Chart(df_ag_1).mark_bar(
-                                        color=cor_tema_1, cornerRadiusTopLeft=6, cornerRadiusTopRight=6
-                                    ).encode(
-                                        x=alt.X('Total:Q', title='Total de Ocorrências'),
-                                        y=alt.Y('Consultor:N', sort='-x', title='Consultor'),
-                                        tooltip=['Consultor', 'Total']
-                                    ).properties(height=240)
-                                    st.altair_chart(chart_1, use_container_width=True)
-                                    st.dataframe(df_ag_1.rename(columns={'Total': 'Qtd Ocorrências'}), hide_index=True, use_container_width=True)
-                                else:
-                                    st.info("Nenhum registro para este critério.")
-                            
-                            if i + 1 < len(graficos_config):
-                                with col_g2:
-                                    titulo_2, df_g2, cor_tema_2 = graficos_config[i + 1]
-                                    st.markdown(f"#### {titulo_2}")
-                                    if not df_g2.empty:
-                                        df_ag_2 = df_g2.groupby('Consultor').size().reset_index(name='Total')
-                                        df_ag_2 = df_ag_2.sort_values(by='Total', ascending=False)
-                                        chart_2 = alt.Chart(df_ag_2).mark_bar(
-                                            color=cor_tema_2, cornerRadiusTopLeft=6, cornerRadiusTopRight=6
-                                        ).encode(
-                                            x=alt.X('Total:Q', title='Total de Ocorrências'),
-                                            y=alt.Y('Consultor:N', sort='-x', title='Consultor'),
-                                            tooltip=['Consultor', 'Total']
-                                        ).properties(height=240)
-                                        st.altair_chart(chart_2, use_container_width=True)
-                                        st.dataframe(df_ag_2.rename(columns={'Total': 'Qtd Ocorrências'}), hide_index=True, use_container_width=True)
-                                    else:
-                                        st.info("Nenhum registro para este critério.")
-                            
-                            st.divider()
-                        st.stop()
-
-                    elif tipo_visao_agenda == "📈 Ocorrências por Classificação":
-                        st.subheader("📈 Gestão de Ocorrências por Classificação")
-                        
-                        if st.session_state.e_supervisor:
-                            lista_cons_class = ["Todos"] + sorted(list(df_base_visao['Consultor'].unique()))
-                            cons_sel_class = st.selectbox("Filtrar por Consultor:", lista_cons_class, key="sel_cons_class")
-                            if cons_sel_class != "Todos":
-                                df_class_vis = df_base_visao[df_base_visao['Consultor'] == cons_sel_class]
-                            else:
-                                df_class_vis = df_base_visao.copy()
-                        else:
-                            df_class_vis = df_base_visao.copy()
-
-                        if df_class_vis.empty:
-                            st.info("Nenhum registro encontrado para os filtros selecionados.")
-                        else:
-                            df_class_agrup = df_class_vis.groupby('Classificação Limpa').size().reset_index(name='Total')
-                            df_class_agrup = df_class_agrup.sort_values(by='Total', ascending=False)
-
-                            col_tabela_class, col_grafico_class = st.columns(2)
-                            
-                            with col_tabela_class:
-                                st.markdown("#### 📋 Quantitativo por Classificação")
-                                df_tabela_ex = df_class_agrup.rename(columns={'Classificação Limpa': 'Classificação', 'Total': 'Qtd Ocorrências'})
-                                st.dataframe(df_tabela_ex, hide_index=True, use_container_width=True)
-                                
-                            with col_grafico_class:
-                                st.markdown("#### 📊 Gráfico Comparativo")
-                                chart_class = alt.Chart(df_class_agrup).mark_bar(
-                                    color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6
-                                ).encode(
-                                    x=alt.X('Total:Q', title='Quantidade de Ocorrências'),
-                                    y=alt.Y('Classificação Limpa:N', sort='-x', title='Classificação'),
-                                    tooltip=['Classificação Limpa', 'Total']
-                                ).properties(height=350)
-                                st.altair_chart(chart_class, use_container_width=True)
-                                
-                        st.stop()
-
-                    elif tipo_visao_agenda == "Ocorrências por Cidade":
+                    if tipo_visao_agenda == "Ocorrências por Cidade":
                         st.subheader("🏙️ Ocorrências por Cidade")
-                        
                         col_tabela_cidade, col_grafico_cidade = st.columns(2)
-                        
                         with col_tabela_cidade:
                             st.markdown(f"**Tabela Consolidada por Cidade**")
                             df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
                             st.dataframe(df_mapa_agrup.sort_values(by='Total Ocorrências', ascending=False), hide_index=True, use_container_width=True)
-                            
                         with col_grafico_cidade:
                             st.markdown("**Gráfico de OCs por Cidade**")
                             chart = alt.Chart(df_mapa_agrup).mark_bar(color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
@@ -2157,7 +2013,6 @@ if aba_agenda is not None:
                                 tooltip=['Cidade', 'Total Ocorrências']
                             ).properties(height=280)
                             st.altair_chart(chart, use_container_width=True)
-                            
                         st.stop()
 
                     if tipo_visao_agenda == "Comodato Inativo":
@@ -2167,7 +2022,6 @@ if aba_agenda is not None:
                         st.subheader("2. Agenda Geral de Visitas Pendentes")
 
                     st.markdown("### Filtros por Status e Prazos")
-                    
                     total_visitas = len(df_base_visao)
                     
                     if tipo_visao_agenda == "Comodato Inativo":
@@ -2219,21 +2073,16 @@ if aba_agenda is not None:
                         lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
                         lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
 
-                        with col_fc1:
-                            consultor_sel = st.selectbox("Consultor:", lista_consultores)
-                        with col_fc2:
-                            cidade_filtro_sel = st.selectbox("Cidade:", lista_cidades_filtro)
-                        with col_fc3:
-                            class_filtro_sel = st.selectbox("Classificação:", lista_class_filtro)
+                        with col_fc1: consultor_sel = st.selectbox("Consultor:", lista_consultores)
+                        with col_fc2: cidade_filtro_sel = st.selectbox("Cidade:", lista_cidades_filtro)
+                        with col_fc3: class_filtro_sel = st.selectbox("Classificação:", lista_class_filtro)
                     else:
                         col_fc1, col_fc2 = st.columns(2)
                         lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
                         lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
 
-                        with col_fc1:
-                            cidade_filtro_sel = st.selectbox("Filtrar por Cidade:", lista_cidades_filtro)
-                        with col_fc2:
-                            class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
+                        with col_fc1: cidade_filtro_sel = st.selectbox("Filtrar por Cidade:", lista_cidades_filtro)
+                        with col_fc2: class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
 
                     df_filtrado = df_base_visao.copy()
                     
@@ -2257,10 +2106,12 @@ if aba_agenda is not None:
                     else:
                         if st.session_state.e_supervisor:
                             df_exibicao = df_filtrado[[
+                                'Status Geral', 'SLA', COL_OCORRENCIA, COL_CLIENTE, 
+                                'Cidade', 'Classificação Limpa', 'Prazo', 'Consultor'
+                            ]].copy() if 'SLA' in df_filtrado.columns else df_filtrado[[
                                 'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
                                 'Cidade', 'Classificação Limpa', 'Prazo', 'Consultor'
                             ]].copy()
-                            df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo', 'Consultor']
                         else:
                             df_exibicao = df_filtrado[[
                                 'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
@@ -2268,24 +2119,13 @@ if aba_agenda is not None:
                             ]].copy()
                             df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
 
-                        df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str)
+                        df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str) if 'Nº OC' in df_exibicao.columns else df_exibicao.iloc[:, 1].astype(str)
                         st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
-                        
-                        st.write("---")
-                        st.markdown("### ✔️ Marcar Ocorrências como Tratadas")
-                        st.markdown("Selecione o número da OC que já foi resolvida para retirá-la da visualização atual:")
-                        
-                        oc_para_tratar = st.selectbox("Selecione a Ocorrência:", [""] + df_exibicao['Nº OC'].tolist())
-                        if oc_para_tratar:
-                            if st.button(f"✔️ Confirmar Tratativa da OC {oc_para_tratar}", type="primary"):
-                                st.session_state.Tratadas_Temp.add(int(oc_para_tratar))
-                                st.success(f"✅ Ocorrência {oc_para_tratar} marcada como tratada!")
-                                st.rerun()
 
                 except Exception as e:
-                    st.error(f"⚠️ Ocorreu um erro ao processar o arquivo. Certifique-se de que é o relatório correto. Erro técnico: {e}")
+                    st.error(f"⚠️ Ocorreu um erro ao processar o arquivo. Erro técnico: {e}")
             else:
-                st.info("👆 Por favor, faça o upload da planilha atualizada de ocorrências no menu lateral esquerdo para carregar o dashboard.")
+                st.info("👆 Por favor, faça o upload da planilha atualizada de ocorrências no menu lateral esquerdo para carregar a agenda.")
 
 
 # =====================================================================
