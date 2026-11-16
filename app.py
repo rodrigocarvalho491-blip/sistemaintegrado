@@ -468,14 +468,340 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
+# --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP E LARGURA AJUSTADA ---
+def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_nomes, id_editando, pending_target_id):
+    colunas_html = ""
+    for idx_m, mes_nome in enumerate(meses_nomes):
+        mes_num = idx_m + 1
+        cards_html = ""
+        for item in cards_por_mes.get(mes_num, []):
+            cid = html_lib.escape(str(item["id"]))
+            cor = html_lib.escape(str(item["cor"]))
+            cod = html_lib.escape(str(item["codigo"]))
+            nome = html_lib.escape(str(item["nome"]))
+            is_selected = "selected-card" if str(item["id"]) == str(id_editando) else ""
+            nome_div = f'<div class="kb-card-name">{nome}</div>' if nome else ""
+            cards_html += f"""
+            <div class="kb-card {is_selected}" draggable="true" data-id="{cid}"
+                 ondragstart="handleDragStart(event, '{cid}')"
+                 ondragend="handleDragEnd(event)"
+                 onclick="handleCardClick('{cid}')">
+                <div class="kb-card-top">{cor} {cod}</div>
+                {nome_div}
+            </div>
+            """
+        colunas_html += f"""
+        <div class="kb-col" data-mes="{mes_num}"
+             ondragover="handleDragOver(event)"
+             ondragleave="handleDragLeave(event)"
+             ondrop="handleDrop(event, {mes_num})">
+            <div class="kb-col-header">{html_lib.escape(mes_nome)}</div>
+            <div class="kb-col-body">
+                {cards_html}
+            </div>
+        </div>
+        """
+
+    html_board = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+        * {{
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }}
+        body {{
+            margin: 0;
+            padding: 4px 2px 12px 2px;
+            background: transparent;
+        }}
+        .kb-wrapper {{
+            display: flex;
+            flex-direction: row;
+            gap: 14px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            align-items: stretch;
+        }}
+        .kb-wrapper::-webkit-scrollbar {{
+            height: 9px;
+        }}
+        .kb-wrapper::-webkit-scrollbar-track {{
+            background: #F1F5FA;
+            border-radius: 6px;
+        }}
+        .kb-wrapper::-webkit-scrollbar-thumb {{
+            background: #CBD5E1;
+            border-radius: 6px;
+        }}
+        .kb-wrapper::-webkit-scrollbar-thumb:hover {{
+            background: #94A3B8;
+        }}
+        .kb-col {{
+            min-width: 175px;
+            max-width: 215px;
+            flex: 1 0 175px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 10px 8px;
+            min-height: 360px;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }}
+        .kb-col.drag-over {{
+            background: #EFF6FF;
+            border: 2px dashed #0055A5;
+        }}
+        .kb-col-header {{
+            text-align: center;
+            font-weight: 700;
+            color: #0055A5;
+            border-bottom: 2px solid #0055A5;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }}
+        .kb-col-body {{
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 300px;
+        }}
+        .kb-card {{
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 10px;
+            padding: 10px 10px;
+            cursor: grab;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+            user-select: none;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+        }}
+        .kb-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,85,165,0.16);
+            border-color: #0055A5;
+        }}
+        .kb-card:active {{
+            cursor: grabbing;
+        }}
+        .kb-card.dragging {{
+            opacity: 0.5;
+        }}
+        .kb-card.selected-card {{
+            border: 2px solid #0055A5;
+            background-color: #F0F7FF;
+        }}
+        .kb-card-top {{
+            font-weight: 700;
+            font-size: 13.5px;
+            color: #1B2A3A;
+            line-height: 1.3;
+        }}
+        .kb-card-name {{
+            font-weight: 500;
+            font-size: 12.5px;
+            color: #334155;
+            margin-top: 4px;
+            line-height: 1.3;
+        }}
+    </style>
+    </head>
+    <body>
+        <div class="kb-wrapper" id="kb-wrapper">
+            {colunas_html}
+        </div>
+        <script>
+            let draggedId = null;
+
+            function sendToStreamlit(payload) {{
+                const doc = window.parent.document;
+                const inputs = doc.querySelectorAll('input');
+                let targetInput = null;
+                for (let inp of inputs) {{
+                    if (inp.getAttribute('aria-label') === 'kb_bridge_{tipo_acompanhamento}') {{
+                        targetInput = inp;
+                        break;
+                    }}
+                }}
+                if (targetInput) {{
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                    nativeInputValueSetter.call(targetInput, JSON.stringify(payload));
+                    targetInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    targetInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+            }}
+
+            function handleDragStart(e, id) {{
+                draggedId = id;
+                e.dataTransfer.setData("text/plain", id);
+                e.dataTransfer.effectAllowed = "move";
+                setTimeout(() => {{
+                    e.target.classList.add("dragging");
+                }}, 0);
+            }}
+
+            function handleDragEnd(e) {{
+                e.target.classList.remove("dragging");
+                document.querySelectorAll('.kb-col').forEach(c => c.classList.remove('drag-over'));
+            }}
+
+            function handleDragOver(e) {{
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                e.currentTarget.classList.add("drag-over");
+            }}
+
+            function handleDragLeave(e) {{
+                e.currentTarget.classList.remove("drag-over");
+            }}
+
+            function handleDrop(e, novoMes) {{
+                e.preventDefault();
+                e.currentTarget.classList.remove("drag-over");
+                const id = e.dataTransfer.getData("text/plain") || draggedId;
+                if (id) {{
+                    sendToStreamlit({{
+                        action: "move",
+                        id: id,
+                        mes: novoMes,
+                        ts: Date.now()
+                    }});
+                }}
+            }}
+
+            function handleCardClick(id) {{
+                sendToStreamlit({{
+                    action: "select",
+                    id: id,
+                    ts: Date.now()
+                }});
+            }}
+
+            // Preserva a posição do scroll horizontal entre reruns
+            const wrapper = document.getElementById("kb-wrapper");
+            const storageKey = "kb_scroll_{tipo_acompanhamento}";
+            const savedScroll = sessionStorage.getItem(storageKey);
+            if (savedScroll) {{
+                wrapper.scrollLeft = parseInt(savedScroll, 10);
+            }}
+            wrapper.addEventListener("scroll", () => {{
+                sessionStorage.setItem(storageKey, wrapper.scrollLeft);
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    components.html(html_board, height=430, scrolling=False)
+
 # --- GERENCIADOR DO PAINEL KANBAN (CONTRATOS E VENDAS) COM ESTILO VISUAL ---
 def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cores):
     usuario = st.session_state.usuario_atual
     dados = carregar_acompanhamento(usuario, tipo_acompanhamento)
     meses_nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
-    if f"edit_id_{tipo_acompanhamento}" not in st.session_state:
-        st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+    key_edit_id = f"edit_id_{tipo_acompanhamento}"
+    key_pending_id = f"pending_select_id_{tipo_acompanhamento}"
+    key_last_bridge_ts = f"last_bridge_ts_{tipo_acompanhamento}"
+    key_bridge_input = f"kb_bridge_input_{tipo_acompanhamento}"
+
+    if key_edit_id not in st.session_state:
+        st.session_state[key_edit_id] = None
+    if key_pending_id not in st.session_state:
+        st.session_state[key_pending_id] = None
+    if key_last_bridge_ts not in st.session_state:
+        st.session_state[key_last_bridge_ts] = 0
+
+    # Input oculto que recebe os eventos de clique e drag-and-drop do quadro interativo
+    st.markdown(
+        f"""
+        <style>
+        div[data-testid="stTextInput"]:has(input[aria-label="kb_bridge_{tipo_acompanhamento}"]) {{
+            position: fixed;
+            left: -9999px;
+            top: -9999px;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    bridge_raw = st.text_input(
+        f"kb_bridge_{tipo_acompanhamento}",
+        key=key_bridge_input,
+        label_visibility="collapsed"
+    )
+
+    if bridge_raw:
+        try:
+            evt = json.loads(bridge_raw)
+            evt_ts = evt.get("ts", 0)
+            if evt_ts and evt_ts != st.session_state[key_last_bridge_ts]:
+                st.session_state[key_last_bridge_ts] = evt_ts
+                action = evt.get("action")
+                target_id = evt.get("id")
+
+                if action == "move" and target_id in dados:
+                    novo_mes = int(evt.get("mes", dados[target_id]["mes"]))
+                    reg_atual = dados[target_id]
+                    if reg_atual["mes"] != novo_mes:
+                        salvar_acompanhamento(
+                            target_id,
+                            usuario,
+                            tipo_acompanhamento,
+                            reg_atual["codigo_cliente"],
+                            reg_atual.get("nome_cliente", ""),
+                            reg_atual["status"],
+                            reg_atual["ano"],
+                            novo_mes,
+                            reg_atual.get("observacoes", "")
+                        )
+                        # Se o cartão arrastado estava aberto em edição, atualiza o mês dele no estado
+                        if st.session_state[key_edit_id] == target_id:
+                            st.session_state[f"ed_ms_{tipo_acompanhamento}_{target_id}"] = meses_nomes[novo_mes - 1]
+                        st.rerun()
+
+                elif action == "select" and target_id in dados:
+                    curr_edit = st.session_state[key_edit_id]
+                    if curr_edit is None or curr_edit == target_id or curr_edit not in dados:
+                        st.session_state[key_edit_id] = target_id
+                        st.session_state[key_pending_id] = None
+                        st.rerun()
+                    else:
+                        # Verifica se houve alguma alteração nos campos do cliente atualmente selecionado
+                        d_curr = dados[curr_edit]
+                        val_cod = st.session_state.get(f"ed_cod_{tipo_acompanhamento}_{curr_edit}", d_curr["codigo_cliente"])
+                        val_nom = st.session_state.get(f"ed_nom_{tipo_acompanhamento}_{curr_edit}", d_curr.get("nome_cliente", ""))
+                        val_st = st.session_state.get(f"ed_st_{tipo_acompanhamento}_{curr_edit}", d_curr["status"])
+                        idx_ms_orig = d_curr["mes"] - 1 if 1 <= d_curr["mes"] <= 12 else 0
+                        val_ms = st.session_state.get(f"ed_ms_{tipo_acompanhamento}_{curr_edit}", meses_nomes[idx_ms_orig])
+                        val_obs = st.session_state.get(f"ed_obs_{tipo_acompanhamento}_{curr_edit}", d_curr.get("observacoes", ""))
+
+                        houve_alteracao = (
+                            str(val_cod).strip() != str(d_curr["codigo_cliente"]).strip()
+                            or str(val_nom).strip() != str(d_curr.get("nome_cliente", "")).strip()
+                            or str(val_st) != str(d_curr["status"])
+                            or (meses_nomes.index(val_ms) + 1) != int(d_curr["mes"])
+                            or str(val_obs).strip() != str(d_curr.get("observacoes", "")).strip()
+                        )
+
+                        if houve_alteracao:
+                            st.session_state[key_pending_id] = target_id
+                            st.rerun()
+                        else:
+                            st.session_state[key_edit_id] = target_id
+                            st.session_state[key_pending_id] = None
+                            st.rerun()
+        except Exception:
+            pass
 
     col_menu_ac, col_conteudo_ac = st.columns([1, 4])
     
@@ -491,35 +817,89 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
             st.markdown(f"{cor} **{st_name}**")
 
     with col_conteudo_ac:
-        id_editando = st.session_state[f"edit_id_{tipo_acompanhamento}"]
+        id_editando = st.session_state[key_edit_id]
+        pending_id = st.session_state[key_pending_id]
+
         if id_editando and id_editando in dados:
             d_edit = dados[id_editando]
+
+            # Caixa de aviso quando há alterações pendentes e o usuário clicou em outro cliente
+            if pending_id and pending_id in dados and pending_id != id_editando:
+                d_prox = dados[pending_id]
+                st.warning(
+                    f"⚠️ **Alterações não salvas!** Você modificou os dados do cliente **{d_edit['codigo_cliente']} - {d_edit.get('nome_cliente', '')}**. "
+                    f"Deseja salvar as alterações antes de abrir o cliente **{d_prox['codigo_cliente']} - {d_prox.get('nome_cliente', '')}**?"
+                )
+                col_av1, col_av2, col_av3, _ = st.columns([2.3, 2.3, 2.3, 3.1])
+                if col_av1.button("💾 Salvar e Trocar", type="primary", use_container_width=True, key=f"av_salv_{tipo_acompanhamento}"):
+                    ed_cod_cur = st.session_state.get(f"ed_cod_{tipo_acompanhamento}_{id_editando}", d_edit["codigo_cliente"])
+                    ed_nom_cur = st.session_state.get(f"ed_nom_{tipo_acompanhamento}_{id_editando}", d_edit.get("nome_cliente", ""))
+                    ed_st_cur = st.session_state.get(f"ed_st_{tipo_acompanhamento}_{id_editando}", d_edit["status"])
+                    idx_ms_cur = d_edit["mes"] - 1 if 1 <= d_edit["mes"] <= 12 else 0
+                    ed_ms_cur = st.session_state.get(f"ed_ms_{tipo_acompanhamento}_{id_editando}", meses_nomes[idx_ms_cur])
+                    ed_obs_cur = st.session_state.get(f"ed_obs_{tipo_acompanhamento}_{id_editando}", d_edit.get("observacoes", ""))
+
+                    if salvar_acompanhamento(
+                        id_editando,
+                        usuario,
+                        tipo_acompanhamento,
+                        str(ed_cod_cur).strip(),
+                        str(ed_nom_cur).strip(),
+                        ed_st_cur,
+                        d_edit["ano"],
+                        meses_nomes.index(ed_ms_cur) + 1,
+                        str(ed_obs_cur)
+                    ):
+                        st.session_state[key_edit_id] = pending_id
+                        st.session_state[key_pending_id] = None
+                        st.rerun()
+
+                if col_av2.button("🗑️ Descartar e Trocar", use_container_width=True, key=f"av_desc_{tipo_acompanhamento}"):
+                    # Limpa estados temporários dos inputs antigos
+                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_obs"]:
+                        st.session_state.pop(f"{k_pfx}_{tipo_acompanhamento}_{id_editando}", None)
+                    st.session_state[key_edit_id] = pending_id
+                    st.session_state[key_pending_id] = None
+                    st.rerun()
+
+                if col_av3.button("↩️ Continuar Editando", use_container_width=True, key=f"av_cont_{tipo_acompanhamento}"):
+                    st.session_state[key_pending_id] = None
+                    st.rerun()
+
             st.markdown("### ✏️ Edição de Cliente")
             with st.container(border=True):
                 c1, c2, c3 = st.columns([2, 3, 3])
-                with c1: ed_cod = st.text_input("Código do Cliente", value=d_edit['codigo_cliente'], key=f"ed_cod_{tipo_acompanhamento}")
-                with c2: ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}")
+                with c1:
+                    ed_cod = st.text_input("Código do Cliente", value=d_edit['codigo_cliente'], key=f"ed_cod_{tipo_acompanhamento}_{id_editando}")
+                with c2:
+                    ed_nome = st.text_input("Nome do Cliente", value=d_edit.get('nome_cliente', ''), key=f"ed_nom_{tipo_acompanhamento}_{id_editando}")
                 with c3: 
                     idx_st = lista_status.index(d_edit['status']) if d_edit['status'] in lista_status else 0
-                    ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}")
+                    ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}_{id_editando}")
                 
                 c4, c5 = st.columns([2, 6])
                 with c4: 
                     idx_ms = d_edit['mes'] - 1 if 1 <= d_edit['mes'] <= 12 else 0
-                    ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}")
-                with c5: ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}")
+                    ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}_{id_editando}")
+                with c5:
+                    ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}_{id_editando}")
                 
                 b1, b2, b3, _ = st.columns([2, 2, 2, 4])
                 if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
                     if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, d_edit['ano'], meses_nomes.index(ed_mes) + 1, ed_obs):
-                        st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                        st.session_state[key_edit_id] = None
+                        st.session_state[key_pending_id] = None
                         st.rerun()
                 if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
-                    st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_obs"]:
+                        st.session_state.pop(f"{k_pfx}_{tipo_acompanhamento}_{id_editando}", None)
+                    st.session_state[key_edit_id] = None
+                    st.session_state[key_pending_id] = None
                     st.rerun()
                 if b3.button("🗑️ Excluir Cliente", use_container_width=True, key=f"ed_del_{tipo_acompanhamento}"):
                     apagar_acompanhamento(id_editando)
-                    st.session_state[f"edit_id_{tipo_acompanhamento}"] = None
+                    st.session_state[key_edit_id] = None
+                    st.session_state[key_pending_id] = None
                     st.rerun()
             st.divider()
 
@@ -543,26 +923,29 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         st.warning("⚠️ Informe o código e o nome do cliente.")
 
         st.divider()
+        st.caption("💡 Clique em um cartão para editar seus dados ou arraste-o para outra coluna para alterar o mês de alocação.")
 
-        cols = st.columns(12)
-        for i, mes in enumerate(meses_nomes):
-            with cols[i]:
-                st.markdown(f"<div style='text-align:center; font-weight:bold; color:#0055A5; border-bottom:2px solid #0055A5; margin-bottom:10px; font-size:14px;'>{mes}</div>", unsafe_allow_html=True)
-                for id_reg, d in dados.items():
-                    if d['ano'] == ano_selecionado and d['mes'] == (i + 1):
-                        if filtro_status != "Todos" and d['status'] != filtro_status:
-                            continue
-                        
-                        cor_status = dict_cores.get(d['status'], "⚪")
-                        nome_formatado = d.get('nome_cliente', '')
+        cards_por_mes = {m: [] for m in range(1, 13)}
+        for id_reg, d in dados.items():
+            if not isinstance(d, dict):
+                continue
+            if d.get('ano') == ano_selecionado and 1 <= int(d.get('mes', 0)) <= 12:
+                if filtro_status != "Todos" and d.get('status') != filtro_status:
+                    continue
+                cards_por_mes[int(d['mes'])].append({
+                    "id": id_reg,
+                    "cor": dict_cores.get(d.get('status', ''), "⚪"),
+                    "codigo": d.get('codigo_cliente', ''),
+                    "nome": d.get('nome_cliente', '')
+                })
 
-                        texto_botao = f"{cor_status} {d['codigo_cliente']}"
-                        if nome_formatado:
-                            texto_botao += f" - {nome_formatado}"
-                            
-                        if st.button(texto_botao, key=f"card_edit_{id_reg}", use_container_width=True, help="Clique para exibir e editar as informações"):
-                            st.session_state[f"edit_id_{tipo_acompanhamento}"] = id_reg
-                            st.rerun()
+        renderizar_kanban_interativo_html(
+            tipo_acompanhamento=tipo_acompanhamento,
+            cards_por_mes=cards_por_mes,
+            meses_nomes=meses_nomes,
+            id_editando=id_editando,
+            pending_target_id=pending_id
+        )
 
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
