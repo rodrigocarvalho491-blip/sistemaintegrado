@@ -566,7 +566,7 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
-# --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP E GRADE SEM ROLAGEM LATERAL ---
+# --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP E ALTURA DINÂMICA ---
 def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_nomes, id_editando, pending_target_id):
     is_contrato = (tipo_acompanhamento == "contrato")
     colunas_html = ""
@@ -624,12 +624,30 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         </div>
         """
 
-    # Calcula altura dinâmica com base nas 2 linhas de 6 meses (Jan-Jun e Jul-Dez)
-    max_cards_r1 = max((len(cards_por_mes.get(m, [])) for m in range(1, 7)), default=0)
-    max_cards_r2 = max((len(cards_por_mes.get(m, [])) for m in range(7, 13)), default=0)
-    alt_r1 = max(205, 56 + max_cards_r1 * 78)
-    alt_r2 = max(205, 56 + max_cards_r2 * 78)
-    altura_iframe = alt_r1 + alt_r2 + 28
+    # Estima a altura inicial proporcional ao número e conteúdo dos cartões por coluna
+    def _estimar_altura_card(item):
+        nome_txt = str(item.get("nome", "") or "").strip()
+        tem_meta = bool(
+            (is_contrato and str(item.get("vigencia", "") or "").strip())
+            or ((not is_contrato) and str(item.get("valor_proposta", "") or "").strip())
+        )
+        alt = 42
+        if nome_txt:
+            linhas_nome = max(1, (len(nome_txt) + 15) // 16)
+            alt += 3 + (linhas_nome * 16)
+        if tem_meta:
+            alt += 5 + 23
+        return alt
+
+    alturas_meses = {}
+    for m in range(1, 13):
+        itens = cards_por_mes.get(m, [])
+        soma_cards = sum(_estimar_altura_card(it) for it in itens)
+        alturas_meses[m] = max(205, 58 + soma_cards)
+
+    alt_r1 = max(alturas_meses[m] for m in range(1, 7))
+    alt_r2 = max(alturas_meses[m] for m in range(7, 13))
+    altura_iframe = alt_r1 + alt_r2 + 32
 
     html_board = f"""
     <!DOCTYPE html>
@@ -645,7 +663,9 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             margin: 0;
             padding: 2px 0 8px 0;
             width: 100%;
+            height: auto;
             overflow-x: hidden;
+            overflow-y: visible;
             background: transparent;
         }}
         .kb-grid {{
@@ -668,6 +688,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         .kb-col {{
             min-width: 0;
             width: 100%;
+            height: auto;
             background: #F8FAFC;
             border: 1px solid #E2E8F0;
             border-radius: 10px;
@@ -807,6 +828,36 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         <script>
             let draggedId = null;
             let isDragging = false;
+
+            function ajustarAlturaIframe() {{
+                const grid = document.getElementById("kb-grid");
+                if (!grid) return;
+                const alturaReal = Math.ceil(grid.getBoundingClientRect().height) + 18;
+                if (window.frameElement) {{
+                    window.frameElement.style.height = alturaReal + "px";
+                    window.frameElement.style.minHeight = alturaReal + "px";
+                    window.frameElement.setAttribute("height", String(alturaReal));
+                    const parentEl = window.frameElement.parentElement;
+                    if (parentEl && parentEl.style && parentEl.style.height) {{
+                        parentEl.style.height = alturaReal + "px";
+                    }}
+                }}
+            }}
+
+            window.addEventListener("DOMContentLoaded", ajustarAlturaIframe);
+            window.addEventListener("load", ajustarAlturaIframe);
+            window.addEventListener("resize", ajustarAlturaIframe);
+            if (document.fonts && document.fonts.ready) {{
+                document.fonts.ready.then(ajustarAlturaIframe);
+            }}
+            if (typeof ResizeObserver !== "undefined") {{
+                const ro = new ResizeObserver(ajustarAlturaIframe);
+                ro.observe(document.body);
+                const gridEl = document.getElementById("kb-grid");
+                if (gridEl) ro.observe(gridEl);
+            }}
+            setTimeout(ajustarAlturaIframe, 80);
+            setTimeout(ajustarAlturaIframe, 350);
 
             function showSavingToast() {{
                 const t = document.getElementById("kb-saving-toast");
