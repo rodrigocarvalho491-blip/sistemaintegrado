@@ -142,20 +142,50 @@ def apagar_nota(nota_id):
         return False
 
 # --- FUNÇÕES DE PERSISTÊNCIA: CONTRATOS & VENDAS ---
+def formatar_valor_proposta(val_raw):
+    txt = " ".join(str(val_raw or "").split()).strip()
+    if not txt:
+        return ""
+    sem_rs = re.sub(r'^r\$\s*', '', txt, flags=re.IGNORECASE).strip()
+    if not any(ch.isdigit() for ch in sem_rs):
+        return txt
+    if re.match(r'^[\d.,]+$', sem_rs):
+        try:
+            if ',' in sem_rs and '.' in sem_rs:
+                num = float(sem_rs.replace('.', '').replace(',', '.'))
+            elif ',' in sem_rs:
+                num = float(sem_rs.replace(',', '.'))
+            elif '.' in sem_rs:
+                partes = sem_rs.split('.')
+                if len(partes[-1]) == 3 and len(partes) > 1:
+                    num = float(sem_rs.replace('.', ''))
+                else:
+                    num = float(sem_rs)
+            else:
+                num = float(sem_rs)
+            formatado = f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return f"R$ {formatado}"
+        except ValueError:
+            pass
+    return f"R$ {sem_rs}"
+
 def carregar_acompanhamento(usuario, tipo):
     try:
         res = supabase.table("acompanhamento").select("*").eq("usuario", usuario).eq("tipo", tipo).execute()
         dados = {}
         cache_vig = st.session_state.get("vigencia_local_cache", {})
+        cache_val = st.session_state.get("valor_proposta_local_cache", {})
         for row in res.data:
             if row.get("vigencia") is None:
                 row["vigencia"] = cache_vig.get(row["id"], "")
+            if row.get("valor_proposta") is None:
+                row["valor_proposta"] = cache_val.get(row["id"], "")
             dados[row["id"]] = row
         return dados
     except Exception:
         return {}
 
-def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, status, ano, mes, observacoes="", vigencia=""):
+def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, status, ano, mes, observacoes="", vigencia="", valor_proposta=""):
     data_mod = datetime.now().strftime("%d/%m/%Y %H:%M")
     payload = {
         "id": id_reg,
@@ -164,35 +194,58 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
         "codigo_cliente": codigo_cliente,
         "nome_cliente": nome_cliente,
         "status": status,
-        "ano": ano,
-        "mes": mes,
+        "ano": int(ano),
+        "mes": int(mes),
         "observacoes": observacoes,
         "vigencia": vigencia,
+        "valor_proposta": valor_proposta,
         "data_modificacao": data_mod
     }
     try:
         supabase.table("acompanhamento").upsert(payload).execute()
         if "vigencia_local_cache" in st.session_state:
             st.session_state["vigencia_local_cache"].pop(id_reg, None)
+        if "valor_proposta_local_cache" in st.session_state:
+            st.session_state["valor_proposta_local_cache"].pop(id_reg, None)
         return True
     except Exception as e:
         err_str = str(e)
         if "42501" in err_str or "row-level security" in err_str.lower():
             st.error("❌ Permissão bloqueada no Supabase (RLS ativo). Execute no SQL Editor do Supabase: `ALTER TABLE acompanhamento DISABLE ROW LEVEL SECURITY;`")
             return False
+        # Tenta salvar sem 'valor_proposta' caso a coluna ainda não exista
         try:
-            payload_sem_vig = {k: v for k, v in payload.items() if k != "vigencia"}
-            supabase.table("acompanhamento").upsert(payload_sem_vig).execute()
+            payload_sem_val = {k: v for k, v in payload.items() if k != "valor_proposta"}
+            supabase.table("acompanhamento").upsert(payload_sem_val).execute()
+            if "vigencia_local_cache" in st.session_state:
+                st.session_state["vigencia_local_cache"].pop(id_reg, None)
+            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
+            if str(valor_proposta).strip():
+                st.warning("⚠️ Cliente salvo, mas a coluna 'valor_proposta' ainda não existe no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento ADD COLUMN IF NOT EXISTS valor_proposta TEXT;`")
+            return True
+        except Exception:
+            pass
+        # Tenta salvar sem 'vigencia' e sem 'valor_proposta'
+        try:
+            payload_sem_extras = {k: v for k, v in payload.items() if k not in ["vigencia", "valor_proposta"]}
+            supabase.table("acompanhamento").upsert(payload_sem_extras).execute()
             st.session_state.setdefault("vigencia_local_cache", {})[id_reg] = vigencia
+            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
+            colunas_faltando = []
             if str(vigencia).strip():
-                st.warning("⚠️ Cliente salvo, mas a coluna 'vigencia' ainda não existe no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento ADD COLUMN IF NOT EXISTS vigencia TEXT;`")
+                colunas_faltando.append("ADD COLUMN IF NOT EXISTS vigencia TEXT")
+            if str(valor_proposta).strip():
+                colunas_faltando.append("ADD COLUMN IF NOT EXISTS valor_proposta TEXT")
+            if colunas_faltando:
+                st.warning(f"⚠️ Cliente salvo, mas faltam colunas no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento {', '.join(colunas_faltando)};`")
             return True
         except Exception:
             try:
-                payload_fallback = {k: v for k, v in payload.items() if k not in ["observacoes", "nome_cliente", "vigencia"]}
+                payload_fallback = {k: v for k, v in payload.items() if k not in ["observacoes", "nome_cliente", "vigencia", "valor_proposta"]}
                 supabase.table("acompanhamento").upsert(payload_fallback).execute()
                 st.session_state.setdefault("vigencia_local_cache", {})[id_reg] = vigencia
-                st.warning("⚠️ Cliente salvo parcialmente. Adicione as colunas 'observacoes', 'nome_cliente' e 'vigencia' no Supabase executando um ALTER TABLE.")
+                st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
+                st.warning("⚠️ Cliente salvo parcialmente. Adicione as colunas 'observacoes', 'nome_cliente', 'vigencia' e 'valor_proposta' no Supabase executando um ALTER TABLE.")
                 return True
             except Exception as e2:
                 st.error(f"Erro ao salvar acompanhamento: {e2}")
@@ -356,7 +409,7 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 }
 
 .block-container, [data-testid="stMainBlockContainer"] {
-  max-width: 1280px !important;
+  max-width: 1440px !important;
   margin: 1.2rem auto 2rem auto !important;
   padding: 1.8rem 2.4rem 2.4rem 2.4rem !important;
   background: #FFFFFF !important;
@@ -483,39 +536,63 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
-# --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP E LARGURA AJUSTADA ---
+# --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP E GRADE SEM ROLAGEM LATERAL ---
 def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_nomes, id_editando, pending_target_id):
+    is_contrato = (tipo_acompanhamento == "contrato")
     colunas_html = ""
     for idx_m, mes_nome in enumerate(meses_nomes):
         mes_num = idx_m + 1
+        itens_mes = cards_por_mes.get(mes_num, [])
+        qtd_mes = len(itens_mes)
         cards_html = ""
-        for item in cards_por_mes.get(mes_num, []):
+        for item in itens_mes:
             cid = html_lib.escape(str(item["id"]))
             cor = html_lib.escape(str(item["cor"]))
             cod = html_lib.escape(str(item["codigo"]))
             nome = html_lib.escape(str(item["nome"]))
+            vig = html_lib.escape(str(item.get("vigencia", "") or "").strip())
+            val_prop = html_lib.escape(str(item.get("valor_proposta", "") or "").strip())
             is_selected = "selected-card" if str(item["id"]) == str(id_editando) else ""
             nome_div = f'<div class="kb-card-name">{nome}</div>' if nome else ""
+
+            meta_div = ""
+            if is_contrato and vig:
+                meta_div = f'<div class="kb-card-meta kb-card-vig">📅 {vig}</div>'
+            elif (not is_contrato) and val_prop:
+                meta_div = f'<div class="kb-card-meta kb-card-val">💰 {val_prop}</div>'
+
             cards_html += f"""
             <div class="kb-card {is_selected}" draggable="true" data-id="{cid}"
                  ondragstart="handleDragStart(event, '{cid}')"
                  ondragend="handleDragEnd(event)"
-                 onclick="handleCardClick('{cid}')">
+                 onclick="handleCardClick(event, '{cid}')">
                 <div class="kb-card-top">{cor} {cod}</div>
                 {nome_div}
+                {meta_div}
             </div>
             """
         colunas_html += f"""
         <div class="kb-col" data-mes="{mes_num}"
+             ondragenter="handleDragEnter(event)"
              ondragover="handleDragOver(event)"
              ondragleave="handleDragLeave(event)"
              ondrop="handleDrop(event, {mes_num})">
-            <div class="kb-col-header">{html_lib.escape(mes_nome)}</div>
+            <div class="kb-col-header">
+                <span class="kb-col-title">{html_lib.escape(mes_nome)}</span>
+                <span class="kb-col-count">{qtd_mes}</span>
+            </div>
             <div class="kb-col-body">
                 {cards_html}
             </div>
         </div>
         """
+
+    # Calcula altura dinâmica com base nas 2 linhas de 6 meses (Jan-Jun e Jul-Dez)
+    max_cards_r1 = max((len(cards_por_mes.get(m, [])) for m in range(1, 7)), default=0)
+    max_cards_r2 = max((len(cards_por_mes.get(m, [])) for m in range(7, 13)), default=0)
+    alt_r1 = max(205, 56 + max_cards_r1 * 78)
+    alt_r2 = max(205, 56 + max_cards_r2 * 78)
+    altura_iframe = alt_r1 + alt_r2 + 28
 
     html_board = f"""
     <!DOCTYPE html>
@@ -527,86 +604,100 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             box-sizing: border-box;
             font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }}
-        body {{
+        html, body {{
             margin: 0;
-            padding: 4px 2px 12px 2px;
+            padding: 2px 0 8px 0;
+            width: 100%;
+            overflow-x: hidden;
             background: transparent;
         }}
-        .kb-wrapper {{
-            display: flex;
-            flex-direction: row;
-            gap: 14px;
-            overflow-x: auto;
-            padding-bottom: 12px;
+        .kb-grid {{
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 10px;
+            width: 100%;
             align-items: stretch;
         }}
-        .kb-wrapper::-webkit-scrollbar {{
-            height: 9px;
+        @media (max-width: 1050px) {{
+            .kb-grid {{
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }}
         }}
-        .kb-wrapper::-webkit-scrollbar-track {{
-            background: #F1F5FA;
-            border-radius: 6px;
-        }}
-        .kb-wrapper::-webkit-scrollbar-thumb {{
-            background: #CBD5E1;
-            border-radius: 6px;
-        }}
-        .kb-wrapper::-webkit-scrollbar-thumb:hover {{
-            background: #94A3B8;
+        @media (max-width: 720px) {{
+            .kb-grid {{
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }}
         }}
         .kb-col {{
-            min-width: 175px;
-            max-width: 215px;
-            flex: 1 0 175px;
+            min-width: 0;
+            width: 100%;
             background: #F8FAFC;
             border: 1px solid #E2E8F0;
             border-radius: 10px;
-            padding: 10px 8px;
-            min-height: 360px;
-            transition: background-color 0.15s ease, border-color 0.15s ease;
+            padding: 8px 6px;
+            min-height: 195px;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }}
         .kb-col.drag-over {{
             background: #EFF6FF;
             border: 2px dashed #0055A5;
+            box-shadow: inset 0 0 0 2px rgba(0, 85, 165, 0.08);
         }}
         .kb-col-header {{
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             font-weight: 700;
             color: #0055A5;
             border-bottom: 2px solid #0055A5;
-            padding-bottom: 6px;
-            margin-bottom: 10px;
-            font-size: 14px;
+            padding: 0 3px 5px 3px;
+            margin-bottom: 8px;
+            font-size: 13.5px;
+        }}
+        .kb-col-count {{
+            background: #E0ECFF;
+            color: #004488;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 999px;
+            line-height: 1.3;
         }}
         .kb-col-body {{
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            min-height: 300px;
+            gap: 7px;
+            flex: 1;
+            min-height: 140px;
         }}
         .kb-card {{
             background: #FFFFFF;
             border: 1px solid #CBD5E1;
-            border-radius: 10px;
-            padding: 10px 10px;
+            border-radius: 8px;
+            padding: 7px 8px;
             cursor: grab;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
             user-select: none;
             word-wrap: break-word;
             overflow-wrap: break-word;
             white-space: normal;
         }}
+        .kb-card * {{
+            pointer-events: none;
+        }}
         .kb-card:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,85,165,0.16);
+            box-shadow: 0 4px 10px rgba(0,85,165,0.16);
             border-color: #0055A5;
         }}
         .kb-card:active {{
             cursor: grabbing;
         }}
         .kb-card.dragging {{
-            opacity: 0.5;
+            opacity: 0.45;
         }}
         .kb-card.selected-card {{
             border: 2px solid #0055A5;
@@ -614,73 +705,147 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         }}
         .kb-card-top {{
             font-weight: 700;
-            font-size: 13.5px;
+            font-size: 12.5px;
             color: #1B2A3A;
-            line-height: 1.3;
+            line-height: 1.25;
         }}
         .kb-card-name {{
             font-weight: 500;
-            font-size: 12.5px;
+            font-size: 11.5px;
             color: #334155;
-            margin-top: 4px;
-            line-height: 1.3;
+            margin-top: 3px;
+            line-height: 1.25;
+        }}
+        .kb-card-meta {{
+            margin-top: 5px;
+            padding: 2px 5px;
+            border-radius: 5px;
+            font-size: 10.5px;
+            font-weight: 600;
+            line-height: 1.25;
+            display: inline-block;
+            max-width: 100%;
+        }}
+        .kb-card-vig {{
+            background: #EFF6FF;
+            color: #0055A5;
+            border: 1px solid #BFDBFE;
+        }}
+        .kb-card-val {{
+            background: #ECFDF5;
+            color: #047857;
+            border: 1px solid #A7F3D0;
+        }}
+        .kb-saving-toast {{
+            position: fixed;
+            bottom: 10px;
+            right: 12px;
+            background: #0055A5;
+            color: #FFFFFF;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+            display: none;
+            z-index: 9999;
         }}
     </style>
     </head>
     <body>
-        <div class="kb-wrapper" id="kb-wrapper">
+        <div class="kb-grid" id="kb-grid">
             {colunas_html}
         </div>
+        <div class="kb-saving-toast" id="kb-saving-toast">💾 Salvando alteração...</div>
         <script>
             let draggedId = null;
+            let isDragging = false;
+
+            function showSavingToast() {{
+                const t = document.getElementById("kb-saving-toast");
+                if (t) t.style.display = "block";
+            }}
 
             function sendToStreamlit(payload) {{
                 const doc = window.parent.document;
-                const inputs = doc.querySelectorAll('input');
-                let targetInput = null;
-                for (let inp of inputs) {{
-                    if (inp.getAttribute('aria-label') === 'kb_bridge_{tipo_acompanhamento}') {{
-                        targetInput = inp;
-                        break;
+                const inputs = doc.querySelectorAll('input[aria-label="kb_bridge_{tipo_acompanhamento}"]');
+                const serialized = JSON.stringify(payload);
+                inputs.forEach(function(targetInput) {{
+                    try {{
+                        if (targetInput._valueTracker) {{
+                            targetInput._valueTracker.setValue("");
+                        }}
+                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        nativeInputValueSetter.call(targetInput, serialized);
+                        targetInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        targetInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        targetInput.dispatchEvent(new KeyboardEvent('keydown', {{
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true,
+                            cancelable: true
+                        }}));
+                        targetInput.dispatchEvent(new KeyboardEvent('keyup', {{
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true
+                        }}));
+                        targetInput.dispatchEvent(new FocusEvent('blur', {{ bubbles: true }}));
+                    }} catch (err) {{
+                        console.error("Erro ao comunicar com Streamlit:", err);
                     }}
-                }}
-                if (targetInput) {{
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    nativeInputValueSetter.call(targetInput, JSON.stringify(payload));
-                    targetInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    targetInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                }}
+                }});
             }}
 
             function handleDragStart(e, id) {{
+                isDragging = true;
                 draggedId = id;
-                e.dataTransfer.setData("text/plain", id);
-                e.dataTransfer.effectAllowed = "move";
+                if (e.dataTransfer) {{
+                    e.dataTransfer.setData("text/plain", id);
+                    e.dataTransfer.effectAllowed = "move";
+                }}
                 setTimeout(() => {{
-                    e.target.classList.add("dragging");
+                    if (e.target) e.target.classList.add("dragging");
                 }}, 0);
             }}
 
             function handleDragEnd(e) {{
-                e.target.classList.remove("dragging");
+                if (e.target) e.target.classList.remove("dragging");
                 document.querySelectorAll('.kb-col').forEach(c => c.classList.remove('drag-over'));
+                setTimeout(() => {{ isDragging = false; }}, 80);
+            }}
+
+            function handleDragEnter(e) {{
+                e.preventDefault();
+                e.currentTarget.classList.add("drag-over");
             }}
 
             function handleDragOver(e) {{
                 e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
+                if (e.dataTransfer) {{
+                    e.dataTransfer.dropEffect = "move";
+                }}
                 e.currentTarget.classList.add("drag-over");
             }}
 
             function handleDragLeave(e) {{
-                e.currentTarget.classList.remove("drag-over");
+                if (!e.currentTarget.contains(e.relatedTarget)) {{
+                    e.currentTarget.classList.remove("drag-over");
+                }}
             }}
 
             function handleDrop(e, novoMes) {{
                 e.preventDefault();
+                e.stopPropagation();
                 e.currentTarget.classList.remove("drag-over");
-                const id = e.dataTransfer.getData("text/plain") || draggedId;
+                const id = (e.dataTransfer ? e.dataTransfer.getData("text/plain") : "") || draggedId;
+                draggedId = null;
                 if (id) {{
+                    showSavingToast();
                     sendToStreamlit({{
                         action: "move",
                         id: id,
@@ -690,29 +855,19 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
                 }}
             }}
 
-            function handleCardClick(id) {{
+            function handleCardClick(e, id) {{
+                if (isDragging) return;
                 sendToStreamlit({{
                     action: "select",
                     id: id,
                     ts: Date.now()
                 }});
             }}
-
-            // Preserva a posição do scroll horizontal entre reruns
-            const wrapper = document.getElementById("kb-wrapper");
-            const storageKey = "kb_scroll_{tipo_acompanhamento}";
-            const savedScroll = sessionStorage.getItem(storageKey);
-            if (savedScroll) {{
-                wrapper.scrollLeft = parseInt(savedScroll, 10);
-            }}
-            wrapper.addEventListener("scroll", () => {{
-                sessionStorage.setItem(storageKey, wrapper.scrollLeft);
-            }});
         </script>
     </body>
     </html>
     """
-    components.html(html_board, height=430, scrolling=False)
+    components.html(html_board, height=altura_iframe, scrolling=False)
 
 # --- HELPERS DE CONSOLIDAÇÃO DE CONTRATOS POR VIGÊNCIA E TRIMESTRE ---
 def normalizar_vigencia_label(vig_raw):
@@ -819,6 +974,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
     usuario = st.session_state.usuario_atual
     dados = carregar_acompanhamento(usuario, tipo_acompanhamento)
     meses_nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    anos_lista = [2024, 2025, 2026, 2027, 2028, 2029, 2030]
     is_contrato = (tipo_acompanhamento == "contrato")
 
     key_edit_id = f"edit_id_{tipo_acompanhamento}"
@@ -868,23 +1024,24 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                 if action == "move" and target_id in dados:
                     novo_mes = int(evt.get("mes", dados[target_id]["mes"]))
                     reg_atual = dados[target_id]
-                    if reg_atual["mes"] != novo_mes:
-                        salvar_acompanhamento(
+                    if int(reg_atual["mes"]) != novo_mes:
+                        ok_move = salvar_acompanhamento(
                             target_id,
                             usuario,
                             tipo_acompanhamento,
                             reg_atual["codigo_cliente"],
                             reg_atual.get("nome_cliente", ""),
                             reg_atual["status"],
-                            reg_atual["ano"],
+                            int(reg_atual["ano"]),
                             novo_mes,
                             reg_atual.get("observacoes", ""),
-                            reg_atual.get("vigencia", "")
+                            reg_atual.get("vigencia", ""),
+                            reg_atual.get("valor_proposta", "")
                         )
-                        # Se o cartão arrastado estava aberto em edição, atualiza o mês dele no estado
-                        if st.session_state[key_edit_id] == target_id:
-                            st.session_state[f"ed_ms_{tipo_acompanhamento}_{target_id}"] = meses_nomes[novo_mes - 1]
-                        st.rerun()
+                        if ok_move:
+                            if st.session_state[key_edit_id] == target_id:
+                                st.session_state[f"ed_ms_{tipo_acompanhamento}_{target_id}"] = meses_nomes[novo_mes - 1]
+                            st.rerun()
 
                 elif action == "select" and target_id in dados:
                     curr_edit = st.session_state[key_edit_id]
@@ -898,20 +1055,25 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         val_cod = st.session_state.get(f"ed_cod_{tipo_acompanhamento}_{curr_edit}", d_curr["codigo_cliente"])
                         val_nom = st.session_state.get(f"ed_nom_{tipo_acompanhamento}_{curr_edit}", d_curr.get("nome_cliente", ""))
                         val_st = st.session_state.get(f"ed_st_{tipo_acompanhamento}_{curr_edit}", d_curr["status"])
-                        idx_ms_orig = d_curr["mes"] - 1 if 1 <= d_curr["mes"] <= 12 else 0
+                        val_ano = st.session_state.get(f"ed_ano_{tipo_acompanhamento}_{curr_edit}", int(d_curr["ano"]))
+                        idx_ms_orig = int(d_curr["mes"]) - 1 if 1 <= int(d_curr["mes"]) <= 12 else 0
                         val_ms = st.session_state.get(f"ed_ms_{tipo_acompanhamento}_{curr_edit}", meses_nomes[idx_ms_orig])
                         val_obs = st.session_state.get(f"ed_obs_{tipo_acompanhamento}_{curr_edit}", d_curr.get("observacoes", ""))
                         val_vig = st.session_state.get(f"ed_vig_{tipo_acompanhamento}_{curr_edit}", d_curr.get("vigencia", "") or "")
+                        val_prop = st.session_state.get(f"ed_val_prop_{tipo_acompanhamento}_{curr_edit}", d_curr.get("valor_proposta", "") or "")
 
                         vig_alterada = is_contrato and (str(val_vig).strip() != str(d_curr.get("vigencia", "") or "").strip())
+                        prop_alterada = (not is_contrato) and (str(val_prop).strip() != str(d_curr.get("valor_proposta", "") or "").strip())
 
                         houve_alteracao = (
                             str(val_cod).strip() != str(d_curr["codigo_cliente"]).strip()
                             or str(val_nom).strip() != str(d_curr.get("nome_cliente", "")).strip()
                             or str(val_st) != str(d_curr["status"])
+                            or int(val_ano) != int(d_curr["ano"])
                             or (meses_nomes.index(val_ms) + 1) != int(d_curr["mes"])
                             or str(val_obs).strip() != str(d_curr.get("observacoes", "")).strip()
                             or vig_alterada
+                            or prop_alterada
                         )
 
                         if houve_alteracao:
@@ -924,11 +1086,11 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
         except Exception:
             pass
 
-    col_menu_ac, col_conteudo_ac = st.columns([1, 4])
+    col_menu_ac, col_conteudo_ac = st.columns([1, 4.3])
     
     with col_menu_ac:
         st.markdown("### 📌 Filtros")
-        ano_selecionado = st.selectbox("📅 Selecione o Ano", [2024, 2025, 2026, 2027, 2028], index=2, key=f"ano_sel_{tipo_acompanhamento}")
+        ano_selecionado = st.selectbox("📅 Selecione o Ano", anos_lista, index=2, key=f"ano_sel_{tipo_acompanhamento}")
         filtro_status = st.selectbox("🏷️ Filtrar por Status", ["Todos"] + lista_status, key=f"filtro_st_{tipo_acompanhamento}")
         
         st.divider()
@@ -956,10 +1118,12 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                     ed_cod_cur = st.session_state.get(f"ed_cod_{tipo_acompanhamento}_{id_editando}", d_edit["codigo_cliente"])
                     ed_nom_cur = st.session_state.get(f"ed_nom_{tipo_acompanhamento}_{id_editando}", d_edit.get("nome_cliente", ""))
                     ed_st_cur = st.session_state.get(f"ed_st_{tipo_acompanhamento}_{id_editando}", d_edit["status"])
-                    idx_ms_cur = d_edit["mes"] - 1 if 1 <= d_edit["mes"] <= 12 else 0
+                    ed_ano_cur = st.session_state.get(f"ed_ano_{tipo_acompanhamento}_{id_editando}", int(d_edit["ano"]))
+                    idx_ms_cur = int(d_edit["mes"]) - 1 if 1 <= int(d_edit["mes"]) <= 12 else 0
                     ed_ms_cur = st.session_state.get(f"ed_ms_{tipo_acompanhamento}_{id_editando}", meses_nomes[idx_ms_cur])
                     ed_obs_cur = st.session_state.get(f"ed_obs_{tipo_acompanhamento}_{id_editando}", d_edit.get("observacoes", ""))
                     ed_vig_cur = st.session_state.get(f"ed_vig_{tipo_acompanhamento}_{id_editando}", d_edit.get("vigencia", "") or "") if is_contrato else ""
+                    ed_val_cur = formatar_valor_proposta(st.session_state.get(f"ed_val_prop_{tipo_acompanhamento}_{id_editando}", d_edit.get("valor_proposta", "") or "")) if not is_contrato else ""
 
                     if salvar_acompanhamento(
                         id_editando,
@@ -968,18 +1132,18 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         str(ed_cod_cur).strip(),
                         str(ed_nom_cur).strip(),
                         ed_st_cur,
-                        d_edit["ano"],
+                        int(ed_ano_cur),
                         meses_nomes.index(ed_ms_cur) + 1,
                         str(ed_obs_cur),
-                        str(ed_vig_cur).strip()
+                        str(ed_vig_cur).strip(),
+                        ed_val_cur
                     ):
                         st.session_state[key_edit_id] = pending_id
                         st.session_state[key_pending_id] = None
                         st.rerun()
 
                 if col_av2.button("🗑️ Descartar e Trocar", use_container_width=True, key=f"av_desc_{tipo_acompanhamento}"):
-                    # Limpa estados temporários dos inputs antigos
-                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_vig", "ed_obs"]:
+                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ano", "ed_ms", "ed_vig", "ed_val_prop", "ed_obs"]:
                         st.session_state.pop(f"{k_pfx}_{tipo_acompanhamento}_{id_editando}", None)
                     st.session_state[key_edit_id] = pending_id
                     st.session_state[key_pending_id] = None
@@ -1000,32 +1164,54 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                     idx_st = lista_status.index(d_edit['status']) if d_edit['status'] in lista_status else 0
                     ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}_{id_editando}")
                 
+                anos_ed_opcoes = sorted(list(set(anos_lista + [int(d_edit['ano'])])))
+                idx_ano_ed = anos_ed_opcoes.index(int(d_edit['ano']))
+                idx_ms = int(d_edit['mes']) - 1 if 1 <= int(d_edit['mes']) <= 12 else 0
+
                 if is_contrato:
-                    c4, c5, c6 = st.columns([2, 2, 4])
+                    c4, c5, c6, c7 = st.columns([1.6, 1.8, 2.2, 3.4])
                     with c4:
-                        idx_ms = d_edit['mes'] - 1 if 1 <= d_edit['mes'] <= 12 else 0
-                        ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}_{id_editando}")
+                        ed_ano = st.selectbox("Ano", anos_ed_opcoes, index=idx_ano_ed, key=f"ed_ano_{tipo_acompanhamento}_{id_editando}")
                     with c5:
-                        ed_vig = st.text_input("Vigência", value=d_edit.get('vigencia', '') or '', placeholder="Ex: 60 meses", key=f"ed_vig_{tipo_acompanhamento}_{id_editando}")
+                        ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}_{id_editando}")
                     with c6:
+                        ed_vig = st.text_input("Vigência", value=d_edit.get('vigencia', '') or '', placeholder="Ex: 60 meses", key=f"ed_vig_{tipo_acompanhamento}_{id_editando}")
+                    with c7:
                         ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}_{id_editando}")
+                    ed_val_prop = ""
                 else:
-                    c4, c5 = st.columns([2, 6])
-                    with c4: 
-                        idx_ms = d_edit['mes'] - 1 if 1 <= d_edit['mes'] <= 12 else 0
+                    c4, c5, c6, c7 = st.columns([1.6, 1.8, 2.4, 3.2])
+                    with c4:
+                        ed_ano = st.selectbox("Ano", anos_ed_opcoes, index=idx_ano_ed, key=f"ed_ano_{tipo_acompanhamento}_{id_editando}")
+                    with c5: 
                         ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}_{id_editando}")
-                    with c5:
+                    with c6:
+                        ed_val_prop = st.text_input("Valor da Proposta (R$)", value=d_edit.get('valor_proposta', '') or '', placeholder="Ex: R$ 15.000,00", key=f"ed_val_prop_{tipo_acompanhamento}_{id_editando}")
+                    with c7:
                         ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}_{id_editando}")
                     ed_vig = ""
                 
                 b1, b2, b3, _ = st.columns([2, 2, 2, 4])
                 if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
-                    if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, d_edit['ano'], meses_nomes.index(ed_mes) + 1, ed_obs, ed_vig.strip() if is_contrato else ""):
+                    val_prop_salv = formatar_valor_proposta(ed_val_prop) if not is_contrato else ""
+                    if salvar_acompanhamento(
+                        id_editando,
+                        usuario,
+                        tipo_acompanhamento,
+                        ed_cod.strip(),
+                        ed_nome.strip(),
+                        ed_status,
+                        int(ed_ano),
+                        meses_nomes.index(ed_mes) + 1,
+                        ed_obs,
+                        ed_vig.strip() if is_contrato else "",
+                        val_prop_salv
+                    ):
                         st.session_state[key_edit_id] = None
                         st.session_state[key_pending_id] = None
                         st.rerun()
                 if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
-                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_vig", "ed_obs"]:
+                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ano", "ed_ms", "ed_vig", "ed_val_prop", "ed_obs"]:
                         st.session_state.pop(f"{k_pfx}_{tipo_acompanhamento}_{id_editando}", None)
                     st.session_state[key_edit_id] = None
                     st.session_state[key_pending_id] = None
@@ -1053,38 +1239,42 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                     if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}", type="primary", use_container_width=True):
                         if novo_cod.strip() and novo_nome.strip():
                             novo_id = str(uuid.uuid4())
-                            if salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_nome.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1, novo_obs.strip(), novo_vig.strip()):
+                            if salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_nome.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1, novo_obs.strip(), novo_vig.strip(), ""):
                                 st.rerun()
                         else:
                             st.warning("⚠️ Informe o código e o nome do cliente.")
             else:
-                c_obs, c_btn = st.columns([5, 1])
+                c_val, c_obs, c_btn = st.columns([2.2, 3.8, 1.2])
+                with c_val: novo_val_prop = st.text_input("Valor da Proposta (R$)", placeholder="Ex: R$ 15.000,00", key=f"n_val_prop_{tipo_acompanhamento}")
                 with c_obs: novo_obs = st.text_input("Observações", placeholder="Detalhes ou anotações...", key=f"n_obs_{tipo_acompanhamento}")
                 with c_btn:
                     st.write(""); st.write("")
                     if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}", type="primary", use_container_width=True):
                         if novo_cod.strip() and novo_nome.strip():
                             novo_id = str(uuid.uuid4())
-                            if salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_nome.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1, novo_obs.strip()):
+                            val_prop_fmt = formatar_valor_proposta(novo_val_prop)
+                            if salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_nome.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1, novo_obs.strip(), "", val_prop_fmt):
                                 st.rerun()
                         else:
                             st.warning("⚠️ Informe o código e o nome do cliente.")
 
         st.divider()
-        st.caption("💡 Clique em um cartão para editar seus dados ou arraste-o para outra coluna para alterar o mês de alocação.")
+        st.caption("💡 Clique em um cartão para editar seus dados (inclusive alterar o ano) ou arraste-o para outra coluna para alterar o mês de alocação.")
 
         cards_por_mes = {m: [] for m in range(1, 13)}
         for id_reg, d in dados.items():
             if not isinstance(d, dict):
                 continue
-            if d.get('ano') == ano_selecionado and 1 <= int(d.get('mes', 0)) <= 12:
+            if int(d.get('ano', 0)) == ano_selecionado and 1 <= int(d.get('mes', 0)) <= 12:
                 if filtro_status != "Todos" and d.get('status') != filtro_status:
                     continue
                 cards_por_mes[int(d['mes'])].append({
                     "id": id_reg,
                     "cor": dict_cores.get(d.get('status', ''), "⚪"),
                     "codigo": d.get('codigo_cliente', ''),
-                    "nome": d.get('nome_cliente', '')
+                    "nome": d.get('nome_cliente', ''),
+                    "vigencia": d.get('vigencia', '') or '',
+                    "valor_proposta": formatar_valor_proposta(d.get('valor_proposta', '') or '')
                 })
 
         renderizar_kanban_interativo_html(
