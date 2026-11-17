@@ -349,6 +349,13 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
   box-shadow: 0 1px 2px rgba(10,37,64,.06), 0 8px 28px rgba(10,37,64,.07);
 }
 
+.block-container:has(div[data-baseweb="tab-panel"]:not([hidden]) .kanban-full-width-marker),
+[data-testid="stMainBlockContainer"]:has(div[data-baseweb="tab-panel"]:not([hidden]) .kanban-full-width-marker) {
+  max-width: 98% !important;
+  padding-left: 1.2rem !important;
+  padding-right: 1.2rem !important;
+}
+
 .cg-header { 
   display: flex; 
   align-items: center; 
@@ -471,10 +478,14 @@ def cabecalho_pagina(titulo, subtitulo):
 # --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP E LARGURA AJUSTADA ---
 def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_nomes, id_editando, pending_target_id):
     colunas_html = ""
+    max_cards_col = 0
     for idx_m, mes_nome in enumerate(meses_nomes):
         mes_num = idx_m + 1
+        lista_mes = cards_por_mes.get(mes_num, [])
+        if len(lista_mes) > max_cards_col:
+            max_cards_col = len(lista_mes)
         cards_html = ""
-        for item in cards_por_mes.get(mes_num, []):
+        for item in lista_mes:
             cid = html_lib.escape(str(item["id"]))
             cor = html_lib.escape(str(item["cor"]))
             cod = html_lib.escape(str(item["codigo"]))
@@ -502,6 +513,8 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         </div>
         """
 
+    altura_board = max(430, 120 + (max_cards_col * 78))
+
     html_board = f"""
     <!DOCTYPE html>
     <html>
@@ -512,42 +525,30 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             box-sizing: border-box;
             font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }}
-        body {{
+        html, body {{
             margin: 0;
-            padding: 4px 2px 12px 2px;
+            padding: 2px 0 8px 0;
+            width: 100%;
+            overflow-x: hidden;
             background: transparent;
         }}
         .kb-wrapper {{
-            display: flex;
-            flex-direction: row;
-            gap: 14px;
-            overflow-x: auto;
-            padding-bottom: 12px;
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 6px;
+            width: 100%;
             align-items: stretch;
         }}
-        .kb-wrapper::-webkit-scrollbar {{
-            height: 9px;
-        }}
-        .kb-wrapper::-webkit-scrollbar-track {{
-            background: #F1F5FA;
-            border-radius: 6px;
-        }}
-        .kb-wrapper::-webkit-scrollbar-thumb {{
-            background: #CBD5E1;
-            border-radius: 6px;
-        }}
-        .kb-wrapper::-webkit-scrollbar-thumb:hover {{
-            background: #94A3B8;
-        }}
         .kb-col {{
-            min-width: 175px;
-            max-width: 215px;
-            flex: 1 0 175px;
+            min-width: 0;
+            width: 100%;
             background: #F8FAFC;
             border: 1px solid #E2E8F0;
-            border-radius: 10px;
-            padding: 10px 8px;
+            border-radius: 8px;
+            padding: 7px 4px;
             min-height: 360px;
+            display: flex;
+            flex-direction: column;
             transition: background-color 0.15s ease, border-color 0.15s ease;
         }}
         .kb-col.drag-over {{
@@ -559,39 +560,45 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             font-weight: 700;
             color: #0055A5;
             border-bottom: 2px solid #0055A5;
-            padding-bottom: 6px;
-            margin-bottom: 10px;
-            font-size: 14px;
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 12.5px;
+            white-space: nowrap;
         }}
         .kb-col-body {{
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
+            flex: 1;
             min-height: 300px;
         }}
         .kb-card {{
             background: #FFFFFF;
             border: 1px solid #CBD5E1;
-            border-radius: 10px;
-            padding: 10px 10px;
+            border-radius: 7px;
+            padding: 7px 5px;
             cursor: grab;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
             transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
             user-select: none;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            word-break: break-word;
             white-space: normal;
+        }}
+        .kb-card * {{
+            pointer-events: none;
         }}
         .kb-card:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,85,165,0.16);
+            box-shadow: 0 4px 10px rgba(0,85,165,0.16);
             border-color: #0055A5;
         }}
         .kb-card:active {{
             cursor: grabbing;
         }}
         .kb-card.dragging {{
-            opacity: 0.5;
+            opacity: 0.45;
         }}
         .kb-card.selected-card {{
             border: 2px solid #0055A5;
@@ -599,16 +606,16 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         }}
         .kb-card-top {{
             font-weight: 700;
-            font-size: 13.5px;
+            font-size: 11.5px;
             color: #1B2A3A;
-            line-height: 1.3;
+            line-height: 1.25;
         }}
         .kb-card-name {{
             font-weight: 500;
-            font-size: 12.5px;
+            font-size: 10.5px;
             color: #334155;
-            margin-top: 4px;
-            line-height: 1.3;
+            margin-top: 3px;
+            line-height: 1.2;
         }}
     </style>
     </head>
@@ -618,9 +625,11 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         </div>
         <script>
             let draggedId = null;
+            let isDragging = false;
 
             function sendToStreamlit(payload) {{
-                const doc = window.parent.document;
+                const parentWin = window.parent;
+                const doc = parentWin.document;
                 const inputs = doc.querySelectorAll('input');
                 let targetInput = null;
                 for (let inp of inputs) {{
@@ -630,41 +639,65 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
                     }}
                 }}
                 if (targetInput) {{
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                    targetInput.focus();
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(parentWin.HTMLInputElement.prototype, "value").set;
                     nativeInputValueSetter.call(targetInput, JSON.stringify(payload));
-                    targetInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    targetInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                    targetInput.dispatchEvent(new parentWin.Event('input', {{ bubbles: true }}));
+                    targetInput.dispatchEvent(new parentWin.KeyboardEvent('keydown', {{
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true
+                    }}));
+                    targetInput.dispatchEvent(new parentWin.Event('change', {{ bubbles: true }}));
+                    targetInput.blur();
                 }}
             }}
 
             function handleDragStart(e, id) {{
+                isDragging = true;
                 draggedId = id;
-                e.dataTransfer.setData("text/plain", id);
-                e.dataTransfer.effectAllowed = "move";
+                if (e.dataTransfer) {{
+                    e.dataTransfer.setData("text/plain", id);
+                    e.dataTransfer.effectAllowed = "move";
+                }}
                 setTimeout(() => {{
-                    e.target.classList.add("dragging");
+                    if (e.target) e.target.classList.add("dragging");
                 }}, 0);
             }}
 
             function handleDragEnd(e) {{
-                e.target.classList.remove("dragging");
+                if (e.target) e.target.classList.remove("dragging");
                 document.querySelectorAll('.kb-col').forEach(c => c.classList.remove('drag-over'));
+                setTimeout(() => {{
+                    isDragging = false;
+                    draggedId = null;
+                }}, 120);
             }}
 
             function handleDragOver(e) {{
                 e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
+                if (e.dataTransfer) {{
+                    e.dataTransfer.dropEffect = "move";
+                }}
                 e.currentTarget.classList.add("drag-over");
             }}
 
             function handleDragLeave(e) {{
-                e.currentTarget.classList.remove("drag-over");
+                if (!e.currentTarget.contains(e.relatedTarget)) {{
+                    e.currentTarget.classList.remove("drag-over");
+                }}
             }}
 
             function handleDrop(e, novoMes) {{
                 e.preventDefault();
+                e.stopPropagation();
                 e.currentTarget.classList.remove("drag-over");
-                const id = e.dataTransfer.getData("text/plain") || draggedId;
+                let id = draggedId;
+                if (!id && e.dataTransfer) {{
+                    id = e.dataTransfer.getData("text/plain");
+                }}
                 if (id) {{
                     sendToStreamlit({{
                         action: "move",
@@ -676,34 +709,26 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             }}
 
             function handleCardClick(id) {{
+                if (isDragging) return;
                 sendToStreamlit({{
                     action: "select",
                     id: id,
                     ts: Date.now()
                 }});
             }}
-
-            // Preserva a posição do scroll horizontal entre reruns
-            const wrapper = document.getElementById("kb-wrapper");
-            const storageKey = "kb_scroll_{tipo_acompanhamento}";
-            const savedScroll = sessionStorage.getItem(storageKey);
-            if (savedScroll) {{
-                wrapper.scrollLeft = parseInt(savedScroll, 10);
-            }}
-            wrapper.addEventListener("scroll", () => {{
-                sessionStorage.setItem(storageKey, wrapper.scrollLeft);
-            }});
         </script>
     </body>
     </html>
     """
-    components.html(html_board, height=430, scrolling=False)
+    components.html(html_board, height=altura_board, scrolling=False)
 
 # --- GERENCIADOR DO PAINEL KANBAN (CONTRATOS E VENDAS) COM ESTILO VISUAL ---
 def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cores):
+    st.markdown('<div class="kanban-full-width-marker"></div>', unsafe_allow_html=True)
     usuario = st.session_state.usuario_atual
     dados = carregar_acompanhamento(usuario, tipo_acompanhamento)
     meses_nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    anos_disponiveis = [2024, 2025, 2026, 2027, 2028]
 
     key_edit_id = f"edit_id_{tipo_acompanhamento}"
     key_pending_id = f"pending_select_id_{tipo_acompanhamento}"
@@ -752,22 +777,22 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                 if action == "move" and target_id in dados:
                     novo_mes = int(evt.get("mes", dados[target_id]["mes"]))
                     reg_atual = dados[target_id]
-                    if reg_atual["mes"] != novo_mes:
-                        salvar_acompanhamento(
+                    if int(reg_atual["mes"]) != novo_mes:
+                        salvou = salvar_acompanhamento(
                             target_id,
                             usuario,
                             tipo_acompanhamento,
                             reg_atual["codigo_cliente"],
                             reg_atual.get("nome_cliente", ""),
                             reg_atual["status"],
-                            reg_atual["ano"],
+                            int(reg_atual["ano"]),
                             novo_mes,
                             reg_atual.get("observacoes", "")
                         )
-                        # Se o cartão arrastado estava aberto em edição, atualiza o mês dele no estado
-                        if st.session_state[key_edit_id] == target_id:
-                            st.session_state[f"ed_ms_{tipo_acompanhamento}_{target_id}"] = meses_nomes[novo_mes - 1]
-                        st.rerun()
+                        if salvou:
+                            if st.session_state[key_edit_id] == target_id:
+                                st.session_state[f"ed_ms_{tipo_acompanhamento}_{target_id}"] = meses_nomes[novo_mes - 1]
+                            st.rerun()
 
                 elif action == "select" and target_id in dados:
                     curr_edit = st.session_state[key_edit_id]
@@ -776,13 +801,13 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         st.session_state[key_pending_id] = None
                         st.rerun()
                     else:
-                        # Verifica se houve alguma alteração nos campos do cliente atualmente selecionado
                         d_curr = dados[curr_edit]
                         val_cod = st.session_state.get(f"ed_cod_{tipo_acompanhamento}_{curr_edit}", d_curr["codigo_cliente"])
                         val_nom = st.session_state.get(f"ed_nom_{tipo_acompanhamento}_{curr_edit}", d_curr.get("nome_cliente", ""))
                         val_st = st.session_state.get(f"ed_st_{tipo_acompanhamento}_{curr_edit}", d_curr["status"])
                         idx_ms_orig = d_curr["mes"] - 1 if 1 <= d_curr["mes"] <= 12 else 0
                         val_ms = st.session_state.get(f"ed_ms_{tipo_acompanhamento}_{curr_edit}", meses_nomes[idx_ms_orig])
+                        val_ano = st.session_state.get(f"ed_ano_{tipo_acompanhamento}_{curr_edit}", int(d_curr["ano"]))
                         val_obs = st.session_state.get(f"ed_obs_{tipo_acompanhamento}_{curr_edit}", d_curr.get("observacoes", ""))
 
                         houve_alteracao = (
@@ -790,6 +815,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                             or str(val_nom).strip() != str(d_curr.get("nome_cliente", "")).strip()
                             or str(val_st) != str(d_curr["status"])
                             or (meses_nomes.index(val_ms) + 1) != int(d_curr["mes"])
+                            or int(val_ano) != int(d_curr["ano"])
                             or str(val_obs).strip() != str(d_curr.get("observacoes", "")).strip()
                         )
 
@@ -803,11 +829,11 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
         except Exception:
             pass
 
-    col_menu_ac, col_conteudo_ac = st.columns([1, 4])
+    col_menu_ac, col_conteudo_ac = st.columns([0.85, 5.15])
     
     with col_menu_ac:
         st.markdown("### 📌 Filtros")
-        ano_selecionado = st.selectbox("📅 Selecione o Ano", [2024, 2025, 2026, 2027, 2028], index=2, key=f"ano_sel_{tipo_acompanhamento}")
+        ano_selecionado = st.selectbox("📅 Selecione o Ano", anos_disponiveis, index=2, key=f"ano_sel_{tipo_acompanhamento}")
         filtro_status = st.selectbox("🏷️ Filtrar por Status", ["Todos"] + lista_status, key=f"filtro_st_{tipo_acompanhamento}")
         
         st.divider()
@@ -837,6 +863,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                     ed_st_cur = st.session_state.get(f"ed_st_{tipo_acompanhamento}_{id_editando}", d_edit["status"])
                     idx_ms_cur = d_edit["mes"] - 1 if 1 <= d_edit["mes"] <= 12 else 0
                     ed_ms_cur = st.session_state.get(f"ed_ms_{tipo_acompanhamento}_{id_editando}", meses_nomes[idx_ms_cur])
+                    ed_ano_cur = st.session_state.get(f"ed_ano_{tipo_acompanhamento}_{id_editando}", int(d_edit["ano"]))
                     ed_obs_cur = st.session_state.get(f"ed_obs_{tipo_acompanhamento}_{id_editando}", d_edit.get("observacoes", ""))
 
                     if salvar_acompanhamento(
@@ -846,7 +873,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         str(ed_cod_cur).strip(),
                         str(ed_nom_cur).strip(),
                         ed_st_cur,
-                        d_edit["ano"],
+                        int(ed_ano_cur),
                         meses_nomes.index(ed_ms_cur) + 1,
                         str(ed_obs_cur)
                     ):
@@ -855,8 +882,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         st.rerun()
 
                 if col_av2.button("🗑️ Descartar e Trocar", use_container_width=True, key=f"av_desc_{tipo_acompanhamento}"):
-                    # Limpa estados temporários dos inputs antigos
-                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_obs"]:
+                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_ano", "ed_obs"]:
                         st.session_state.pop(f"{k_pfx}_{tipo_acompanhamento}_{id_editando}", None)
                     st.session_state[key_edit_id] = pending_id
                     st.session_state[key_pending_id] = None
@@ -877,21 +903,25 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                     idx_st = lista_status.index(d_edit['status']) if d_edit['status'] in lista_status else 0
                     ed_status = st.selectbox("Status", lista_status, index=idx_st, key=f"ed_st_{tipo_acompanhamento}_{id_editando}")
                 
-                c4, c5 = st.columns([2, 6])
+                c4, c5, c6 = st.columns([1.5, 1.5, 5])
                 with c4: 
                     idx_ms = d_edit['mes'] - 1 if 1 <= d_edit['mes'] <= 12 else 0
                     ed_mes = st.selectbox("Mês de Alocação", meses_nomes, index=idx_ms, key=f"ed_ms_{tipo_acompanhamento}_{id_editando}")
                 with c5:
+                    ano_atual_reg = int(d_edit.get('ano', ano_selecionado))
+                    idx_ano = anos_disponiveis.index(ano_atual_reg) if ano_atual_reg in anos_disponiveis else 2
+                    ed_ano = st.selectbox("Ano de Alocação", anos_disponiveis, index=idx_ano, key=f"ed_ano_{tipo_acompanhamento}_{id_editando}")
+                with c6:
                     ed_obs = st.text_input("Observações", value=d_edit.get('observacoes', ''), key=f"ed_obs_{tipo_acompanhamento}_{id_editando}")
                 
                 b1, b2, b3, _ = st.columns([2, 2, 2, 4])
                 if b1.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"ed_salv_{tipo_acompanhamento}"):
-                    if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, d_edit['ano'], meses_nomes.index(ed_mes) + 1, ed_obs):
+                    if salvar_acompanhamento(id_editando, usuario, tipo_acompanhamento, ed_cod.strip(), ed_nome.strip(), ed_status, int(ed_ano), meses_nomes.index(ed_mes) + 1, ed_obs):
                         st.session_state[key_edit_id] = None
                         st.session_state[key_pending_id] = None
                         st.rerun()
                 if b2.button("❌ Cancelar", use_container_width=True, key=f"ed_canc_{tipo_acompanhamento}"):
-                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_obs"]:
+                    for k_pfx in ["ed_cod", "ed_nom", "ed_st", "ed_ms", "ed_ano", "ed_obs"]:
                         st.session_state.pop(f"{k_pfx}_{tipo_acompanhamento}_{id_editando}", None)
                     st.session_state[key_edit_id] = None
                     st.session_state[key_pending_id] = None
@@ -923,7 +953,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         st.warning("⚠️ Informe o código e o nome do cliente.")
 
         st.divider()
-        st.caption("💡 Clique em um cartão para editar seus dados ou arraste-o para outra coluna para alterar o mês de alocação.")
+        st.caption("💡 Clique em um cartão para editar seus dados (status, mês, ano ou observações) ou arraste-o para outra coluna para alterar o mês de alocação.")
 
         cards_por_mes = {m: [] for m in range(1, 13)}
         for id_reg, d in dados.items():
