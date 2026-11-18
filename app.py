@@ -566,9 +566,16 @@ def cabecalho_pagina(titulo, subtitulo):
         unsafe_allow_html=True,
     )
 
-# --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP E ALTURA DINÂMICA ---
-def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_nomes, id_editando, pending_target_id):
+# --- COMPONENTE INTERATIVO DE QUADRO KANBAN COM DRAG & DROP, MENU DE CONTEXTO E ALTURA DINÂMICA ---
+def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_nomes, id_editando, pending_target_id, lista_status=None, dict_cores=None):
     is_contrato = (tipo_acompanhamento == "contrato")
+    lista_status = lista_status or []
+    dict_cores = dict_cores or {}
+    status_options_json = json.dumps(
+        [{"status": s, "cor": dict_cores.get(s, "⚪")} for s in lista_status],
+        ensure_ascii=False
+    )
+
     colunas_html = ""
     for idx_m, mes_nome in enumerate(meses_nomes):
         mes_num = idx_m + 1
@@ -577,6 +584,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         cards_html = ""
         for item in itens_mes:
             cid = html_lib.escape(str(item["id"]))
+            st_atual = html_lib.escape(str(item.get("status", "")))
             cor = html_lib.escape(str(item["cor"]))
             cod = html_lib.escape(str(item["codigo"]))
             nome = html_lib.escape(str(item["nome"]))
@@ -599,10 +607,11 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
                 meta_div = f'<div class="kb-card-meta {classe_val}">💰 {val_prop}</div>'
 
             cards_html += f"""
-            <div class="kb-card {is_selected}" draggable="true" data-id="{cid}"
+            <div class="kb-card {is_selected}" draggable="true" data-id="{cid}" data-status="{st_atual}"
                  ondragstart="handleDragStart(event, '{cid}')"
                  ondragend="handleDragEnd(event)"
-                 onclick="handleCardClick(event, '{cid}')">
+                 onclick="handleCardClick(event, '{cid}')"
+                 oncontextmenu="handleCardContextMenu(event, '{cid}')">
                 <div class="kb-card-top">{cor} {cod}</div>
                 {nome_div}
                 {meta_div}
@@ -643,7 +652,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
     for m in range(1, 13):
         itens = cards_por_mes.get(m, [])
         soma_cards = sum(_estimar_altura_card(it) for it in itens)
-        alturas_meses[m] = max(205, 58 + soma_cards)
+        alturas_meses[m] = max(215, 58 + soma_cards)
 
     alt_r1 = max(alturas_meses[m] for m in range(1, 7))
     alt_r2 = max(alturas_meses[m] for m in range(7, 13))
@@ -693,7 +702,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             border: 1px solid #E2E8F0;
             border-radius: 10px;
             padding: 8px 6px;
-            min-height: 195px;
+            min-height: 205px;
             display: flex;
             flex-direction: column;
             transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -818,14 +827,67 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             display: none;
             z-index: 9999;
         }}
+        .kb-ctx-menu {{
+            position: fixed;
+            min-width: 225px;
+            max-width: 280px;
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 10px;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22);
+            padding: 6px;
+            display: none;
+            z-index: 10000;
+        }}
+        .kb-ctx-header {{
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 4px 8px 6px 8px;
+            border-bottom: 1px solid #E2E8F0;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        .kb-ctx-item {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 7px 9px;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1B2A3A;
+            cursor: pointer;
+            transition: background-color 0.12s ease, color 0.12s ease;
+        }}
+        .kb-ctx-item:hover {{
+            background-color: #EFF6FF;
+            color: #0055A5;
+        }}
+        .kb-ctx-item.active {{
+            background-color: #F0F7FF;
+            color: #0055A5;
+        }}
+        .kb-ctx-check {{
+            font-weight: 800;
+            color: #0055A5;
+            font-size: 12px;
+        }}
     </style>
     </head>
     <body>
         <div class="kb-grid" id="kb-grid">
             {colunas_html}
         </div>
+        <div class="kb-ctx-menu" id="kb-ctx-menu"></div>
         <div class="kb-saving-toast" id="kb-saving-toast">💾 Salvando alteração...</div>
         <script>
+            const STATUS_OPTIONS = {status_options_json};
             let draggedId = null;
             let isDragging = false;
 
@@ -864,6 +926,110 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
                 if (t) t.style.display = "block";
             }}
 
+            function hideContextMenu() {{
+                const menu = document.getElementById("kb-ctx-menu");
+                if (menu) menu.style.display = "none";
+            }}
+
+            function handleCardContextMenu(e, id) {{
+                e.preventDefault();
+                e.stopPropagation();
+                if (!STATUS_OPTIONS || !STATUS_OPTIONS.length) return;
+
+                const menu = document.getElementById("kb-ctx-menu");
+                if (!menu) return;
+
+                const cardEl = e.currentTarget;
+                const currentStatus = cardEl ? (cardEl.getAttribute("data-status") || "") : "";
+                const topEl = cardEl ? cardEl.querySelector(".kb-card-top") : null;
+                const cardLabel = topEl ? topEl.textContent.trim() : "";
+
+                menu.innerHTML = "";
+
+                const headerEl = document.createElement("div");
+                headerEl.className = "kb-ctx-header";
+                headerEl.textContent = cardLabel ? ("Alterar Status • " + cardLabel) : "Alterar Status";
+                menu.appendChild(headerEl);
+
+                STATUS_OPTIONS.forEach(function(opt) {{
+                    const isCurrent = (opt.status === currentStatus);
+                    const itemEl = document.createElement("div");
+                    itemEl.className = "kb-ctx-item" + (isCurrent ? " active" : "");
+
+                    const labelSpan = document.createElement("span");
+                    labelSpan.textContent = opt.cor + " " + opt.status;
+                    itemEl.appendChild(labelSpan);
+
+                    if (isCurrent) {{
+                        const chkSpan = document.createElement("span");
+                        chkSpan.className = "kb-ctx-check";
+                        chkSpan.textContent = "✓";
+                        itemEl.appendChild(chkSpan);
+                    }}
+
+                    itemEl.addEventListener("click", function(ev) {{
+                        ev.stopPropagation();
+                        hideContextMenu();
+                        if (opt.status !== currentStatus) {{
+                            showSavingToast();
+                            sendToStreamlit({{
+                                action: "change_status",
+                                id: id,
+                                status: opt.status,
+                                ts: Date.now()
+                            }});
+                        }}
+                    }});
+
+                    menu.appendChild(itemEl);
+                }});
+
+                menu.style.visibility = "hidden";
+                menu.style.display = "block";
+
+                const pad = 6;
+                const menuW = menu.offsetWidth || 235;
+                const menuH = menu.offsetHeight || 180;
+                const winW = window.innerWidth || document.documentElement.clientWidth;
+                const winH = window.innerHeight || document.documentElement.clientHeight;
+
+                let posX = e.clientX;
+                let posY = e.clientY;
+
+                if (posX + menuW + pad > winW) {{
+                    posX = Math.max(pad, winW - menuW - pad);
+                }}
+                if (posY + menuH + pad > winH) {{
+                    posY = Math.max(pad, e.clientY - menuH);
+                }}
+
+                menu.style.left = posX + "px";
+                menu.style.top = posY + "px";
+                menu.style.visibility = "visible";
+            }}
+
+            document.addEventListener("click", function(e) {{
+                const menu = document.getElementById("kb-ctx-menu");
+                if (menu && !menu.contains(e.target)) {{
+                    hideContextMenu();
+                }}
+            }});
+
+            document.addEventListener("contextmenu", function(e) {{
+                const menu = document.getElementById("kb-ctx-menu");
+                if (menu && !e.target.closest(".kb-card") && !menu.contains(e.target)) {{
+                    hideContextMenu();
+                }}
+            }});
+
+            document.addEventListener("keydown", function(e) {{
+                if (e.key === "Escape") {{
+                    hideContextMenu();
+                }}
+            }});
+
+            window.addEventListener("blur", hideContextMenu);
+
             function sendToStreamlit(payload) {{
                 const doc = window.parent.document;
                 const inputs = doc.querySelectorAll('input[aria-label="kb_bridge_{tipo_acompanhamento}"]');
@@ -900,6 +1066,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             }}
 
             function handleDragStart(e, id) {{
+                hideContextMenu();
                 isDragging = true;
                 draggedId = id;
                 if (e.dataTransfer) {{
@@ -954,6 +1121,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             }}
 
             function handleCardClick(e, id) {{
+                hideContextMenu();
                 if (isDragging) return;
                 sendToStreamlit({{
                     action: "select",
@@ -1087,7 +1255,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
     if key_last_bridge_ts not in st.session_state:
         st.session_state[key_last_bridge_ts] = 0
 
-    # Input oculto que recebe os eventos de clique e drag-and-drop do quadro interativo
+    # Input oculto que recebe os eventos de clique, menu de contexto e drag-and-drop do quadro interativo
     st.markdown(
         f"""
         <style>
@@ -1140,6 +1308,29 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         if ok_move:
                             if st.session_state[key_edit_id] == target_id:
                                 st.session_state[f"ed_ms_{tipo_acompanhamento}_{target_id}"] = meses_nomes[novo_mes - 1]
+                            st.rerun()
+
+                elif action == "change_status" and target_id in dados:
+                    novo_status = evt.get("status")
+                    reg_atual = dados[target_id]
+                    if novo_status in lista_status and reg_atual.get("status") != novo_status:
+                        ok_status = salvar_acompanhamento(
+                            target_id,
+                            usuario,
+                            tipo_acompanhamento,
+                            reg_atual["codigo_cliente"],
+                            reg_atual.get("nome_cliente", ""),
+                            novo_status,
+                            int(reg_atual["ano"]),
+                            int(reg_atual["mes"]),
+                            reg_atual.get("observacoes", ""),
+                            reg_atual.get("vigencia", ""),
+                            reg_atual.get("valor_proposta", ""),
+                            reg_atual.get("comissao", "")
+                        )
+                        if ok_status:
+                            if st.session_state[key_edit_id] == target_id:
+                                st.session_state[f"ed_st_{tipo_acompanhamento}_{target_id}"] = novo_status
                             st.rerun()
 
                 elif action == "select" and target_id in dados:
@@ -1372,18 +1563,22 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                             st.warning("⚠️ Informe o código e o nome do cliente.")
 
         st.divider()
-        st.caption("💡 Clique em um cartão para editar seus dados (inclusive alterar o ano) ou arraste-o para outra coluna para alterar o mês de alocação.")
+        st.caption("💡 Clique em um cartão para editar seus dados, clique com o botão direito para alterar o status rapidamente ou arraste-o para outra coluna para alterar o mês de alocação.")
 
+        ordem_status = {st_nome: idx for idx, st_nome in enumerate(lista_status)}
         cards_por_mes = {m: [] for m in range(1, 13)}
         for id_reg, d in dados.items():
             if not isinstance(d, dict):
                 continue
             if int(d.get('ano', 0)) == ano_selecionado and 1 <= int(d.get('mes', 0)) <= 12:
-                if filtro_status != "Todos" and d.get('status') != filtro_status:
+                st_atual = d.get('status', '')
+                if filtro_status != "Todos" and st_atual != filtro_status:
                     continue
                 cards_por_mes[int(d['mes'])].append({
                     "id": id_reg,
-                    "cor": dict_cores.get(d.get('status', ''), "⚪"),
+                    "status": st_atual,
+                    "ordem_status": ordem_status.get(st_atual, len(lista_status)),
+                    "cor": dict_cores.get(st_atual, "⚪"),
                     "codigo": d.get('codigo_cliente', ''),
                     "nome": d.get('nome_cliente', ''),
                     "vigencia": d.get('vigencia', '') or '',
@@ -1391,12 +1586,23 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                     "comissao": str(d.get('comissao', '') or '').strip()
                 })
 
+        for m in range(1, 13):
+            cards_por_mes[m].sort(
+                key=lambda item: (
+                    item["ordem_status"],
+                    str(item.get("codigo", "")).strip().lower(),
+                    str(item.get("nome", "")).strip().lower(),
+                )
+            )
+
         renderizar_kanban_interativo_html(
             tipo_acompanhamento=tipo_acompanhamento,
             cards_por_mes=cards_por_mes,
             meses_nomes=meses_nomes,
             id_editando=id_editando,
-            pending_target_id=pending_id
+            pending_target_id=pending_id,
+            lista_status=lista_status,
+            dict_cores=dict_cores
         )
 
         if is_contrato:
