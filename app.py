@@ -417,51 +417,130 @@ LOGO_PATH = os.path.join(DIRETORIO_ATUAL, "logo.png")
 
 CUSTOM_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 html, body, [class*="css"], .stApp {
   font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-  background-color: #F1F5FA !important;
+  background-color: #EEF3F9 !important;
   color: #1B2A3A !important;
 }
 
-[data-testid="stHeader"] { background: transparent; }
+[data-testid="stHeader"] { background: transparent !important; }
 #MainMenu, footer { visibility: hidden; }
 
+/* --- TIPOGRAFIA DE TÍTULOS EM EVIDÊNCIA --- */
+h1, h2, h3, .cg-title, [data-testid="stHeading"] {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif !important;
+  letter-spacing: -0.02em !important;
+  color: #0A2540 !important;
+}
+
+[data-testid="stMainBlockContainer"] h1 {
+  font-size: 2rem !important;
+  font-weight: 800 !important;
+}
+
+[data-testid="stMainBlockContainer"] h2 {
+  font-size: 1.45rem !important;
+  font-weight: 700 !important;
+  color: #003366 !important;
+  margin-top: 0.6rem !important;
+}
+
+[data-testid="stMainBlockContainer"] h3 {
+  font-size: 1.22rem !important;
+  font-weight: 700 !important;
+  color: #0A2540 !important;
+  padding: 0.25rem 0 0.25rem 0.8rem !important;
+  border-left: 4px solid #0055A5 !important;
+  margin-top: 0.4rem !important;
+  margin-bottom: 0.85rem !important;
+}
+
+[data-testid="stSidebar"] h3 {
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 0.88rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: #0055A5 !important;
+  padding-bottom: 0.2rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* --- NAVEGAÇÃO SUPERIOR (ABAS FIXAS) --- */
 div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
-    position: sticky !important;
-    top: 0px !important;
-    z-index: 9999 !important;
-    background-color: #F1F5FA !important;
-    padding-top: 15px !important;
-    padding-bottom: 10px !important;
-    border-bottom: 1px solid #E2E8F0;
+  position: sticky !important;
+  top: 0px !important;
+  z-index: 9999 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(8px) !important;
+  padding: 0.7rem 0.6rem 0.55rem 0.6rem !important;
+  margin-bottom: 1.25rem !important;
+  border-bottom: 2px solid #E2E8F0 !important;
+  gap: 0.45rem !important;
 }
 
+div[data-testid="stTabs"] button[role="tab"] {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.98rem !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  background-color: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 10px !important;
+  padding: 0.55rem 1.05rem !important;
+  transition: all 0.18s ease !important;
+}
+
+div[data-testid="stTabs"] button[role="tab"]:hover {
+  background-color: #EFF6FF !important;
+  color: #0055A5 !important;
+  border-color: #BFDBFE !important;
+}
+
+div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+  background: linear-gradient(135deg, #0055A5 0%, #003D7A 100%) !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  border-color: #003D7A !important;
+  box-shadow: 0 4px 12px rgba(0, 85, 165, 0.22) !important;
+}
+
+div[data-testid="stTabs"] div[data-baseweb="tab-highlight"] {
+  display: none !important;
+}
+
+/* --- CONTAINER PRINCIPAL --- */
 .block-container, [data-testid="stMainBlockContainer"] {
-  max-width: 1440px !important;
-  margin: 1.2rem auto 2rem auto !important;
-  padding: 1.8rem 2.4rem 2.4rem 2.4rem !important;
+  max-width: 1460px !important;
+  margin: 1.1rem auto 2rem auto !important;
+  padding: 1.7rem 2.3rem 2.4rem 2.3rem !important;
   background: #FFFFFF !important;
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(10,37,64,.06), 0 8px 28px rgba(10,37,64,.07);
+  border-radius: 18px !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 2px 6px rgba(10, 37, 64, 0.04), 0 12px 32px rgba(10, 37, 64, 0.07) !important;
 }
 
+/* --- CABEÇALHO EXECUTIVO CONSIGAZ --- */
 .cg-header { 
   display: flex; 
   align-items: center; 
-  gap: 1.5rem; 
+  gap: 1.4rem; 
   position: relative;
-  padding-bottom: 1.2rem; 
-  margin-bottom: 2rem; 
-  border-bottom: 2px solid #E2E8F0; 
+  padding: 1.1rem 1.4rem;
+  margin-bottom: 1.75rem; 
+  background: linear-gradient(135deg, #F8FBFF 0%, #EDF4FC 100%);
+  border: 1px solid #D6E4F5;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0, 85, 165, 0.05);
 }
 .cg-header::after { 
   content: ""; 
   position: absolute; 
-  left: 0; 
-  bottom: -2px; 
-  width: 140px; 
+  left: 1.4rem; 
+  bottom: -1px; 
+  width: 150px; 
   height: 4px; 
   border-radius: 4px; 
   background: linear-gradient(90deg, #0055A5 0%, #F28C28 100%); 
@@ -469,49 +548,261 @@ div[data-testid="stTabs"] > div[data-baseweb="tab-list"] {
 
 .cg-logo-wrapper {
   background: #FFFFFF;
-  padding: 6px 12px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 8px 14px;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(10, 37, 64, 0.07);
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid #E2E8F0;
+  flex-shrink: 0;
 }
-.cg-logo { height: 55px; width: auto; display: block; }
-.cg-header-sep { width: 2px; align-self: stretch; background: #E2E8F0; }
-.cg-title { font-size: 1.65rem; font-weight: 800; line-height: 1.2; color: #003366 !important; }
-.cg-subtitle { font-size: 0.95rem; margin-top: 0.2rem; color: #64748B !important; font-weight: 500; }
+.cg-logo { height: 54px; width: auto; display: block; }
+.cg-header-sep { width: 2px; align-self: stretch; background: linear-gradient(180deg, #CBD5E1 0%, #E2E8F0 100%); }
+.cg-title { 
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 1.82rem !important; 
+  font-weight: 800 !important; 
+  line-height: 1.18 !important; 
+  color: #0A2540 !important; 
+  letter-spacing: -0.025em !important;
+}
+.cg-subtitle { 
+  font-size: 0.95rem !important; 
+  margin-top: 0.28rem !important; 
+  color: #475569 !important; 
+  font-weight: 500 !important; 
+}
 
+/* --- BARRA LATERAL --- */
 [data-testid="stSidebar"] {
-  background-color: #FFFFFF !important;
-  border-right: 1px solid #E2E8F0;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+  border-right: 1px solid #E2E8F0 !important;
 }
 .cg-side-brand { 
-  padding: 0.8rem 0.5rem 1.2rem 0.5rem; 
+  padding: 0.9rem 0.6rem 1.2rem 0.6rem; 
   margin-bottom: 1rem; 
   border-bottom: 1px solid #E2E8F0; 
   text-align: center;
 }
 .cg-side-logo-wrapper {
   background: #FFFFFF;
-  padding: 6px 10px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
   display: inline-block;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 3px 10px rgba(10, 37, 64, 0.06);
 }
-.cg-side-logo { height: 38px; width: auto; display: inline-block; }
-.cg-side-name { margin-top: 0.6rem; font-size: 0.7rem; font-weight: 700; color: #64748B !important; letter-spacing: 0.08em; text-transform: uppercase; }
+.cg-side-logo { height: 42px; width: auto; display: inline-block; }
+.cg-side-name { 
+  margin-top: 0.65rem; 
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 0.74rem; 
+  font-weight: 700; 
+  color: #0055A5 !important; 
+  letter-spacing: 0.09em; 
+  text-transform: uppercase; 
+}
 
-div.stButton > button {
-  width: 100%;
-  padding: 0.6rem 0.5rem;
-  border-radius: 10px !important;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  transition: all 0.2s ease;
+.cg-user-card {
+  background: #F0F7FF;
+  border: 1px solid #BFDBFE;
+  border-left: 4px solid #0055A5;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.75rem;
 }
-div.stButton > button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,85,165,0.15);
+.cg-user-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0A2540;
+}
+.cg-user-role {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #0055A5;
+  margin-top: 2px;
+}
+
+/* --- BOTÕES PADRÃO --- */
+div.stButton > button,
+div.stFormSubmitButton > button,
+div.stDownloadButton > button {
+  width: 100%;
+  padding: 0.62rem 0.85rem !important;
+  border-radius: 10px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 700 !important;
+  transition: all 0.2s ease !important;
+}
+
+div.stButton > button[kind="primary"],
+div.stFormSubmitButton > button[kind="primary"],
+div.stDownloadButton > button {
+  background: linear-gradient(135deg, #0055A5 0%, #003F7F 100%) !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  box-shadow: 0 3px 10px rgba(0, 85, 165, 0.22) !important;
+}
+
+div.stButton > button[kind="primary"]:hover,
+div.stFormSubmitButton > button[kind="primary"]:hover,
+div.stDownloadButton > button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 85, 165, 0.3) !important;
+}
+
+div.stButton > button[kind="secondary"] {
+  background-color: #FFFFFF !important;
+  color: #0A2540 !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05) !important;
+}
+
+div.stButton > button[kind="secondary"]:hover {
+  transform: translateY(-2px) !important;
+  background-color: #F0F7FF !important;
+  border-color: #0055A5 !important;
+  color: #0055A5 !important;
+  box-shadow: 0 4px 12px rgba(0, 85, 165, 0.14) !important;
+}
+
+/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS --- */
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="stHorizontalBlock"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+  gap: 0.85rem !important;
+  margin-top: 0.35rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button {
+  min-height: 94px !important;
+  padding: 0.85rem 0.65rem !important;
+  border-radius: 14px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Cartões Inativos com borda superior codificada por urgência */
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"] {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+  border: 1px solid #D8E2EE !important;
+  border-top: 4px solid #0055A5 !important;
+  color: #0A2540 !important;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(2) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(2) div.stButton > button[kind="secondary"] {
+  border-top-color: #DC2626 !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(3) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(3) div.stButton > button[kind="secondary"] {
+  border-top-color: #0284C7 !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(4) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(4) div.stButton > button[kind="secondary"] {
+  border-top-color: #EA580C !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(5) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(5) div.stButton > button[kind="secondary"] {
+  border-top-color: #D97706 !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"]:hover,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"]:hover {
+  transform: translateY(-3px) !important;
+  background: #F0F7FF !important;
+  border-color: #0055A5 !important;
+  box-shadow: 0 8px 20px rgba(0, 85, 165, 0.14) !important;
+}
+
+/* Cartão Ativo (Filtro Selecionado) */
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] {
+  background: linear-gradient(135deg, #0055A5 0%, #00356B 100%) !important;
+  border: 1px solid #00356B !important;
+  border-bottom: 4px solid #F28C28 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 22px rgba(0, 85, 165, 0.28) !important;
+  transform: translateY(-2px) !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p {
+  color: #FFFFFF !important;
+}
+
+/* Número em evidência (1ª linha) e Rótulo (2ª linha) */
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:first-child,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:first-child {
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 2rem !important;
+  font-weight: 800 !important;
+  line-height: 1.08 !important;
+  margin: 0 0 4px 0 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:last-child,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:last-child {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  margin: 0 !important;
+  opacity: 0.92 !important;
+}
+
+/* --- CARDS DE MÉTRICAS, INPUTS E EXPANDERS (TEMA CLARO LIMPO) --- */
+[data-testid="stMetric"] {
+  background: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
+  border-top: 3px solid #0055A5 !important;
+  border-radius: 12px !important;
+  padding: 0.8rem 1rem !important;
+}
+[data-testid="stMetricValue"] {
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 800 !important;
+  color: #0A2540 !important;
+}
+
+[data-testid="stExpander"] {
+  background-color: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
+}
+
+div[data-baseweb="input"] > div,
+div[data-baseweb="textarea"] > div,
+div[data-baseweb="select"] > div {
+  border-radius: 10px !important;
+  border-color: #CBD5E1 !important;
+  background-color: #FFFFFF !important;
+}
+
+div[data-baseweb="input"] > div:focus-within,
+div[data-baseweb="textarea"] > div:focus-within,
+div[data-baseweb="select"] > div:focus-within {
+  border-color: #0055A5 !important;
+  box-shadow: 0 0 0 3px rgba(0, 85, 165, 0.12) !important;
+}
+
+hr {
+  border-color: #E2E8F0 !important;
+  margin-top: 1.15rem !important;
+  margin-bottom: 1.15rem !important;
 }
 </style>
 """
@@ -523,11 +814,11 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Cop
     component_html = f"""
     <div style="margin-top: 5px; margin-bottom: 10px;">
         <button id="btn_{chave_unica}" onclick="copiarTexto_{chave_unica}()" style="
-            background-color: #0055A5; color: white; padding: 8px 16px; border: none;
-            border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer;
-            display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #0055A5 0%, #003F7F 100%); color: white; padding: 9px 18px; border: none;
+            border-radius: 10px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 13.5px; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 3px 10px rgba(0,85,165,0.22);
         ">{label_btn}</button>
-        <span id="msg_{chave_unica}" style="margin-left: 10px; color: green; font-weight: bold; font-size: 13px; display: none;">Copiado com sucesso!</span>
+        <span id="msg_{chave_unica}" style="margin-left: 10px; color: #15803D; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 13px; display: none;">Copiado com sucesso!</span>
     </div>
     <script>
     const TEXTO_{chave_unica} = {texto_js};
@@ -553,7 +844,7 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Cop
     function mostrarMsg_{chave_unica}(ok) {{
         const msg = document.getElementById("msg_{chave_unica}");
         msg.textContent = ok ? "Copiado com sucesso!" : "Não foi possível copiar. Selecione o texto acima e use Ctrl+C.";
-        msg.style.color = ok ? "green" : "#b00020";
+        msg.style.color = ok ? "#15803D" : "#b00020";
         msg.style.display = "inline";
         setTimeout(function() {{ msg.style.display = "none"; }}, ok ? 2500 : 5000);
     }}
@@ -584,7 +875,7 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Cop
     }}
     </script>
     """
-    components.html(component_html, height=50)
+    components.html(component_html, height=52)
 
 @st.cache_data(show_spinner=False)
 def _logo_base64(caminho):
@@ -678,7 +969,6 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         </div>
         """
 
-    # Estima a altura inicial proporcional ao número e conteúdo dos cartões por coluna
     def _estimar_altura_card(item):
         nome_txt = str(item.get("nome", "") or "").strip()
         tem_meta = bool(
@@ -709,6 +999,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
     <head>
     <meta charset="utf-8">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
         * {{
             box-sizing: border-box;
             font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -744,9 +1035,9 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             width: 100%;
             height: auto;
             background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 10px;
-            padding: 8px 6px;
+            border: 1px solid #D8E2EE;
+            border-radius: 12px;
+            padding: 9px 7px;
             min-height: 205px;
             display: flex;
             flex-direction: column;
@@ -761,19 +1052,20 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
             color: #0055A5;
             border-bottom: 2px solid #0055A5;
-            padding: 0 3px 5px 3px;
+            padding: 0 3px 6px 3px;
             margin-bottom: 8px;
-            font-size: 13.5px;
+            font-size: 14px;
         }}
         .kb-col-count {{
             background: #E0ECFF;
-            color: #004488;
+            color: #003D7A;
             font-size: 11px;
-            font-weight: 700;
-            padding: 1px 6px;
+            font-weight: 800;
+            padding: 2px 7px;
             border-radius: 999px;
             line-height: 1.3;
         }}
@@ -787,10 +1079,10 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         .kb-card {{
             background: #FFFFFF;
             border: 1px solid #CBD5E1;
-            border-radius: 8px;
+            border-radius: 9px;
             padding: 7px 8px;
             cursor: grab;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 4px rgba(10,37,64,0.05);
             transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
             user-select: none;
             word-wrap: break-word;
@@ -802,7 +1094,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         }}
         .kb-card:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0,85,165,0.16);
+            box-shadow: 0 5px 12px rgba(0,85,165,0.15);
             border-color: #0055A5;
         }}
         .kb-card:active {{
@@ -818,7 +1110,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         .kb-card-top {{
             font-weight: 700;
             font-size: 12.5px;
-            color: #1B2A3A;
+            color: #0A2540;
             line-height: 1.25;
         }}
         .kb-card-name {{
@@ -830,7 +1122,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         }}
         .kb-card-meta {{
             margin-top: 5px;
-            padding: 2px 5px;
+            padding: 2px 6px;
             border-radius: 5px;
             font-size: 10.5px;
             font-weight: 600;
@@ -1303,7 +1595,6 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
     if key_add_reset not in st.session_state:
         st.session_state[key_add_reset] = 0
 
-    # Input oculto que recebe os eventos de clique, menu de contexto e drag-and-drop do quadro interativo
     st.markdown(
         f"""
         <style>
@@ -1388,7 +1679,6 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                         st.session_state[key_pending_id] = None
                         st.rerun()
                     else:
-                        # Verifica se houve alguma alteração nos campos do cliente atualmente selecionado
                         d_curr = dados[curr_edit]
                         val_cod = st.session_state.get(f"ed_cod_{tipo_acompanhamento}_{curr_edit}", d_curr["codigo_cliente"])
                         val_nom = st.session_state.get(f"ed_nom_{tipo_acompanhamento}_{curr_edit}", d_curr.get("nome_cliente", ""))
@@ -1447,7 +1737,6 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
         if id_editando and id_editando in dados:
             d_edit = dados[id_editando]
 
-            # Caixa de aviso quando há alterações pendentes e o usuário clicou em outro cliente
             if pending_id and pending_id in dados and pending_id != id_editando:
                 d_prox = dados[pending_id]
                 st.warning(
@@ -1689,30 +1978,32 @@ if not st.session_state.autenticado:
         unsafe_allow_html=True,
     )
     
-    st.title("🔐 Acesso ao Sistema Integrado | Consigaz")
-    st.markdown("Insira suas credenciais para acessar a plataforma.")
+    _, col_login, _ = st.columns([1.1, 1.8, 1.1])
+    with col_login:
+        cabecalho_pagina("Acesso ao Sistema Integrado", "Plataforma Corporativa Consigaz • Insira suas credenciais para continuar.")
 
-    with st.form("form_login_sistema"):
-        usuario_input = st.text_input("Usuário").strip().lower()
-        senha_input = st.text_input("Senha", type="password", placeholder="••••••••").strip()
-        btn_entrar = st.form_submit_button("Entrar no Sistema", type="primary")
-        
-        if btn_entrar:
-            if usuario_input in banco_usuarios and banco_usuarios[usuario_input]["senha"] == senha_input:
-                usr_data = banco_usuarios[usuario_input]
-                st.session_state.autenticado = True
-                st.session_state.usuario_atual = usuario_input
-                nivel_acc = usr_data["nivel_acesso"]
-                st.session_state.e_admin = (nivel_acc == "admin")
-                st.session_state.e_supervisor = (nivel_acc == "supervisor")
-                st.session_state.troca_obrigatoria = usr_data["precisa_trocar_senha"] or (senha_input == "123456")
-                
-                if st.session_state.ultimo_usuario_logado != usuario_input:
-                    st.session_state.df_excel_agenda = None
-                    st.session_state.ultimo_usuario_logado = usuario_input
-                st.rerun()
-            else:
-                st.error("❌ Usuário ou senha incorretos!")
+        with st.form("form_login_sistema"):
+            usuario_input = st.text_input("Usuário", placeholder="Digite seu usuário").strip().lower()
+            senha_input = st.text_input("Senha", type="password", placeholder="••••••••").strip()
+            st.write("")
+            btn_entrar = st.form_submit_button("Entrar no Sistema", type="primary")
+            
+            if btn_entrar:
+                if usuario_input in banco_usuarios and banco_usuarios[usuario_input]["senha"] == senha_input:
+                    usr_data = banco_usuarios[usuario_input]
+                    st.session_state.autenticado = True
+                    st.session_state.usuario_atual = usuario_input
+                    nivel_acc = usr_data["nivel_acesso"]
+                    st.session_state.e_admin = (nivel_acc == "admin")
+                    st.session_state.e_supervisor = (nivel_acc == "supervisor")
+                    st.session_state.troca_obrigatoria = usr_data["precisa_trocar_senha"] or (senha_input == "123456")
+                    
+                    if st.session_state.ultimo_usuario_logado != usuario_input:
+                        st.session_state.df_excel_agenda = None
+                        st.session_state.ultimo_usuario_logado = usuario_input
+                    st.rerun()
+                else:
+                    st.error("❌ Usuário ou senha incorretos!")
     st.stop()
 
 if st.session_state.troca_obrigatoria:
@@ -1749,11 +2040,15 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-st.sidebar.markdown(f"👤 **Usuário Ativo:** `{st.session_state.usuario_atual}`")
-if st.session_state.e_admin:
-    st.sidebar.caption("⭐ Perfil: Administrador")
-elif st.session_state.e_supervisor:
-    st.sidebar.caption("📊 Perfil: Supervisor")
+perfil_label = "Administrador" if st.session_state.e_admin else ("Supervisor" if st.session_state.e_supervisor else "Colaborador")
+perfil_icon = "⭐" if st.session_state.e_admin else ("📊" if st.session_state.e_supervisor else "👤")
+st.sidebar.markdown(
+    f'<div class="cg-user-card">'
+    f'<div class="cg-user-name">👤 {html_lib.escape(st.session_state.usuario_atual)}</div>'
+    f'<div class="cg-user-role">{perfil_icon} Perfil: {perfil_label}</div>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 if st.session_state.e_admin:
     lista_abas = ["⚙️ Painel Admin"]
@@ -3138,29 +3433,55 @@ if aba_agenda is not None:
                             st.altair_chart(chart, use_container_width=True)
                         st.stop()
                     else:
-                        st.subheader("2. Agenda Geral de Visitas Pendentes")
+                        st.subheader("Agenda Geral de Visitas Pendentes")
 
-                    st.markdown("### Filtros por Status e Prazos")
+                    st.markdown("#### 🎯 Filtros Rápidos por Status e Prazos")
                     total_visitas = len(df_base_visao)
+                    filtro_atual_agenda = st.session_state.filtro_dashboard_ativo
                     
                     if tipo_visao_agenda == "Comodato Inativo":
                         vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 3ª Semana'])
                         hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 2ª Semana'])
                         amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟢 1ª Semana'])
                         
+                        st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
                         c1, c2, c3, c4 = st.columns(4)
                         with c1:
-                            if st.button(f"📋 **{total_visitas}**\nTotal", use_container_width=True):
+                            if st.button(
+                                f"**{total_visitas}**\n\nTotal",
+                                type="primary" if filtro_atual_agenda == "Todas" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_total"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "Todas"
+                                st.rerun()
                         with c2:
-                            if st.button(f"🔴 **{vencidas_qt}**\n3ª Semana", use_container_width=True):
+                            if st.button(
+                                f"**{vencidas_qt}**\n\n3ª Semana",
+                                type="primary" if filtro_atual_agenda == "🔴 3ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_3sem"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "🔴 3ª Semana"
+                                st.rerun()
                         with c3:
-                            if st.button(f"🟡 **{hoje_qt}**\n2ª Semana", use_container_width=True):
+                            if st.button(
+                                f"**{hoje_qt}**\n\n2ª Semana",
+                                type="primary" if filtro_atual_agenda == "🟡 2ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_2sem"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "🟡 2ª Semana"
+                                st.rerun()
                         with c4:
-                            if st.button(f"🟢 **{amanha_qt}**\n1ª Semana", use_container_width=True):
+                            if st.button(
+                                f"**{amanha_qt}**\n\n1ª Semana",
+                                type="primary" if filtro_atual_agenda == "🟢 1ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_1sem"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "🟢 1ª Semana"
+                                st.rerun()
                     else:
                         vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 Vencido'])
                         hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔵 Vence Hoje'])
@@ -3168,23 +3489,55 @@ if aba_agenda is not None:
                         semana_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 Vence na Semana'])
                         cinco_dias_qt = len(df_base_visao[df_base_visao['Prazo_DT'] <= sexta_semana])
 
+                        st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
                         c1, c2, c3, c4, c5 = st.columns(5)
                         with c1:
-                            if st.button(f"**{total_visitas}**\nTotal", use_container_width=True):
+                            if st.button(
+                                f"**{total_visitas}**\n\nTotal",
+                                type="primary" if filtro_atual_agenda == "Todas" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_total"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "Todas"
+                                st.rerun()
                         with c2:
-                            if st.button(f"**{vencidas_qt}**\nVencidas", use_container_width=True):
+                            if st.button(
+                                f"**{vencidas_qt}**\n\nVencidas",
+                                type="primary" if filtro_atual_agenda == "🔴 Vencido" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_vencidas"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "🔴 Vencido"
+                                st.rerun()
                         with c3:
-                            if st.button(f"**{hoje_qt}**\nVence Hoje", use_container_width=True):
+                            if st.button(
+                                f"**{hoje_qt}**\n\nVence Hoje",
+                                type="primary" if filtro_atual_agenda == "🔵 Vence Hoje" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_hoje"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "🔵 Vence Hoje"
+                                st.rerun()
                         with c4:
-                            if st.button(f"**{amanha_qt}**\nVence Amanhã", use_container_width=True):
+                            if st.button(
+                                f"**{amanha_qt}**\n\nVence Amanhã",
+                                type="primary" if filtro_atual_agenda == "🟠 Vence Amanhã" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_amanha"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "🟠 Vence Amanhã"
+                                st.rerun()
                         with c5:
-                            if st.button(f"**{semana_qt}**\nVence na Semana", use_container_width=True):
+                            if st.button(
+                                f"**{semana_qt}**\n\nVence na Semana",
+                                type="primary" if filtro_atual_agenda == "🟡 Vence na Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_semana"
+                            ):
                                 st.session_state.filtro_dashboard_ativo = "🟡 Vence na Semana"
+                                st.rerun()
 
+                    st.caption(f"🔎 Filtro ativo no painel: **{st.session_state.filtro_dashboard_ativo}**")
                     st.divider()
 
                     if st.session_state.e_supervisor:
@@ -3287,7 +3640,7 @@ if aba_notas is not None:
 
         with col_menu_notas:
             st.markdown("### 📓 Minhas Notas")
-            if st.button("➕ Nova Nota", use_container_width=True):
+            if st.button("➕ Nova Nota", type="primary", use_container_width=True):
                 st.session_state.nota_selecionada_id = None
                 st.rerun()
                 
@@ -3314,7 +3667,7 @@ if aba_notas is not None:
                 with c2: cli = st.text_input("Cliente", value=c_val)
                 txt = st.text_area("Anotação", value=txt_val, height=200)
                 
-                b1, b2, _ = st.columns([1, 1, 4])
+                b1, b2, _ = st.columns([1.4, 1.2, 3.4])
                 with b1: btn_s = st.form_submit_button("💾 Salvar na Nuvem", type="primary")
                 with b2: btn_d = st.form_submit_button("🗑️ Apagar") if id_atual else False
 
