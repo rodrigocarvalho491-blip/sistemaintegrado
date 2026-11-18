@@ -518,7 +518,8 @@ div.stButton > button:hover {
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Copiar Texto Completo"):
-    texto_js = json.dumps(str(texto_para_copiar))
+    texto_norm = str(texto_para_copiar).replace("\r\n", "\n").replace("\r", "\n")
+    texto_js = json.dumps(texto_norm).replace("</", "<\\/")
     component_html = f"""
     <div style="margin-top: 5px; margin-bottom: 10px;">
         <button id="btn_{chave_unica}" onclick="copiarTexto_{chave_unica}()" style="
@@ -529,13 +530,57 @@ def botao_copiar_customizado(texto_para_copiar, chave_unica, label_btn="📄 Cop
         <span id="msg_{chave_unica}" style="margin-left: 10px; color: green; font-weight: bold; font-size: 13px; display: none;">Copiado com sucesso!</span>
     </div>
     <script>
-    function copiarTexto_{chave_unica}() {{
-        const texto = {texto_js};
-        navigator.clipboard.writeText(texto).then(function() {{
-            const msg = document.getElementById("msg_{chave_unica}");
-            msg.style.display = "inline";
-            setTimeout(function() {{ msg.style.display = "none"; }}, 2500);
-        }}).catch(err => console.error('Erro ao copiar', err));
+    const TEXTO_{chave_unica} = {texto_js};
+
+    function escapeHtml_{chave_unica}(s) {{
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }}
+
+    function copiarFallback_{chave_unica}(texto) {{
+        const ta = document.createElement('textarea');
+        ta.value = texto;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        let ok = false;
+        try {{ ok = document.execCommand('copy'); }} catch (e) {{ ok = false; }}
+        document.body.removeChild(ta);
+        return ok;
+    }}
+
+    function mostrarMsg_{chave_unica}(ok) {{
+        const msg = document.getElementById("msg_{chave_unica}");
+        msg.textContent = ok ? "Copiado com sucesso!" : "Não foi possível copiar. Selecione o texto acima e use Ctrl+C.";
+        msg.style.color = ok ? "green" : "#b00020";
+        msg.style.display = "inline";
+        setTimeout(function() {{ msg.style.display = "none"; }}, ok ? 2500 : 5000);
+    }}
+
+    async function copiarTexto_{chave_unica}() {{
+        const texto = TEXTO_{chave_unica};
+        let ok = false;
+        try {{
+            if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {{
+                const html = '<div>' + escapeHtml_{chave_unica}(texto).replace(/\\n/g, '<br>') + '</div>';
+                const item = new ClipboardItem({{
+                    'text/plain': new Blob([texto], {{ type: 'text/plain' }}),
+                    'text/html': new Blob([html], {{ type: 'text/html' }})
+                }});
+                await navigator.clipboard.write([item]);
+                ok = true;
+            }} else if (navigator.clipboard && navigator.clipboard.writeText) {{
+                await navigator.clipboard.writeText(texto);
+                ok = true;
+            }}
+        }} catch (e) {{
+            ok = false;
+        }}
+        if (!ok) {{
+            ok = copiarFallback_{chave_unica}(texto);
+        }}
+        mostrarMsg_{chave_unica}(ok);
     }}
     </script>
     """
@@ -1247,6 +1292,7 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
     key_pending_id = f"pending_select_id_{tipo_acompanhamento}"
     key_last_bridge_ts = f"last_bridge_ts_{tipo_acompanhamento}"
     key_bridge_input = f"kb_bridge_input_{tipo_acompanhamento}"
+    key_add_reset = f"add_reset_{tipo_acompanhamento}"
 
     if key_edit_id not in st.session_state:
         st.session_state[key_edit_id] = None
@@ -1254,6 +1300,8 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
         st.session_state[key_pending_id] = None
     if key_last_bridge_ts not in st.session_state:
         st.session_state[key_last_bridge_ts] = 0
+    if key_add_reset not in st.session_state:
+        st.session_state[key_add_reset] = 0
 
     # Input oculto que recebe os eventos de clique, menu de contexto e drag-and-drop do quadro interativo
     st.markdown(
@@ -1525,39 +1573,42 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
                     st.rerun()
             st.divider()
 
+        arc = st.session_state[key_add_reset]
         with st.expander("➕ Adicionar Novo Cliente", expanded=False):
             c_cod, c_nom, c_st, c_mes = st.columns([2, 3, 3, 2])
-            with c_cod: novo_cod = st.text_input("Código", key=f"n_cod_{tipo_acompanhamento}")
-            with c_nom: novo_nome = st.text_input("Nome do Cliente", key=f"n_nom_{tipo_acompanhamento}")
-            with c_st: novo_st = st.selectbox("Status Inicial", lista_status, key=f"n_st_{tipo_acompanhamento}")
-            with c_mes: novo_ms = st.selectbox("Mês de Alocação", meses_nomes, key=f"n_ms_{tipo_acompanhamento}")
+            with c_cod: novo_cod = st.text_input("Código", key=f"n_cod_{tipo_acompanhamento}_{arc}")
+            with c_nom: novo_nome = st.text_input("Nome do Cliente", key=f"n_nom_{tipo_acompanhamento}_{arc}")
+            with c_st: novo_st = st.selectbox("Status Inicial", lista_status, key=f"n_st_{tipo_acompanhamento}_{arc}")
+            with c_mes: novo_ms = st.selectbox("Mês de Alocação", meses_nomes, key=f"n_ms_{tipo_acompanhamento}_{arc}")
 
             if is_contrato:
                 c_vig, c_obs, c_btn = st.columns([2, 4, 1.2])
-                with c_vig: novo_vig = st.text_input("Vigência", placeholder="Ex: 60 meses", key=f"n_vig_{tipo_acompanhamento}")
-                with c_obs: novo_obs = st.text_input("Observações", placeholder="Detalhes ou anotações...", key=f"n_obs_{tipo_acompanhamento}")
+                with c_vig: novo_vig = st.text_input("Vigência", placeholder="Ex: 60 meses", key=f"n_vig_{tipo_acompanhamento}_{arc}")
+                with c_obs: novo_obs = st.text_input("Observações", placeholder="Detalhes ou anotações...", key=f"n_obs_{tipo_acompanhamento}_{arc}")
                 with c_btn:
                     st.write(""); st.write("")
-                    if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}", type="primary", use_container_width=True):
+                    if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}_{arc}", type="primary", use_container_width=True):
                         if novo_cod.strip() and novo_nome.strip():
                             novo_id = str(uuid.uuid4())
                             if salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_nome.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1, novo_obs.strip(), novo_vig.strip(), "", ""):
+                                st.session_state[key_add_reset] += 1
                                 st.rerun()
                         else:
                             st.warning("⚠️ Informe o código e o nome do cliente.")
             else:
                 c_val, c_com, c_obs, c_btn = st.columns([2.2, 2.0, 3.3, 1.3])
-                with c_val: novo_val_prop = st.text_input("Valor da Proposta (R$)", placeholder="Ex: R$ 15.000,00", key=f"n_val_prop_{tipo_acompanhamento}")
-                with c_com: novo_comissao = st.radio("Comissão", ["20%", "10%"], horizontal=True, index=None, key=f"n_comissao_{tipo_acompanhamento}")
-                with c_obs: novo_obs = st.text_input("Observações", placeholder="Detalhes ou anotações...", key=f"n_obs_{tipo_acompanhamento}")
+                with c_val: novo_val_prop = st.text_input("Valor da Proposta (R$)", placeholder="Ex: R$ 15.000,00", key=f"n_val_prop_{tipo_acompanhamento}_{arc}")
+                with c_com: novo_comissao = st.radio("Comissão", ["20%", "10%"], horizontal=True, index=None, key=f"n_comissao_{tipo_acompanhamento}_{arc}")
+                with c_obs: novo_obs = st.text_input("Observações", placeholder="Detalhes ou anotações...", key=f"n_obs_{tipo_acompanhamento}_{arc}")
                 with c_btn:
                     st.write(""); st.write("")
-                    if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}", type="primary", use_container_width=True):
+                    if st.button("Adicionar", key=f"btn_add_{tipo_acompanhamento}_{arc}", type="primary", use_container_width=True):
                         if novo_cod.strip() and novo_nome.strip():
                             novo_id = str(uuid.uuid4())
                             val_prop_fmt = formatar_valor_proposta(novo_val_prop)
                             com_fmt = (novo_comissao or "").strip()
                             if salvar_acompanhamento(novo_id, usuario, tipo_acompanhamento, novo_cod.strip(), novo_nome.strip(), novo_st, ano_selecionado, meses_nomes.index(novo_ms) + 1, novo_obs.strip(), "", val_prop_fmt, com_fmt):
+                                st.session_state[key_add_reset] += 1
                                 st.rerun()
                         else:
                             st.warning("⚠️ Informe o código e o nome do cliente.")
@@ -1936,37 +1987,48 @@ if aba_tratativa is not None:
                 st.divider()
                 st.subheader("5. Relatório Fotográfico - Upload de Imagens")
                 
-                def carregar_fotos(label, max_arquivos=None):
-                    fotos = st.file_uploader(label, type=["png", "jpg", "jpeg"], accept_multiple_files=True, key=f"up_{label}_{rc}")
-                    if max_arquivos and fotos and len(fotos) > max_arquivos:
-                        st.error(f"⚠️ Limite excedido para {label}. Serão considerados apenas os primeiros {max_arquivos} arquivos.")
-                        return fotos[:max_arquivos]
-                    return fotos
+                def carregar_fotos(label, key_suffix=None):
+                    k_up = f"up_{key_suffix or label}_{rc}"
+                    return st.file_uploader(label, type=["png", "jpg", "jpeg"], accept_multiple_files=True, key=k_up)
 
                 dic_fotos_final = {}
                 col_f1, col_f2 = st.columns(2)
-                with col_f1: dic_fotos_final["FACHADA"] = carregar_fotos("📸 FACHADA (Até 2 fotos)", max_arquivos=2)
-                with col_f2: dic_fotos_final["CILINDROS"] = carregar_fotos("📸 CILINDROS (Até 5 fotos)", max_arquivos=5)
+                with col_f1: dic_fotos_final["FACHADA"] = carregar_fotos("📸 FACHADA", key_suffix="FACHADA")
+                with col_f2: dic_fotos_final["CILINDROS"] = carregar_fotos("📸 CILINDROS", key_suffix="CILINDROS")
 
                 st.write("---")
                 if qtd_centrais_visita == 1:
                     c1, c2, c3 = st.columns(3)
-                    with c1: dic_fotos_final["ABRIGO"] = carregar_fotos("📸 ABRIGO (Até 10 fotos)", max_arquivos=10)
-                    with c2: dic_fotos_final["CENTRAL"] = carregar_fotos("📸 CENTRAL (Até 5 fotos)", max_arquivos=5)
-                    with c3: dic_fotos_final["EQUIPAMENTOS"] = carregar_fotos("📸 EQUIPAMENTOS", max_arquivos=None)
+                    with c1: dic_fotos_final["ABRIGO"] = carregar_fotos("📸 ABRIGO", key_suffix="ABRIGO")
+                    with c2: dic_fotos_final["CENTRAL"] = carregar_fotos("📸 CENTRAL", key_suffix="CENTRAL")
+                    with c3: dic_fotos_final["EQUIPAMENTOS"] = carregar_fotos("📸 EQUIPAMENTOS", key_suffix="EQUIPAMENTOS")
                 else:
                     for i in range(1, int(qtd_centrais_visita) + 1):
                         st.markdown(f"**📸 FOTOS - CENTRAL {i:02d}**")
                         c1, c2, c3 = st.columns(3)
                         with c1:
                             nome_abrigo = f"ABRIGO CENTRAL {i:02d}"
-                            dic_fotos_final[nome_abrigo] = carregar_fotos(f"📸 {nome_abrigo} (Até 10)", max_arquivos=10)
+                            dic_fotos_final[nome_abrigo] = carregar_fotos(f"📸 {nome_abrigo}", key_suffix=nome_abrigo)
                         with c2:
                             nome_central = f"CENTRAL {i:02d}"
-                            dic_fotos_final[nome_central] = carregar_fotos(f"📸 {nome_central} (Até 5)", max_arquivos=5)
+                            dic_fotos_final[nome_central] = carregar_fotos(f"📸 {nome_central}", key_suffix=nome_central)
                         with c3:
                             nome_equip = f"EQUIPAMENTOS CENTRAL {i:02d}"
-                            dic_fotos_final[nome_equip] = carregar_fotos(f"📸 {nome_equip}", max_arquivos=None)
+                            dic_fotos_final[nome_equip] = carregar_fotos(f"📸 {nome_equip}", key_suffix=nome_equip)
+
+                st.write("---")
+                col_div1, col_div2 = st.columns([1, 2])
+                with col_div1:
+                    titulo_fotos_diversas = st.text_input(
+                        "Título das Fotos Diversas",
+                        placeholder="Ex: Caminho da Mangueira",
+                        key=f"titulo_fotos_diversas_{rc}"
+                    )
+                with col_div2:
+                    fotos_diversas = carregar_fotos("📸 FOTOS DIVERSAS", key_suffix="FOTOS_DIVERSAS")
+
+                nome_cat_diversas = titulo_fotos_diversas.strip() if titulo_fotos_diversas and titulo_fotos_diversas.strip() else "FOTOS DIVERSAS"
+                dic_fotos_final[nome_cat_diversas] = fotos_diversas
 
                 st.divider()
                 col_b1, col_b2 = st.columns(2)
@@ -2058,7 +2120,8 @@ Obs.: {observacoes}"""
                                 if arquivos:
                                     pdf.add_page()
                                     pdf.set_font("Arial", "B", 11)
-                                    pdf.cell(0, 6, categoria.upper(), ln=1, align="L")
+                                    cat_titulo = categoria.upper().encode("latin-1", errors="replace").decode("latin-1")
+                                    pdf.cell(0, 6, cat_titulo, ln=1, align="L")
                                     pdf.ln(4)
                                     
                                     for idx, arq in enumerate(arquivos):
@@ -2331,6 +2394,9 @@ Obs.: {observacoes}"""
                         preco_servico = st.text_input("Valor preço de serviço: R$", key=f"preco_serv_{rcc}")
 
                 st.divider()
+                obs_contrato = st.text_area("Obs.:", key=f"obs_c_{rcc}")
+
+                st.divider()
 
                 if st.button("📝 Gerar Texto Padrão do Contrato", type="primary"):
                     lines_out = []
@@ -2434,6 +2500,10 @@ Obs.: {observacoes}"""
                                 lines_out.append(f"Valor preço de religue: R$ {preco_religue.strip()}")
                             if preco_servico and preco_servico.strip():
                                 lines_out.append(f"Valor preço de serviço: R$ {preco_servico.strip()}")
+
+                    if obs_contrato and obs_contrato.strip():
+                        lines_out.append("")
+                        lines_out.append(f"Obs.: {obs_contrato.strip()}")
 
                     texto_padrao_contrato = "\n".join(lines_out).strip()
 
@@ -2701,15 +2771,14 @@ Obs.: {observacoes}"""
                     if clausula_contrato == "Não":
                         st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
 
-                    clausula_txt = "Cliente possui cláusula em contrato.\n" if clausula_contrato == "Sim" else ""
+                    clausula_txt = "\n\nCliente possui cláusula em contrato." if clausula_contrato == "Sim" else ""
                     
                     p_ant_fmt = preco_anterior_input.strip()
                     if not p_ant_fmt.startswith("R$"):
                         p_ant_fmt = f"R$ {p_ant_fmt}"
 
                     texto_aniversario = (
-                        f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.\n"
-                        f"{clausula_txt}"
+                        f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.{clausula_txt}\n\n"
                         f"Preço anterior: {p_ant_fmt}\n"
                         f"Preço Aniversário: R$ {p_aniv_str}"
                     )
@@ -2731,7 +2800,7 @@ Obs.: {observacoes}"""
                 ci_input = st.text_input("Número da C.I. (9 ou 11 dígitos)", placeholder="Ex: 588358982 ou 588.358.982", key=f"ci_num_{rca}")
 
                 if st.button("📝 Gerar Texto Final com C.I.", type="primary"):
-                    clausula_txt = "Cliente possui cláusula em contrato.\n" if clausula_contrato == "Sim" else ""
+                    clausula_txt = "\n\nCliente possui cláusula em contrato." if clausula_contrato == "Sim" else ""
                     
                     p_ant_fmt = preco_anterior_input.strip()
                     if not p_ant_fmt.startswith("R$"):
@@ -2740,8 +2809,7 @@ Obs.: {observacoes}"""
                     ci_fmt = formatar_ci_num(ci_input)
 
                     texto_ci = (
-                        f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.\n"
-                        f"{clausula_txt}"
+                        f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.{clausula_txt}\n\n"
                         f"Preço anterior: {p_ant_fmt}\n"
                         f"Preço Aniversário: R$ {p_aniv_str}\n\n"
                         f"CI.: {ci_fmt} - Preço Aniversário"
