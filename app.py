@@ -142,32 +142,73 @@ def apagar_nota(nota_id):
         return False
 
 # --- FUNÇÕES DE PERSISTÊNCIA: CONTRATOS & VENDAS ---
+def parse_valor_moeda(val_raw):
+    txt = " ".join(str(val_raw or "").split()).strip()
+    if not txt:
+        return None
+    sem_rs = re.sub(r'^r\$\s*', '', txt, flags=re.IGNORECASE).strip()
+    if not any(ch.isdigit() for ch in sem_rs):
+        return None
+    if re.match(r'^[\d.,]+$', sem_rs):
+        try:
+            if ',' in sem_rs and '.' in sem_rs:
+                return float(sem_rs.replace('.', '').replace(',', '.'))
+            elif ',' in sem_rs:
+                return float(sem_rs.replace(',', '.'))
+            elif '.' in sem_rs:
+                partes = sem_rs.split('.')
+                if len(partes[-1]) == 3 and len(partes) > 1:
+                    return float(sem_rs.replace('.', ''))
+                return float(sem_rs)
+            else:
+                return float(sem_rs)
+        except ValueError:
+            return None
+    return None
+
+def formatar_moeda_brl(valor_float):
+    formatado = f"{float(valor_float):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {formatado}"
+
 def formatar_valor_proposta(val_raw):
     txt = " ".join(str(val_raw or "").split()).strip()
     if not txt:
         return ""
+    num = parse_valor_moeda(txt)
+    if num is not None:
+        return formatar_moeda_brl(num)
     sem_rs = re.sub(r'^r\$\s*', '', txt, flags=re.IGNORECASE).strip()
-    if not any(ch.isdigit() for ch in sem_rs):
-        return txt
-    if re.match(r'^[\d.,]+$', sem_rs):
-        try:
-            if ',' in sem_rs and '.' in sem_rs:
-                num = float(sem_rs.replace('.', '').replace(',', '.'))
-            elif ',' in sem_rs:
-                num = float(sem_rs.replace(',', '.'))
-            elif '.' in sem_rs:
-                partes = sem_rs.split('.')
-                if len(partes[-1]) == 3 and len(partes) > 1:
-                    num = float(sem_rs.replace('.', ''))
-                else:
-                    num = float(sem_rs)
-            else:
-                num = float(sem_rs)
-            formatado = f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            return f"R$ {formatado}"
-        except ValueError:
-            pass
     return f"R$ {sem_rs}"
+
+def _extrair_metadados_obs(obs_raw):
+    txt = str(obs_raw or "")
+    comissao_extraida = ""
+    val_prop_extraido = ""
+
+    m_com = re.search(r'\[\[COMISSAO:(20%|10%)\]\]', txt)
+    if m_com:
+        comissao_extraida = m_com.group(1)
+        txt = re.sub(r'\s*\[\[COMISSAO:(?:20%|10%)\]\]', '', txt)
+
+    m_val = re.search(r'\[\[VAL_PROP:(.*?)\]\]', txt)
+    if m_val:
+        val_prop_extraido = m_val.group(1).strip()
+        txt = re.sub(r'\s*\[\[VAL_PROP:.*?\]\]', '', txt)
+
+    return txt.strip(), comissao_extraida, val_prop_extraido
+
+def _anexar_metadados_obs(obs_limpa, comissao="", valor_proposta=""):
+    partes = []
+    base = str(obs_limpa or "").strip()
+    if base:
+        partes.append(base)
+    com_clean = str(comissao or "").strip()
+    if com_clean in ("20%", "10%"):
+        partes.append(f"[[COMISSAO:{com_clean}]]")
+    val_clean = str(valor_proposta or "").strip()
+    if val_clean:
+        partes.append(f"[[VAL_PROP:{val_clean}]]")
+    return "\n".join(partes).strip()
 
 def carregar_acompanhamento(usuario, tipo):
     try:
@@ -177,12 +218,22 @@ def carregar_acompanhamento(usuario, tipo):
         cache_val = st.session_state.get("valor_proposta_local_cache", {})
         cache_com = st.session_state.get("comissao_local_cache", {})
         for row in res.data:
+            obs_limpa, com_obs, val_obs = _extrair_metadados_obs(row.get("observacoes", ""))
+            row["observacoes"] = obs_limpa
+
             if row.get("vigencia") is None:
                 row["vigencia"] = cache_vig.get(row["id"], "")
-            if row.get("valor_proposta") is None:
-                row["valor_proposta"] = cache_val.get(row["id"], "")
-            if row.get("comissao") is None:
-                row["comissao"] = cache_com.get(row["id"], "")
+
+            val_db = str(row.get("valor_proposta") or "").strip()
+            if not val_db:
+                val_db = val_obs or cache_val.get(row["id"], "")
+            row["valor_proposta"] = val_db
+
+            com_db = str(row.get("comissao") or "").strip()
+            if not com_db:
+                com_db = com_obs or cache_com.get(row["id"], "")
+            row["comissao"] = com_db
+
             dados[row["id"]] = row
         return dados
     except Exception:
@@ -190,6 +241,10 @@ def carregar_acompanhamento(usuario, tipo):
 
 def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, status, ano, mes, observacoes="", vigencia="", valor_proposta="", comissao=""):
     data_mod = datetime.now().strftime("%d/%m/%Y %H:%M")
+    obs_limpa, _, _ = _extrair_metadados_obs(observacoes)
+    com_clean = str(comissao or "").strip()
+    val_clean = str(valor_proposta or "").strip()
+
     payload = {
         "id": id_reg,
         "usuario": usuario,
@@ -199,10 +254,10 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
         "status": status,
         "ano": int(ano),
         "mes": int(mes),
-        "observacoes": observacoes,
+        "observacoes": obs_limpa,
         "vigencia": vigencia,
-        "valor_proposta": valor_proposta,
-        "comissao": comissao,
+        "valor_proposta": val_clean,
+        "comissao": com_clean,
         "data_modificacao": data_mod
     }
     try:
@@ -219,62 +274,49 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
         if "42501" in err_str or "row-level security" in err_str.lower():
             st.error("❌ Permissão bloqueada no Supabase (RLS ativo). Execute no SQL Editor do Supabase: `ALTER TABLE acompanhamento DISABLE ROW LEVEL SECURITY;`")
             return False
-        # Tenta salvar sem 'comissao' caso a coluna ainda não exista
+        # Tenta salvar sem 'comissao' caso a coluna ainda não exista, persistindo comissão nas observações do Supabase
         try:
             payload_sem_com = {k: v for k, v in payload.items() if k != "comissao"}
+            payload_sem_com["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean)
             supabase.table("acompanhamento").upsert(payload_sem_com).execute()
             if "vigencia_local_cache" in st.session_state:
                 st.session_state["vigencia_local_cache"].pop(id_reg, None)
             if "valor_proposta_local_cache" in st.session_state:
                 st.session_state["valor_proposta_local_cache"].pop(id_reg, None)
-            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
-            if str(comissao).strip():
-                st.warning("⚠️ Cliente salvo, mas a coluna 'comissao' ainda não existe no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento ADD COLUMN IF NOT EXISTS comissao TEXT;`")
+            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
             return True
         except Exception:
             pass
-        # Tenta salvar sem 'valor_proposta' e 'comissao' caso ainda não existam
+        # Tenta salvar sem 'valor_proposta' e 'comissao' caso ainda não existam, persistindo ambos nas observações do Supabase
         try:
             payload_sem_val = {k: v for k, v in payload.items() if k not in ["valor_proposta", "comissao"]}
+            payload_sem_val["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean, valor_proposta=val_clean)
             supabase.table("acompanhamento").upsert(payload_sem_val).execute()
             if "vigencia_local_cache" in st.session_state:
                 st.session_state["vigencia_local_cache"].pop(id_reg, None)
-            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
-            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
-            colunas_faltando = []
-            if str(valor_proposta).strip():
-                colunas_faltando.append("ADD COLUMN IF NOT EXISTS valor_proposta TEXT")
-            if str(comissao).strip():
-                colunas_faltando.append("ADD COLUMN IF NOT EXISTS comissao TEXT")
-            if colunas_faltando:
-                st.warning(f"⚠️ Cliente salvo, mas faltam colunas no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento {', '.join(colunas_faltando)};`")
+            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = val_clean
+            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
             return True
         except Exception:
             pass
         # Tenta salvar sem 'vigencia', 'valor_proposta' e 'comissao'
         try:
             payload_sem_extras = {k: v for k, v in payload.items() if k not in ["vigencia", "valor_proposta", "comissao"]}
+            payload_sem_extras["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean, valor_proposta=val_clean)
             supabase.table("acompanhamento").upsert(payload_sem_extras).execute()
             st.session_state.setdefault("vigencia_local_cache", {})[id_reg] = vigencia
-            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
-            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
-            colunas_faltando = []
+            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = val_clean
+            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
             if str(vigencia).strip():
-                colunas_faltando.append("ADD COLUMN IF NOT EXISTS vigencia TEXT")
-            if str(valor_proposta).strip():
-                colunas_faltando.append("ADD COLUMN IF NOT EXISTS valor_proposta TEXT")
-            if str(comissao).strip():
-                colunas_faltando.append("ADD COLUMN IF NOT EXISTS comissao TEXT")
-            if colunas_faltando:
-                st.warning(f"⚠️ Cliente salvo, mas faltam colunas no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento {', '.join(colunas_faltando)};`")
+                st.warning("⚠️ Cliente salvo, mas falta a coluna 'vigencia' no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento ADD COLUMN IF NOT EXISTS vigencia TEXT;`")
             return True
         except Exception:
             try:
                 payload_fallback = {k: v for k, v in payload.items() if k not in ["observacoes", "nome_cliente", "vigencia", "valor_proposta", "comissao"]}
                 supabase.table("acompanhamento").upsert(payload_fallback).execute()
                 st.session_state.setdefault("vigencia_local_cache", {})[id_reg] = vigencia
-                st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
-                st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
+                st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = val_clean
+                st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
                 st.warning("⚠️ Cliente salvo parcialmente. Adicione as colunas 'observacoes', 'nome_cliente', 'vigencia', 'valor_proposta' e 'comissao' no Supabase executando um ALTER TABLE.")
                 return True
             except Exception as e2:
@@ -667,7 +709,7 @@ div.stButton > button[kind="secondary"]:hover {
   box-shadow: 0 4px 12px rgba(0, 85, 165, 0.14) !important;
 }
 
-/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS --- */
+/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS (MESMO LAYOUT DOS CARDS DE MÉTRICAS) --- */
 .element-container:has(.cg-kpi-marker) + .element-container [data-testid="stHorizontalBlock"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
   gap: 0.85rem !important;
@@ -677,63 +719,45 @@ div.stButton > button[kind="secondary"]:hover {
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button {
-  min-height: 94px !important;
-  padding: 0.85rem 0.65rem !important;
-  border-radius: 14px !important;
+  min-height: 92px !important;
+  padding: 0.8rem 1rem !important;
+  border-radius: 12px !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   justify-content: center !important;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  text-align: left !important;
+  transition: all 0.2s ease !important;
 }
 
-/* Cartões Inativos com borda superior codificada por urgência */
+/* Cartões Inativos com o mesmo layout limpo dos cards de métrica */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"] {
-  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
-  border: 1px solid #D8E2EE !important;
-  border-top: 4px solid #0055A5 !important;
+  background: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
+  border-top: 3px solid #0055A5 !important;
   color: #0A2540 !important;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(2) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(2) div.stButton > button[kind="secondary"] {
-  border-top-color: #DC2626 !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(3) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(3) div.stButton > button[kind="secondary"] {
-  border-top-color: #0284C7 !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(4) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(4) div.stButton > button[kind="secondary"] {
-  border-top-color: #EA580C !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(5) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(5) div.stButton > button[kind="secondary"] {
-  border-top-color: #D97706 !important;
+  box-shadow: none !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"]:hover,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"]:hover {
-  transform: translateY(-3px) !important;
+  transform: translateY(-2px) !important;
   background: #F0F7FF !important;
-  border-color: #0055A5 !important;
-  box-shadow: 0 8px 20px rgba(0, 85, 165, 0.14) !important;
+  border-color: #BFDBFE !important;
+  border-top: 3px solid #0055A5 !important;
+  box-shadow: 0 4px 12px rgba(0, 85, 165, 0.12) !important;
 }
 
 /* Cartão Ativo (Filtro Selecionado) */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] {
-  background: linear-gradient(135deg, #0055A5 0%, #00356B 100%) !important;
-  border: 1px solid #00356B !important;
-  border-bottom: 4px solid #F28C28 !important;
+  background: linear-gradient(135deg, #0055A5 0%, #003F7F 100%) !important;
+  border: 1px solid #003F7F !important;
+  border-top: 3px solid #F28C28 !important;
   color: #FFFFFF !important;
-  box-shadow: 0 8px 22px rgba(0, 85, 165, 0.28) !important;
-  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 85, 165, 0.24) !important;
+  transform: translateY(-1px) !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p,
@@ -741,26 +765,37 @@ div.stButton > button[kind="secondary"]:hover {
   color: #FFFFFF !important;
 }
 
-/* Número em evidência (1ª linha) e Rótulo (2ª linha) */
+/* Rótulo no topo (1ª linha) e Número em evidência embaixo (2ª linha), igual ao st.metric */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:first-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:first-child {
-  font-family: 'Outfit', sans-serif !important;
-  font-size: 2rem !important;
-  font-weight: 800 !important;
-  line-height: 1.08 !important;
-  margin: 0 0 4px 0 !important;
-  letter-spacing: -0.02em !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.86rem !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  line-height: 1.25 !important;
+  margin: 0 0 6px 0 !important;
+  letter-spacing: 0 !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:first-child,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:first-child {
+  color: #DBEAFE !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:last-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:last-child {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.78rem !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 1.95rem !important;
+  font-weight: 800 !important;
+  color: #0A2540 !important;
+  line-height: 1.1 !important;
   margin: 0 !important;
-  opacity: 0.92 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:last-child,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:last-child {
+  color: #FFFFFF !important;
 }
 
 /* --- CARDS DE MÉTRICAS, INPUTS E EXPANDERS (TEMA CLARO LIMPO) --- */
@@ -925,22 +960,34 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             cod = html_lib.escape(str(item["codigo"]))
             nome = html_lib.escape(str(item["nome"]))
             vig = html_lib.escape(str(item.get("vigencia", "") or "").strip())
-            val_prop = html_lib.escape(str(item.get("valor_proposta", "") or "").strip())
+            val_prop_raw = str(item.get("valor_proposta", "") or "").strip()
+            val_prop = html_lib.escape(val_prop_raw)
             comissao = str(item.get("comissao", "") or "").strip()
             is_selected = "selected-card" if str(item["id"]) == str(id_editando) else ""
             nome_div = f'<div class="kb-card-name">{nome}</div>' if nome else ""
 
             meta_div = ""
             if is_contrato and vig:
-                meta_div = f'<div class="kb-card-meta kb-card-vig">📅 {vig}</div>'
-            elif (not is_contrato) and val_prop:
-                if comissao == "20%":
-                    classe_val = "kb-card-val-verde"
-                elif comissao == "10%":
-                    classe_val = "kb-card-val-amarelo"
-                else:
-                    classe_val = "kb-card-val-neutro"
-                meta_div = f'<div class="kb-card-meta {classe_val}">💰 {val_prop}</div>'
+                meta_div = f'<div class="kb-card-meta-group"><div class="kb-card-meta kb-card-vig">📅 {vig}</div></div>'
+            elif not is_contrato:
+                partes_meta = []
+                if val_prop:
+                    partes_meta.append(f'<div class="kb-card-meta kb-card-val-neutro">💰 {val_prop}</div>')
+                if comissao in ("20%", "10%"):
+                    classe_com = "kb-card-val-verde" if comissao == "20%" else "kb-card-val-amarelo"
+                    val_num = parse_valor_moeda(val_prop_raw)
+                    if val_num is not None:
+                        perc = 0.20 if comissao == "20%" else 0.10
+                        val_com_fmt = html_lib.escape(formatar_moeda_brl(val_num * perc))
+                        partes_meta.append(
+                            f'<div class="kb-card-meta {classe_com}">💵 {val_com_fmt}</div>'
+                        )
+                    else:
+                        partes_meta.append(
+                            f'<div class="kb-card-meta {classe_com}">💵 {html_lib.escape(comissao)}</div>'
+                        )
+                if partes_meta:
+                    meta_div = f'<div class="kb-card-meta-group">{"".join(partes_meta)}</div>'
 
             cards_html += f"""
             <div class="kb-card {is_selected}" draggable="true" data-id="{cid}" data-status="{st_atual}"
@@ -971,16 +1018,21 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
 
     def _estimar_altura_card(item):
         nome_txt = str(item.get("nome", "") or "").strip()
-        tem_meta = bool(
-            (is_contrato and str(item.get("vigencia", "") or "").strip())
-            or ((not is_contrato) and str(item.get("valor_proposta", "") or "").strip())
-        )
+        val_txt = str(item.get("valor_proposta", "") or "").strip()
+        com_txt = str(item.get("comissao", "") or "").strip()
+        tem_vig = is_contrato and bool(str(item.get("vigencia", "") or "").strip())
+        tem_val = (not is_contrato) and bool(val_txt)
+        tem_com = (not is_contrato) and (com_txt in ("20%", "10%"))
         alt = 42
         if nome_txt:
             linhas_nome = max(1, (len(nome_txt) + 15) // 16)
             alt += 3 + (linhas_nome * 16)
-        if tem_meta:
+        if tem_vig:
             alt += 5 + 23
+        if tem_val:
+            alt += 5 + 23
+        if tem_com:
+            alt += 4 + 26
         return alt
 
     alturas_meses = {}
@@ -1120,8 +1172,15 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             margin-top: 3px;
             line-height: 1.25;
         }}
-        .kb-card-meta {{
+        .kb-card-meta-group {{
             margin-top: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            width: 100%;
+        }}
+        .kb-card-meta {{
             padding: 2px 6px;
             border-radius: 5px;
             font-size: 10.5px;
@@ -1129,6 +1188,9 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             line-height: 1.25;
             display: inline-block;
             max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
         }}
         .kb-card-vig {{
             background: #EFF6FF;
@@ -1492,6 +1554,7 @@ def _ordenacao_vigencia_key(vig_label):
     return (1, 0, vig_label.lower())
 
 def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
+    meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     trimestres_cols = [
         "1º Tri (Jan, Fev, Mar)",
         "2º Tri (Abr, Mai, Jun)",
@@ -1500,11 +1563,12 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
     ]
     contagem_por_vigencia = {}
     totais_tri = {t: 0 for t in trimestres_cols}
+    totais_por_mes = {m: 0 for m in range(1, 13)}
 
     for d in dados.values():
         if not isinstance(d, dict):
             continue
-        if d.get("ano") != ano_selecionado:
+        if int(d.get("ano", 0)) != ano_selecionado:
             continue
         if str(d.get("status", "")).strip() != "Processo Enviado":
             continue
@@ -1530,18 +1594,45 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
 
         contagem_por_vigencia[vig_label][tri_nome] += 1
         totais_tri[tri_nome] += 1
+        totais_por_mes[mes_num] += 1
 
     st.divider()
     st.markdown(f"### 📊 Consolidado — Contratos \"Processo Enviado\" por Vigência ({ano_selecionado})")
-    st.caption("Quantidade de contratos no status **Processo Enviado** agrupados por vigência e trimestre.")
+
+    col_sub_c, col_filtro_mes_c = st.columns([3.3, 1.2])
+    with col_sub_c:
+        st.caption(f"Ano de referência: **{ano_selecionado}** • Filtre por mês para atualizar os indicadores superiores mantendo a tabela completa abaixo.")
+    with col_filtro_mes_c:
+        mes_filtro_c = st.selectbox(
+            "📅 Filtrar por Mês",
+            ["Todos (Ano)"] + meses_cols,
+            key=f"filtro_mes_consolidado_contrato_{ano_selecionado}"
+        )
 
     total_geral = sum(totais_tri.values())
-    c_k1, c_k2, c_k3, c_k4, c_k5 = st.columns(5)
-    c_k1.metric("1º Tri (Jan-Mar)", totais_tri[trimestres_cols[0]])
-    c_k2.metric("2º Tri (Abr-Jun)", totais_tri[trimestres_cols[1]])
-    c_k3.metric("3º Tri (Jul-Set)", totais_tri[trimestres_cols[2]])
-    c_k4.metric("4º Tri (Out-Dez)", totais_tri[trimestres_cols[3]])
-    c_k5.metric("Total Enviado", total_geral)
+    if mes_filtro_c == "Todos (Ano)":
+        c_k1, c_k2, c_k3, c_k4, c_k5 = st.columns(5)
+        c_k1.metric(f"1º Tri ({ano_selecionado})", totais_tri[trimestres_cols[0]])
+        c_k2.metric(f"2º Tri ({ano_selecionado})", totais_tri[trimestres_cols[1]])
+        c_k3.metric(f"3º Tri ({ano_selecionado})", totais_tri[trimestres_cols[2]])
+        c_k4.metric(f"4º Tri ({ano_selecionado})", totais_tri[trimestres_cols[3]])
+        c_k5.metric(f"Total Enviado ({ano_selecionado})", total_geral)
+    else:
+        m_idx_c = meses_cols.index(mes_filtro_c) + 1
+        qtd_mes_c = totais_por_mes[m_idx_c]
+        if m_idx_c in (1, 2, 3):
+            tri_ref_lbl, tri_ref_val = "1º Tri (Jan-Mar)", totais_tri[trimestres_cols[0]]
+        elif m_idx_c in (4, 5, 6):
+            tri_ref_lbl, tri_ref_val = "2º Tri (Abr-Jun)", totais_tri[trimestres_cols[1]]
+        elif m_idx_c in (7, 8, 9):
+            tri_ref_lbl, tri_ref_val = "3º Tri (Jul-Set)", totais_tri[trimestres_cols[2]]
+        else:
+            tri_ref_lbl, tri_ref_val = "4º Tri (Out-Dez)", totais_tri[trimestres_cols[3]]
+
+        c_k1, c_k2, c_k3 = st.columns(3)
+        c_k1.metric(f"📄 Enviados em {mes_filtro_c}/{ano_selecionado}", qtd_mes_c)
+        c_k2.metric(f"📅 {tri_ref_lbl} ({ano_selecionado})", tri_ref_val)
+        c_k3.metric(f"📊 Total Enviado ({ano_selecionado})", total_geral)
 
     if not contagem_por_vigencia:
         st.info(f"Nenhum contrato com status 'Processo Enviado' encontrado para o ano de {ano_selecionado}.")
@@ -1571,6 +1662,106 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
 
     df_consolidado = pd.DataFrame(linhas_tabela)
     st.dataframe(df_consolidado, hide_index=True, use_container_width=True)
+
+# --- CONSOLIDAÇÃO MENSAL DE COMISSÕES EM VENDAS EXECUTADAS ---
+def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
+    meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    soma_20_por_mes = {m: 0.0 for m in range(1, 13)}
+    soma_10_por_mes = {m: 0.0 for m in range(1, 13)}
+    soma_prop_por_mes = {m: 0.0 for m in range(1, 13)}
+    qtd_vendas_por_mes = {m: 0 for m in range(1, 13)}
+    total_propostas_executadas = 0.0
+    qtd_vendas_executadas = 0
+
+    for d in dados.values():
+        if not isinstance(d, dict):
+            continue
+        if int(d.get("ano", 0)) != ano_selecionado:
+            continue
+        if str(d.get("status", "")).strip().lower() != "instalação / serviço executado":
+            continue
+        try:
+            mes_num = int(d.get("mes", 0))
+        except (TypeError, ValueError):
+            continue
+        if not (1 <= mes_num <= 12):
+            continue
+
+        qtd_vendas_executadas += 1
+        qtd_vendas_por_mes[mes_num] += 1
+        val_num = parse_valor_moeda(d.get("valor_proposta", ""))
+        if val_num is None:
+            continue
+
+        total_propostas_executadas += val_num
+        soma_prop_por_mes[mes_num] += val_num
+        comissao_sel = str(d.get("comissao", "") or "").strip()
+        if comissao_sel == "20%":
+            soma_20_por_mes[mes_num] += val_num * 0.20
+        elif comissao_sel == "10%":
+            soma_10_por_mes[mes_num] += val_num * 0.10
+
+    total_comissao_20 = sum(soma_20_por_mes.values())
+    total_comissao_10 = sum(soma_10_por_mes.values())
+    total_geral_comissoes = total_comissao_20 + total_comissao_10
+
+    st.divider()
+    st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" ({ano_selecionado})")
+
+    col_sub_v, col_filtro_mes_v = st.columns([3.3, 1.2])
+    with col_sub_v:
+        st.caption(f"Ano de referência: **{ano_selecionado}** • Filtre por mês para visualizar os valores nos indicadores superiores, mantendo a tabela completa abaixo.")
+    with col_filtro_mes_v:
+        mes_filtro_v = st.selectbox(
+            "📅 Filtrar por Mês",
+            ["Todos (Ano)"] + meses_cols,
+            key=f"filtro_mes_consolidado_venda_{ano_selecionado}"
+        )
+
+    if mes_filtro_v == "Todos (Ano)":
+        periodo_lbl = f"Ano {ano_selecionado}"
+        val_20_top = total_comissao_20
+        val_10_top = total_comissao_10
+        val_tot_top = total_geral_comissoes
+        val_prop_top = total_propostas_executadas
+        qtd_top = qtd_vendas_executadas
+    else:
+        m_idx_v = meses_cols.index(mes_filtro_v) + 1
+        periodo_lbl = f"{mes_filtro_v}/{ano_selecionado}"
+        val_20_top = soma_20_por_mes[m_idx_v]
+        val_10_top = soma_10_por_mes[m_idx_v]
+        val_tot_top = val_20_top + val_10_top
+        val_prop_top = soma_prop_por_mes[m_idx_v]
+        qtd_top = qtd_vendas_por_mes[m_idx_v]
+
+    c_k1, c_k2, c_k3, c_k4 = st.columns(4)
+    c_k1.metric(f"🟢 Comissão 20% ({periodo_lbl})", formatar_moeda_brl(val_20_top))
+    c_k2.metric(f"🟡 Comissão 10% ({periodo_lbl})", formatar_moeda_brl(val_10_top))
+    c_k3.metric(f"💵 Total Comissões ({periodo_lbl})", formatar_moeda_brl(val_tot_top))
+    c_k4.metric(f"📦 Propostas Executadas ({periodo_lbl})", f"{formatar_moeda_brl(val_prop_top)} ({qtd_top})")
+
+    if qtd_vendas_executadas == 0:
+        st.info(f"Nenhuma venda com status 'Instalação / Serviço executado' encontrada para o ano de {ano_selecionado}.")
+        return
+
+    linha_20 = {"Tipo de Comissão": "🟢 Comissão 20%"}
+    linha_10 = {"Tipo de Comissão": "🟡 Comissão 10%"}
+    linha_total = {"Tipo de Comissão": "Total Geral"}
+
+    for idx_m, mes_nome in enumerate(meses_cols):
+        mes_num = idx_m + 1
+        v20 = soma_20_por_mes[mes_num]
+        v10 = soma_10_por_mes[mes_num]
+        linha_20[mes_nome] = formatar_moeda_brl(v20)
+        linha_10[mes_nome] = formatar_moeda_brl(v10)
+        linha_total[mes_nome] = formatar_moeda_brl(v20 + v10)
+
+    linha_20["Total"] = formatar_moeda_brl(total_comissao_20)
+    linha_10["Total"] = formatar_moeda_brl(total_comissao_10)
+    linha_total["Total"] = formatar_moeda_brl(total_geral_comissoes)
+
+    df_comissoes = pd.DataFrame([linha_20, linha_10, linha_total])
+    st.dataframe(df_comissoes, hide_index=True, use_container_width=True)
 
 # --- GERENCIADOR DO PAINEL KANBAN (CONTRATOS E VENDAS) COM ESTILO VISUAL ---
 def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cores):
@@ -1947,6 +2138,8 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
 
         if is_contrato:
             renderizar_consolidado_contratos_vigencia(dados, ano_selecionado)
+        else:
+            renderizar_consolidado_vendas_comissao(dados, ano_selecionado)
 
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
@@ -3266,28 +3459,18 @@ if aba_agenda is not None:
             return texto_limpo if texto_limpo else str(texto)
 
         def classificar_status_abertura(row, hoje_ref):
-            prazo = row['Prazo_DT']
             abertura = row['Abertura_DT']
             
-            if pd.isna(prazo):
-                return "Normal"
-            
-            prazo_dia = pd.Timestamp(prazo).normalize()
-            hoje = pd.Timestamp(hoje_ref).normalize()
-            
-            if prazo_dia == hoje:
-                return "🔵 Vence Hoje"
-            elif prazo_dia < hoje:
-                return "🔴 Vencido"
-                
             if pd.isna(abertura):
                 return "🟢 1ª Semana"
                 
             abertura_dia = pd.Timestamp(abertura).normalize()
-            delta_dias = (prazo_dia - abertura_dia).days
-            if delta_dias <= 7:
+            hoje = pd.Timestamp(hoje_ref).normalize()
+            dias_abertura = (hoje - abertura_dia).days
+            
+            if dias_abertura <= 7:
                 return "🟢 1ª Semana"
-            elif delta_dias <= 14:
+            elif dias_abertura <= 14:
                 return "🟡 2ª Semana"
             else:
                 return "🔴 3ª Semana"
@@ -3338,6 +3521,12 @@ if aba_agenda is not None:
                 label_visibility="collapsed"
             )
 
+            if "ultima_visao_agenda" not in st.session_state:
+                st.session_state.ultima_visao_agenda = tipo_visao_agenda
+            elif st.session_state.ultima_visao_agenda != tipo_visao_agenda:
+                st.session_state.ultima_visao_agenda = tipo_visao_agenda
+                st.session_state.filtro_dashboard_ativo = "Todas"
+
             st.divider()
             st.markdown("### 🏷️ Legenda de Status")
             if tipo_visao_agenda == "Comodato Inativo":
@@ -3384,7 +3573,13 @@ if aba_agenda is not None:
                     df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.Tratadas_Temp)]
                     
                     df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
-                    df_pendentes['Abertura_DT'] = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+                    abertura_parsed = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+                    mask_na_abertura = abertura_parsed.isna() & df_pendentes[COL_ABERTURA].notna()
+                    if mask_na_abertura.any():
+                        abertura_parsed.loc[mask_na_abertura] = pd.to_datetime(
+                            df_pendentes.loc[mask_na_abertura, COL_ABERTURA], dayfirst=True, errors='coerce'
+                        )
+                    df_pendentes['Abertura_DT'] = abertura_parsed
                     df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
                     
                     df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
@@ -3448,7 +3643,7 @@ if aba_agenda is not None:
                         c1, c2, c3, c4 = st.columns(4)
                         with c1:
                             if st.button(
-                                f"**{total_visitas}**\n\nTotal",
+                                f"📋 Total\n\n**{total_visitas}**",
                                 type="primary" if filtro_atual_agenda == "Todas" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ci_total"
@@ -3457,7 +3652,7 @@ if aba_agenda is not None:
                                 st.rerun()
                         with c2:
                             if st.button(
-                                f"**{vencidas_qt}**\n\n3ª Semana",
+                                f"🔴 3ª Semana\n\n**{vencidas_qt}**",
                                 type="primary" if filtro_atual_agenda == "🔴 3ª Semana" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ci_3sem"
@@ -3466,7 +3661,7 @@ if aba_agenda is not None:
                                 st.rerun()
                         with c3:
                             if st.button(
-                                f"**{hoje_qt}**\n\n2ª Semana",
+                                f"🟡 2ª Semana\n\n**{hoje_qt}**",
                                 type="primary" if filtro_atual_agenda == "🟡 2ª Semana" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ci_2sem"
@@ -3475,7 +3670,7 @@ if aba_agenda is not None:
                                 st.rerun()
                         with c4:
                             if st.button(
-                                f"**{amanha_qt}**\n\n1ª Semana",
+                                f"🟢 1ª Semana\n\n**{amanha_qt}**",
                                 type="primary" if filtro_atual_agenda == "🟢 1ª Semana" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ci_1sem"
@@ -3493,7 +3688,7 @@ if aba_agenda is not None:
                         c1, c2, c3, c4, c5 = st.columns(5)
                         with c1:
                             if st.button(
-                                f"**{total_visitas}**\n\nTotal",
+                                f"📋 Total\n\n**{total_visitas}**",
                                 type="primary" if filtro_atual_agenda == "Todas" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ag_total"
@@ -3502,7 +3697,7 @@ if aba_agenda is not None:
                                 st.rerun()
                         with c2:
                             if st.button(
-                                f"**{vencidas_qt}**\n\nVencidas",
+                                f"🔴 Vencidas\n\n**{vencidas_qt}**",
                                 type="primary" if filtro_atual_agenda == "🔴 Vencido" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ag_vencidas"
@@ -3511,7 +3706,7 @@ if aba_agenda is not None:
                                 st.rerun()
                         with c3:
                             if st.button(
-                                f"**{hoje_qt}**\n\nVence Hoje",
+                                f"🔵 Vence Hoje\n\n**{hoje_qt}**",
                                 type="primary" if filtro_atual_agenda == "🔵 Vence Hoje" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ag_hoje"
@@ -3520,7 +3715,7 @@ if aba_agenda is not None:
                                 st.rerun()
                         with c4:
                             if st.button(
-                                f"**{amanha_qt}**\n\nVence Amanhã",
+                                f"🟠 Vence Amanhã\n\n**{amanha_qt}**",
                                 type="primary" if filtro_atual_agenda == "🟠 Vence Amanhã" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ag_amanha"
@@ -3529,7 +3724,7 @@ if aba_agenda is not None:
                                 st.rerun()
                         with c5:
                             if st.button(
-                                f"**{semana_qt}**\n\nVence na Semana",
+                                f"🟡 Vence na Semana\n\n**{semana_qt}**",
                                 type="primary" if filtro_atual_agenda == "🟡 Vence na Semana" else "secondary",
                                 use_container_width=True,
                                 key="btn_kpi_ag_semana"
