@@ -709,7 +709,7 @@ div.stButton > button[kind="secondary"]:hover {
   box-shadow: 0 4px 12px rgba(0, 85, 165, 0.14) !important;
 }
 
-/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS --- */
+/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS (LAYOUT CARD MÉTRICA) --- */
 .element-container:has(.cg-kpi-marker) + .element-container [data-testid="stHorizontalBlock"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
   gap: 0.85rem !important;
@@ -719,90 +719,81 @@ div.stButton > button[kind="secondary"]:hover {
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button {
-  min-height: 94px !important;
-  padding: 0.85rem 0.65rem !important;
-  border-radius: 14px !important;
+  min-height: 92px !important;
+  padding: 0.85rem 1.05rem !important;
+  border-radius: 12px !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   justify-content: center !important;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  text-align: left !important;
+  transition: all 0.2s ease !important;
 }
 
-/* Cartões Inativos com borda superior codificada por urgência */
+/* Cartão Inativo — Mesmo visual limpo dos cartões de Total de Comissão */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"] {
-  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
-  border: 1px solid #D8E2EE !important;
-  border-top: 4px solid #0055A5 !important;
+  background: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
+  border-top: 3.5px solid #0055A5 !important;
   color: #0A2540 !important;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(2) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(2) div.stButton > button[kind="secondary"] {
-  border-top-color: #DC2626 !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(3) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(3) div.stButton > button[kind="secondary"] {
-  border-top-color: #0284C7 !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(4) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(4) div.stButton > button[kind="secondary"] {
-  border-top-color: #EA580C !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(5) div.stButton > button[kind="secondary"],
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(5) div.stButton > button[kind="secondary"] {
-  border-top-color: #D97706 !important;
+  box-shadow: 0 2px 6px rgba(10, 37, 64, 0.04) !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"]:hover,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"]:hover {
-  transform: translateY(-3px) !important;
+  transform: translateY(-2px) !important;
   background: #F0F7FF !important;
-  border-color: #0055A5 !important;
-  box-shadow: 0 8px 20px rgba(0, 85, 165, 0.14) !important;
+  border-color: #BFDBFE !important;
+  border-top-color: #0055A5 !important;
+  box-shadow: 0 6px 16px rgba(0, 85, 165, 0.12) !important;
 }
 
 /* Cartão Ativo (Filtro Selecionado) */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] {
-  background: linear-gradient(135deg, #0055A5 0%, #00356B 100%) !important;
-  border: 1px solid #00356B !important;
-  border-bottom: 4px solid #F28C28 !important;
-  color: #FFFFFF !important;
-  box-shadow: 0 8px 22px rgba(0, 85, 165, 0.28) !important;
+  background: linear-gradient(180deg, #EFF6FF 0%, #E0EEFF 100%) !important;
+  border: 1.5px solid #0055A5 !important;
+  border-top: 4px solid #0055A5 !important;
+  color: #0A2540 !important;
+  box-shadow: 0 6px 18px rgba(0, 85, 165, 0.18) !important;
   transform: translateY(-2px) !important;
 }
 
-.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p,
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p {
-  color: #FFFFFF !important;
-}
-
-/* Número em evidência (1ª linha) e Rótulo (2ª linha) */
+/* Rótulo Superior (1ª linha) igual ao título do st.metric */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:first-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:first-child {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: #475569 !important;
+  margin: 0 0 6px 0 !important;
+  line-height: 1.2 !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:first-child,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:first-child {
+  color: #0055A5 !important;
+  font-weight: 700 !important;
+}
+
+/* Valor/Quantidade em Evidência (2ª linha) igual ao valor do st.metric */
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:last-child,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:last-child {
   font-family: 'Outfit', sans-serif !important;
   font-size: 2rem !important;
   font-weight: 800 !important;
-  line-height: 1.08 !important;
-  margin: 0 0 4px 0 !important;
+  line-height: 1.05 !important;
+  margin: 0 !important;
   letter-spacing: -0.02em !important;
+  color: #0A2540 !important;
 }
 
-.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:last-child,
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:last-child {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.78rem !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
-  margin: 0 !important;
-  opacity: 0.92 !important;
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:last-child,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:last-child {
+  color: #003D7A !important;
 }
 
 /* --- CARDS DE MÉTRICAS, INPUTS E EXPANDERS (TEMA CLARO LIMPO) --- */
@@ -968,6 +959,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             nome = html_lib.escape(str(item["nome"]))
             vig = html_lib.escape(str(item.get("vigencia", "") or "").strip())
             val_prop_raw = str(item.get("valor_proposta", "") or "").strip()
+            val_prop = html_lib.escape(val_prop_raw)
             comissao = str(item.get("comissao", "") or "").strip()
             is_selected = "selected-card" if str(item["id"]) == str(id_editando) else ""
             nome_div = f'<div class="kb-card-name">{nome}</div>' if nome else ""
@@ -975,23 +967,25 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             meta_div = ""
             if is_contrato and vig:
                 meta_div = f'<div class="kb-card-meta-group"><div class="kb-card-meta kb-card-vig">📅 {vig}</div></div>'
-            elif not is_contrato and comissao in ("20%", "10%"):
-                classe_com = "kb-card-val-verde" if comissao == "20%" else "kb-card-val-amarelo"
-                val_num = parse_valor_moeda(val_prop_raw)
-                if val_num is not None:
-                    perc = 0.20 if comissao == "20%" else 0.10
-                    val_com_fmt = html_lib.escape(formatar_moeda_brl(val_num * perc))
-                    meta_div = (
-                        f'<div class="kb-card-meta-group">'
-                        f'<div class="kb-card-meta {classe_com}">💵 {val_com_fmt}</div>'
-                        f'</div>'
-                    )
-                else:
-                    meta_div = (
-                        f'<div class="kb-card-meta-group">'
-                        f'<div class="kb-card-meta {classe_com}">💵 {html_lib.escape(comissao)}</div>'
-                        f'</div>'
-                    )
+            elif not is_contrato:
+                partes_meta = []
+                if val_prop:
+                    partes_meta.append(f'<div class="kb-card-meta kb-card-val-neutro">💰 {val_prop}</div>')
+                if comissao in ("20%", "10%"):
+                    classe_com = "kb-card-val-verde" if comissao == "20%" else "kb-card-val-amarelo"
+                    val_num = parse_valor_moeda(val_prop_raw)
+                    if val_num is not None:
+                        perc = 0.20 if comissao == "20%" else 0.10
+                        val_com_fmt = html_lib.escape(formatar_moeda_brl(val_num * perc))
+                        partes_meta.append(
+                            f'<div class="kb-card-meta {classe_com}">💵 {val_com_fmt}</div>'
+                        )
+                    else:
+                        partes_meta.append(
+                            f'<div class="kb-card-meta {classe_com}">💵 {html_lib.escape(comissao)}</div>'
+                        )
+                if partes_meta:
+                    meta_div = f'<div class="kb-card-meta-group">{"".join(partes_meta)}</div>'
 
             cards_html += f"""
             <div class="kb-card {is_selected}" draggable="true" data-id="{cid}" data-status="{st_atual}"
@@ -1022,8 +1016,10 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
 
     def _estimar_altura_card(item):
         nome_txt = str(item.get("nome", "") or "").strip()
+        val_txt = str(item.get("valor_proposta", "") or "").strip()
         com_txt = str(item.get("comissao", "") or "").strip()
         tem_vig = is_contrato and bool(str(item.get("vigencia", "") or "").strip())
+        tem_val = (not is_contrato) and bool(val_txt)
         tem_com = (not is_contrato) and (com_txt in ("20%", "10%"))
         alt = 42
         if nome_txt:
@@ -1031,8 +1027,10 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             alt += 3 + (linhas_nome * 16)
         if tem_vig:
             alt += 5 + 23
+        if tem_val:
+            alt += 5 + 23
         if tem_com:
-            alt += 5 + 24
+            alt += 4 + 24
         return alt
 
     alturas_meses = {}
@@ -1639,8 +1637,8 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
     meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     soma_20_por_mes = {m: 0.0 for m in range(1, 13)}
     soma_10_por_mes = {m: 0.0 for m in range(1, 13)}
-    total_propostas_executadas = 0.0
-    qtd_vendas_executadas = 0
+    soma_propostas_por_mes = {m: 0.0 for m in range(1, 13)}
+    qtd_vendas_por_mes = {m: 0 for m in range(1, 13)}
 
     for d in dados.values():
         if not isinstance(d, dict):
@@ -1656,12 +1654,12 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
         if not (1 <= mes_num <= 12):
             continue
 
-        qtd_vendas_executadas += 1
+        qtd_vendas_por_mes[mes_num] += 1
         val_num = parse_valor_moeda(d.get("valor_proposta", ""))
         if val_num is None:
             continue
 
-        total_propostas_executadas += val_num
+        soma_propostas_por_mes[mes_num] += val_num
         comissao_sel = str(d.get("comissao", "") or "").strip()
         if comissao_sel == "20%":
             soma_20_por_mes[mes_num] += val_num * 0.20
@@ -1671,16 +1669,44 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
     total_comissao_20 = sum(soma_20_por_mes.values())
     total_comissao_10 = sum(soma_10_por_mes.values())
     total_geral_comissoes = total_comissao_20 + total_comissao_10
+    total_propostas_executadas = sum(soma_propostas_por_mes.values())
+    qtd_vendas_executadas = sum(qtd_vendas_por_mes.values())
 
     st.divider()
-    st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" por Mês ({ano_selecionado})")
-    st.caption("Somatória mensal dos valores de comissão (20% e 10%) considerando as vendas no status **Instalação / Serviço executado**.")
+    col_tit_cons, col_filtro_mes_cons = st.columns([3.2, 1.3])
+    with col_tit_cons:
+        st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" ({ano_selecionado})")
+        st.caption("Somatória mensal dos valores de comissão (20% e 10%) considerando as vendas no status **Instalação / Serviço executado**.")
+    with col_filtro_mes_cons:
+        opcoes_periodo = [f"Ano ({ano_selecionado})"] + meses_cols
+        periodo_selecionado = st.selectbox(
+            "📅 Filtrar Indicadores por Mês",
+            opcoes_periodo,
+            index=0,
+            key=f"filtro_mes_consolidado_vendas_{ano_selecionado}"
+        )
+
+    if periodo_selecionado in meses_cols:
+        mes_filtro_idx = meses_cols.index(periodo_selecionado) + 1
+        label_periodo = f"{periodo_selecionado}/{ano_selecionado}"
+        val_card_20 = soma_20_por_mes[mes_filtro_idx]
+        val_card_10 = soma_10_por_mes[mes_filtro_idx]
+        val_card_total = val_card_20 + val_card_10
+        val_card_propostas = soma_propostas_por_mes[mes_filtro_idx]
+        qtd_card_vendas = qtd_vendas_por_mes[mes_filtro_idx]
+    else:
+        label_periodo = f"Ano {ano_selecionado}"
+        val_card_20 = total_comissao_20
+        val_card_10 = total_comissao_10
+        val_card_total = total_geral_comissoes
+        val_card_propostas = total_propostas_executadas
+        qtd_card_vendas = qtd_vendas_executadas
 
     c_k1, c_k2, c_k3, c_k4 = st.columns(4)
-    c_k1.metric("🟢 Comissão 20% (Ano)", formatar_moeda_brl(total_comissao_20))
-    c_k2.metric("🟡 Comissão 10% (Ano)", formatar_moeda_brl(total_comissao_10))
-    c_k3.metric("💵 Total Comissões (Ano)", formatar_moeda_brl(total_geral_comissoes))
-    c_k4.metric("📦 Propostas Executadas", f"{formatar_moeda_brl(total_propostas_executadas)} ({qtd_vendas_executadas})")
+    c_k1.metric(f"🟢 Comissão 20% ({label_periodo})", formatar_moeda_brl(val_card_20))
+    c_k2.metric(f"🟡 Comissão 10% ({label_periodo})", formatar_moeda_brl(val_card_10))
+    c_k3.metric(f"💵 Total Comissões ({label_periodo})", formatar_moeda_brl(val_card_total))
+    c_k4.metric(f"📦 Propostas ({label_periodo} • {qtd_card_vendas})", formatar_moeda_brl(val_card_propostas))
 
     if qtd_vendas_executadas == 0:
         st.info(f"Nenhuma venda com status 'Instalação / Serviço executado' encontrada para o ano de {ano_selecionado}.")
@@ -3156,4 +3182,749 @@ Obs.: {observacoes}"""
 
                         linhas_texto.append(f"Redução de vigência? {sim_nao_box(red_vig)}")
                         if red_vig == "Sim":
-                            linhas_texto.append(f
+                            linhas_texto.append(f"(Se sim, descreva o motivo): {motivo_red_vig.strip()}")
+
+                        texto_aprovacao = "\n".join(linhas_texto)
+
+                        st.success("✅ Texto de Aprovação gerado com sucesso!")
+                        st.text_area("Texto Gerado:", value=texto_aprovacao, height=500, key=f"txt_area_aprov_{rcap}")
+                        botao_copiar_customizado(texto_aprovacao, "aprovacao_txt")
+
+            # -------------------------------------------------------------
+            # 4. ANIVERSÁRIO DE CONTRATO
+            # -------------------------------------------------------------
+            elif menu_tratativa == "🎂 Aniversário de Contrato":
+                rca = st.session_state.reset_counter
+                cabecalho_pagina("Aniversário de Contrato", "Calculadora de reajuste por IPCA acumulado de 12M e geração de formulário.")
+
+                if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_limp_aniv_{rca}"):
+                    st.session_state.reset_counter += 1
+                    st.rerun()
+
+                st.divider()
+                ipca_api, ipca_periodo = obter_ipca_acumulado_12m()
+                if ipca_api is not None:
+                    ipca_vigente = ipca_api
+                    st.success(f"📊 **IPCA Acumulado de 12 meses (Fonte oficial, referência {ipca_periodo}):** `{ipca_vigente:.2f}%`")
+                else:
+                    ipca_vigente = st.number_input("IPCA acumulado de 12 meses (%) - informado manualmente", min_value=0.0, value=4.58, step=0.01, format="%.2f", key=f"ipca_manual_{rca}")
+
+                col_an1, col_an2 = st.columns(2)
+                with col_an1: preco_anterior_input = st.text_input("Preço Anterior (R$)", value="7,7400", key=f"preco_ant_{rca}")
+                with col_an2: clausula_contrato = st.radio("Cliente possui cláusula em contrato?", ["Sim", "Não"], horizontal=True, index=None, key=f"clausula_{rca}")
+
+                st.divider()
+                p_aniv_str = "0,0000"
+                try:
+                    val_limpo = preco_anterior_input.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+                    p_ant = float(val_limpo)
+                    p_aniv = p_ant * (1 + (ipca_vigente / 100.0))
+                    p_aniv_str = f"{p_aniv:.4f}".replace(".", ",")
+                except ValueError:
+                    pass
+
+                if st.button("📝 Gerar Texto de Aniversário de Contrato", type="primary"):
+                    if clausula_contrato == "Não":
+                        st.warning("⚠️ **Atenção:** O cliente selecionado não possui cláusula de reajuste em contrato.")
+
+                    clausula_txt = "\n\nCliente possui cláusula em contrato." if clausula_contrato == "Sim" else ""
+                    
+                    p_ant_fmt = preco_anterior_input.strip()
+                    if not p_ant_fmt.startswith("R$"):
+                        p_ant_fmt = f"R$ {p_ant_fmt}"
+
+                    texto_aniversario = (
+                        f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.{clausula_txt}\n\n"
+                        f"Preço anterior: {p_ant_fmt}\n"
+                        f"Preço Aniversário: R$ {p_aniv_str}"
+                    )
+
+                    st.success("✅ Texto gerado com sucesso!")
+                    
+                    col_v1, col_v2 = st.columns([1, 2])
+                    with col_v1:
+                        st.text_input("Preço Novo para Abertura da CI:", value=f"R$ {p_aniv_str}", disabled=False, key=f"valor_novo_ci_{rca}")
+                    with col_v2:
+                        st.write(""); st.write("")
+                        botao_copiar_customizado(f"R$ {p_aniv_str}", "btn_copy_val_novo", label_btn="💵 Copiar Valor Novo")
+
+                    st.text_area("Texto Gerado:", value=texto_aniversario, height=180, key=f"txt_area_aniv_{rca}")
+                    botao_copiar_customizado(texto_aniversario, "aniversario_txt")
+
+                st.divider()
+                st.subheader("Tratativa com C.I.")
+                ci_input = st.text_input("Número da C.I. (9 ou 11 dígitos)", placeholder="Ex: 588358982 ou 588.358.982", key=f"ci_num_{rca}")
+
+                if st.button("📝 Gerar Texto Final com C.I.", type="primary"):
+                    clausula_txt = "\n\nCliente possui cláusula em contrato." if clausula_contrato == "Sim" else ""
+                    
+                    p_ant_fmt = preco_anterior_input.strip()
+                    if not p_ant_fmt.startswith("R$"):
+                        p_ant_fmt = f"R$ {p_ant_fmt}"
+
+                    ci_fmt = formatar_ci_num(ci_input)
+
+                    texto_ci = (
+                        f"Aumento de Aniversário de contrato, IPCA - {ipca_vigente:.2f}%.{clausula_txt}\n\n"
+                        f"Preço anterior: {p_ant_fmt}\n"
+                        f"Preço Aniversário: R$ {p_aniv_str}\n\n"
+                        f"CI.: {ci_fmt} - Preço Aniversário"
+                    )
+
+                    st.success("✅ Texto com C.I. gerado com sucesso!")
+                    st.text_area("Texto com C.I.:", value=texto_ci, height=220, key=f"txt_area_ci_{rca}")
+                    botao_copiar_customizado(texto_ci, "ci_txt")
+
+            # -------------------------------------------------------------
+            # 5. FICHA DE CLIENTE
+            # -------------------------------------------------------------
+            elif menu_tratativa == "🗂️ Ficha de Cliente":
+                rcf = st.session_state.reset_counter_fc
+                cabecalho_pagina("Ficha de Cliente", "Preenchimento de condições contratuais e comerciais para ficha de cliente.")
+
+                if st.button("🔄 Novo Cliente / Limpar Tela", key=f"btn_limp_fc_{rcf}"):
+                    st.session_state.reset_counter_fc += 1
+                    st.rerun()
+
+                st.divider()
+
+                motivo_fc = st.text_input("Motivo:", key=f"fc_motivo_{rcf}")
+
+                col_fc_c1, col_fc_c2 = st.columns(2)
+                with col_fc_c1:
+                    contrato_ant_fc = st.text_input("Contrato / Aditamento Anterior:", key=f"fc_cont_ant_{rcf}")
+                with col_fc_c2:
+                    contrato_novo_fc = st.text_input("Contrato Novo:", key=f"fc_cont_novo_{rcf}")
+
+                comodato_fc = st.text_input("Comodato:", key=f"fc_comodato_{rcf}")
+
+                st.divider()
+
+                tipo_forn_fc = st.radio(
+                    "Tipo de Fornecimento:",
+                    ["Granel", "Cilindro", "Ambos"],
+                    horizontal=True,
+                    index=None,
+                    key=f"fc_tp_forn_{rcf}"
+                )
+
+                preco_granel_fc = ""
+                p13_fc, p20_fc, p45_fc = "", "", ""
+                consumo_granel_fc = ""
+                consumo_cil_fc = ""
+
+                if tipo_forn_fc in ["Granel", "Ambos"]:
+                    st.markdown("**Dados Granel:**")
+                    col_fc_g1, col_fc_g2 = st.columns(2)
+                    with col_fc_g1:
+                        preco_granel_fc = st.text_input("Preço Granel (/kg):", key=f"fc_preco_granel_{rcf}")
+                    with col_fc_g2:
+                        consumo_granel_fc = st.text_input("Consumo Mensal Previsto (Granel):", key=f"fc_cons_granel_{rcf}")
+
+                if tipo_forn_fc in ["Cilindro", "Ambos"]:
+                    st.markdown("**Dados Cilindro:**")
+                    col_fc_p1, col_fc_p2, col_fc_p3 = st.columns(3)
+                    with col_fc_p1:
+                        p13_fc = st.text_input("Preço P13 (/und P13):", key=f"fc_p13_{rcf}")
+                    with col_fc_p2:
+                        p20_fc = st.text_input("Preço P20 (/und P20):", key=f"fc_p20_{rcf}")
+                    with col_fc_p3:
+                        p45_fc = st.text_input("Preço P45 (/und P45):", key=f"fc_p45_{rcf}")
+                    consumo_cil_fc = st.text_input("Consumo Mensal Previsto (Cilindro):", key=f"fc_cons_cil_{rcf}")
+
+                st.divider()
+
+                col_fc_v1, col_fc_v2 = st.columns(2)
+                with col_fc_v1:
+                    cond_pag_fc = st.text_input("Condição de Pagamento:", key=f"fc_cond_pag_{rcf}")
+                with col_fc_v2:
+                    vigencia_fc = st.text_input("Vigência:", key=f"fc_vigencia_{rcf}")
+
+                obs_fc = st.text_area("Obs.:", key=f"fc_obs_{rcf}")
+
+                st.divider()
+
+                if st.button("📝 Gerar Texto da Ficha de Cliente", type="primary", key=f"btn_gerar_fc_{rcf}"):
+                    linhas_fc = []
+                    linhas_fc.append(f"CONTRATO / ADITAMENTO ANTERIOR: {contrato_ant_fc.strip()}".rstrip())
+                    linhas_fc.append(f"CONTRATO NOVO: {contrato_novo_fc.strip()}".rstrip())
+                    linhas_fc.append(f"COMODATO: {comodato_fc.strip()}".rstrip())
+
+                    if tipo_forn_fc in ["Granel", "Ambos"]:
+                        p_g = preco_granel_fc.strip()
+                        if p_g:
+                            p_g_clean = re.sub(r'(?i)\s*/\s*kg\s*$', '', p_g).strip()
+                            linhas_fc.append(f"PREÇO GRANEL: {p_g_clean} /kg")
+                        else:
+                            linhas_fc.append("PREÇO GRANEL:")
+
+                    if tipo_forn_fc in ["Cilindro", "Ambos"]:
+                        partes_cil_fc = []
+                        if p13_fc.strip():
+                            p13_clean = re.sub(r'(?i)\s*/\s*und(\s*p13)?\s*$', '', p13_fc.strip()).strip()
+                            partes_cil_fc.append(f"{p13_clean} /und P13")
+                        if p20_fc.strip():
+                            p20_clean = re.sub(r'(?i)\s*/\s*und(\s*p20)?\s*$', '', p20_fc.strip()).strip()
+                            partes_cil_fc.append(f"{p20_clean} /und P20")
+                        if p45_fc.strip():
+                            p45_clean = re.sub(r'(?i)\s*/\s*und(\s*p45)?\s*$', '', p45_fc.strip()).strip()
+                            partes_cil_fc.append(f"{p45_clean} /und P45")
+                        linhas_fc.append(f"PREÇO CILINDRO: {' | '.join(partes_cil_fc)}".rstrip())
+
+                    if tipo_forn_fc in ["Granel", "Ambos"]:
+                        linhas_fc.append(f"CONSUMO MENSAL PREVISTO GRANEL: {consumo_granel_fc.strip()}".rstrip())
+
+                    if tipo_forn_fc in ["Cilindro", "Ambos"]:
+                        linhas_fc.append(f"CONSUMO MENSAL PREVISTO CILINDRO: {consumo_cil_fc.strip()}".rstrip())
+
+                    linhas_fc.append(f"CONDIÇÃO DE PAGAMENTO: {cond_pag_fc.strip()}".rstrip())
+                    linhas_fc.append(f"VIGÊNCIA: {vigencia_fc.strip()}".rstrip())
+                    linhas_fc.append("")
+                    linhas_fc.append(f"Motivo: {motivo_fc.strip()}".rstrip())
+
+                    if obs_fc.strip():
+                        linhas_fc.append("")
+                        linhas_fc.append(f"Obs.: {obs_fc.strip()}")
+
+                    texto_ficha_cliente = "\n".join(linhas_fc)
+
+                    st.success("✅ Texto da Ficha de Cliente gerado com sucesso!")
+                    st.text_area("Texto Gerado:", value=texto_ficha_cliente, height=320, key=f"txt_area_fc_{rcf}")
+                    botao_copiar_customizado(texto_ficha_cliente, "ficha_cliente_txt")
+
+
+# =====================================================================
+# ABA 2: AGENDA DE OCORRÊNCIAS
+# =====================================================================
+if aba_agenda is not None:
+    with aba_agenda:
+        COL_OCORRENCIA = "Número da ocorrência"
+        COL_CLIENTE = "Nome do cliente"
+        COL_ENDERECO = "Endereço de Entrega"
+        COL_ABERTURA = "Data/Hora de abertura"
+        COL_PRAZO = "Prazo de Atendimento"
+        COL_FECHAMENTO = "Data/Hora de fechamento"
+        COL_SUB_CLASSIF = "Subclassificação Ocorrência"
+        COL_PROPRIETARIO = "Proprietário da ocorrência"
+
+        def extrair_cidade(endereco):
+            if pd.isna(endereco):
+                return "-"
+            s = str(endereco).strip()
+            s_norm = s.replace(';', ',').replace('|', ',')
+            partes = [p.strip() for p in s_norm.split(',')]
+            if len(partes) >= 2:
+                cidade = partes[-2].strip()
+                if cidade.isdigit() and len(partes) >= 3:
+                    cidade = partes[-3].strip()
+                return cidade.title()
+            return s.title()
+
+        def limpar_classificacao(texto):
+            if pd.isna(texto):
+                return "-"
+            texto_limpo = re.sub(r'\[.*?\]', '', str(texto)).strip()
+            return texto_limpo if texto_limpo else str(texto)
+
+        def classificar_status_abertura(row, hoje_ref):
+            abertura = row['Abertura_DT']
+            
+            if pd.isna(abertura):
+                return "🟢 1ª Semana"
+                
+            abertura_dia = pd.Timestamp(abertura).normalize()
+            hoje = pd.Timestamp(hoje_ref).normalize()
+            dias_abertura = (hoje - abertura_dia).days
+            
+            if dias_abertura <= 7:
+                return "🟢 1ª Semana"
+            elif dias_abertura <= 14:
+                return "🟡 2ª Semana"
+            else:
+                return "🔴 3ª Semana"
+
+        def classificar_status_geral(row, hoje_ref):
+            prazo = row['Prazo_DT']
+            if pd.isna(prazo):
+                return "Normal"
+            
+            prazo_dia = pd.Timestamp(prazo).normalize()
+            hoje = pd.Timestamp(hoje_ref).normalize()
+            
+            amanha = hoje + timedelta(days=1)
+            dias_para_sexta = (4 - hoje.weekday()) % 7
+            sexta_semana = hoje + timedelta(days=dias_para_sexta)
+            
+            if prazo_dia < hoje:
+                return "🔴 Vencido"
+            elif prazo_dia == hoje:
+                return "🔵 Vence Hoje"
+            elif prazo_dia == amanha:
+                return "🟠 Vence Amanhã"
+            elif prazo_dia <= sexta_semana:
+                return "🟡 Vence na Semana"
+            else:
+                return "🟢 No Prazo"
+
+        col_menu_agenda, col_conteudo_agenda = st.columns([1, 4])
+
+        with col_menu_agenda:
+            st.markdown("### 📌 Filtros")
+            arquivo_excel = st.file_uploader(
+                "📂 Importar Planilha Excel", 
+                type=["xlsx", "xls"],
+                key="uploader_agenda_excel_novo"
+            )
+            
+            st.divider()
+            
+            opcoes_visao = ["Todas Ocorrências", "Comodato Inativo", "Ocorrências por Cidade"]
+            if st.session_state.e_supervisor:
+                opcoes_visao.append("📊 Dashboard de Gestão (Gráficos)")
+                opcoes_visao.append("📈 Ocorrências por Classificação")
+
+            tipo_visao_agenda = st.radio(
+                "Visualização:",
+                opcoes_visao,
+                label_visibility="collapsed"
+            )
+
+            if "ultima_visao_agenda" not in st.session_state:
+                st.session_state.ultima_visao_agenda = tipo_visao_agenda
+            elif st.session_state.ultima_visao_agenda != tipo_visao_agenda:
+                st.session_state.ultima_visao_agenda = tipo_visao_agenda
+                st.session_state.filtro_dashboard_ativo = "Todas"
+
+            st.divider()
+            st.markdown("### 🏷️ Legenda de Status")
+            if tipo_visao_agenda == "Comodato Inativo":
+                st.markdown("🟢 **1ª Semana**")
+                st.markdown("🟡 **2ª Semana**")
+                st.markdown("🔴 **3ª Semana**")
+            else:
+                st.markdown("🔴 **Vencido**")
+                st.markdown("🔵 **Vence Hoje**")
+                st.markdown("🟠 **Vence Amanhã**")
+                st.markdown("🟡 **Vence na Semana**")
+                st.markdown("🟢 **No Prazo**")
+
+        with col_conteudo_agenda:
+            cabecalho_pagina("Módulo de Pós-Vendas & Atendimento", "Sistema Integrado de Gestão de Ocorrências por Prazos, SLAs e Geografia")
+
+            if arquivo_excel is not None:
+                try:
+                    df = ler_arquivo_excel_robusto(arquivo_excel)
+                    df.columns = [str(c).strip() for c in df.columns]
+                    
+                    if COL_OCORRENCIA not in df.columns:
+                        for idx_r, row in df.iterrows():
+                            row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
+                            if COL_OCORRENCIA in row_str:
+                                df.columns = [str(c).strip() for c in df.iloc[idx_r].values]
+                                df = df.iloc[idx_r+1:].reset_index(drop=True)
+                                break
+
+                    if COL_OCORRENCIA not in df.columns:
+                        st.error(f"❌ A coluna obrigatória '{COL_OCORRENCIA}' não foi encontrada no arquivo. Verifique se o relatório está correto.")
+                        st.stop()
+
+                    df = df.dropna(subset=[COL_OCORRENCIA])
+                    
+                    if "Tratadas_Temp" not in st.session_state:
+                        st.session_state.Tratadas_Temp = set()
+
+                    df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
+                    df_pendentes[COL_OCORRENCIA] = pd.to_numeric(df_pendentes[COL_OCORRENCIA], errors='coerce')
+                    df_pendentes = df_pendentes.dropna(subset=[COL_OCORRENCIA])
+                    df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
+                    
+                    df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.Tratadas_Temp)]
+                    
+                    df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
+                    abertura_parsed = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+                    mask_na_abertura = abertura_parsed.isna() & df_pendentes[COL_ABERTURA].notna()
+                    if mask_na_abertura.any():
+                        abertura_parsed.loc[mask_na_abertura] = pd.to_datetime(
+                            df_pendentes.loc[mask_na_abertura, COL_ABERTURA], dayfirst=True, errors='coerce'
+                        )
+                    df_pendentes['Abertura_DT'] = abertura_parsed
+                    df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
+                    
+                    df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
+                    df_pendentes['Classificação Limpa'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_classificacao)
+                    
+                    if st.session_state.e_supervisor:
+                        if COL_PROPRIETARIO in df_pendentes.columns:
+                            df_pendentes['Consultor'] = df_pendentes[COL_PROPRIETARIO].fillna("Não Atribuído").astype(str)
+                        elif 'Vendedor/Consultor' in df_pendentes.columns:
+                            df_pendentes['Consultor'] = df_pendentes['Vendedor/Consultor'].fillna("Não Atribuído").astype(str)
+                        else:
+                            df_pendentes['Consultor'] = "Geral"
+                    else:
+                        df_pendentes['Consultor'] = "Geral"
+
+                    hoje = datetime.now()
+                    dias_para_sexta = (4 - hoje.weekday()) % 7
+                    sexta_semana = hoje + timedelta(days=dias_para_sexta)
+                    sexta_semana = sexta_semana.replace(hour=23, minute=59, second=59)
+
+                    if tipo_visao_agenda == "Comodato Inativo":
+                        df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_abertura(r, hoje), axis=1)
+                    else:
+                        df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, hoje), axis=1)
+
+                    df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
+                    df_base_visao = df_pendentes.copy()
+
+                    if tipo_visao_agenda == "Comodato Inativo":
+                        df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
+                        st.subheader("⚠️ Relatório Específico: Comodato Inativo")
+                    elif tipo_visao_agenda == "Ocorrências por Cidade":
+                        st.subheader("🏙️ Ocorrências por Cidade")
+                        col_tabela_cidade, col_grafico_cidade = st.columns(2)
+                        with col_tabela_cidade:
+                            st.markdown("**Tabela Consolidada por Cidade**")
+                            df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
+                            st.dataframe(df_mapa_agrup.sort_values(by='Total Ocorrências', ascending=False), hide_index=True, use_container_width=True)
+                        with col_grafico_cidade:
+                            st.markdown("**Gráfico de OCs por Cidade**")
+                            chart = alt.Chart(df_mapa_agrup).mark_bar(color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+                                x=alt.X('Cidade:N', sort='-y', title='Cidade'),
+                                y=alt.Y('Total Ocorrências:Q', title='Qtd Ocorrências'),
+                                tooltip=['Cidade', 'Total Ocorrências']
+                            ).properties(height=280)
+                            st.altair_chart(chart, use_container_width=True)
+                        st.stop()
+                    else:
+                        st.subheader("Agenda Geral de Visitas Pendentes")
+
+                    st.markdown("#### 🎯 Filtros Rápidos por Status e Prazos")
+                    total_visitas = len(df_base_visao)
+                    filtro_atual_agenda = st.session_state.filtro_dashboard_ativo
+                    
+                    if tipo_visao_agenda == "Comodato Inativo":
+                        vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 3ª Semana'])
+                        hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 2ª Semana'])
+                        amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟢 1ª Semana'])
+                        
+                        st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
+                        c1, c2, c3, c4 = st.columns(4)
+                        with c1:
+                            if st.button(
+                                f"📋 Total\n\n**{total_visitas}**",
+                                type="primary" if filtro_atual_agenda == "Todas" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_total"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "Todas"
+                                st.rerun()
+                        with c2:
+                            if st.button(
+                                f"🔴 3ª Semana\n\n**{vencidas_qt}**",
+                                type="primary" if filtro_atual_agenda == "🔴 3ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_3sem"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🔴 3ª Semana"
+                                st.rerun()
+                        with c3:
+                            if st.button(
+                                f"🟡 2ª Semana\n\n**{hoje_qt}**",
+                                type="primary" if filtro_atual_agenda == "🟡 2ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_2sem"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟡 2ª Semana"
+                                st.rerun()
+                        with c4:
+                            if st.button(
+                                f"🟢 1ª Semana\n\n**{amanha_qt}**",
+                                type="primary" if filtro_atual_agenda == "🟢 1ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_1sem"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟢 1ª Semana"
+                                st.rerun()
+                    else:
+                        vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 Vencido'])
+                        hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔵 Vence Hoje'])
+                        amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟠 Vence Amanhã'])
+                        semana_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 Vence na Semana'])
+                        cinco_dias_qt = len(df_base_visao[df_base_visao['Prazo_DT'] <= sexta_semana])
+
+                        st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
+                        c1, c2, c3, c4, c5 = st.columns(5)
+                        with c1:
+                            if st.button(
+                                f"📋 Total\n\n**{total_visitas}**",
+                                type="primary" if filtro_atual_agenda == "Todas" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_total"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "Todas"
+                                st.rerun()
+                        with c2:
+                            if st.button(
+                                f"🔴 Vencidas\n\n**{vencidas_qt}**",
+                                type="primary" if filtro_atual_agenda == "🔴 Vencido" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_vencidas"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🔴 Vencido"
+                                st.rerun()
+                        with c3:
+                            if st.button(
+                                f"🔵 Vence Hoje\n\n**{hoje_qt}**",
+                                type="primary" if filtro_atual_agenda == "🔵 Vence Hoje" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_hoje"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🔵 Vence Hoje"
+                                st.rerun()
+                        with c4:
+                            if st.button(
+                                f"🟠 Vence Amanhã\n\n**{amanha_qt}**",
+                                type="primary" if filtro_atual_agenda == "🟠 Vence Amanhã" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_amanha"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟠 Vence Amanhã"
+                                st.rerun()
+                        with c5:
+                            if st.button(
+                                f"🟡 Vence na Semana\n\n**{semana_qt}**",
+                                type="primary" if filtro_atual_agenda == "🟡 Vence na Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_semana"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟡 Vence na Semana"
+                                st.rerun()
+
+                    st.caption(f"🔎 Filtro ativo no painel: **{st.session_state.filtro_dashboard_ativo}**")
+                    st.divider()
+
+                    if st.session_state.e_supervisor:
+                        col_fc1, col_fc2, col_fc3 = st.columns(3)
+                        lista_consultores = ["Todos"] + sorted(list(df_base_visao['Consultor'].unique()))
+                        lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
+                        lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
+
+                        with col_fc1: consultor_sel = st.selectbox("Consultor:", lista_consultores)
+                        with col_fc2: cidade_filtro_sel = st.selectbox("Cidade:", lista_cidades_filtro)
+                        with col_fc3: class_filtro_sel = st.selectbox("Classificação:", lista_class_filtro)
+                    else:
+                        col_fc1, col_fc2 = st.columns(2)
+                        lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
+                        lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
+
+                        with col_fc1: cidade_filtro_sel = st.selectbox("Filtrar por Cidade:", lista_cidades_filtro)
+                        with col_fc2: class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
+
+                    df_filtrado = df_base_visao.copy()
+                    
+                    if st.session_state.filtro_dashboard_ativo != "Todas":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == st.session_state.filtro_dashboard_ativo]
+
+                    if st.session_state.e_supervisor and consultor_sel != "Todos":
+                        df_filtrado = df_filtrado[df_filtrado['Consultor'] == consultor_sel]
+                    if cidade_filtro_sel != "Todas":
+                        df_filtrado = df_filtrado[df_filtrado['Cidade'] == cidade_filtro_sel]
+                    if class_filtro_sel != "Todas":
+                        df_filtrado = df_filtrado[df_filtrado['Classificação Limpa'] == class_filtro_sel]
+
+                    df_filtrado['Prazo'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
+
+                    if df_filtrado.empty:
+                        st.success("✅ Excelente! Não há nenhuma ocorrência pendente para os filtros selecionados.")
+                    else:
+                        if st.session_state.e_supervisor:
+                            df_exibicao = df_filtrado[[
+                                'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
+                                'Cidade', 'Classificação Limpa', 'Prazo', 'Consultor'
+                            ]].copy()
+                            df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo', 'Consultor']
+                        else:
+                            df_exibicao = df_filtrado[[
+                                'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
+                                'Cidade', 'Classificação Limpa', 'Prazo'
+                            ]].copy()
+                            df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
+
+                        df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str)
+                        st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
+
+                except Exception as e:
+                    st.error(f"⚠️ Ocorreu um erro ao processar o arquivo. Certifique-se de que é o relatório correto. Erro técnico: {e}")
+            else:
+                st.info("👆 Por favor, faça o upload da planilha atualizada de ocorrências no menu lateral esquerdo para carregar o dashboard.")
+
+
+# =====================================================================
+# ABA 3: STATUS DE CONTRATOS
+# =====================================================================
+if aba_contratos is not None:
+    with aba_contratos:
+        cabecalho_pagina("Status de Contratos", "Acompanhamento de clientes em processo de contrato.")
+        status_contratos = ["Elaboração de Contrato", "Aguardando Ass do Cliente", "Aguardando Ass do Gerente", "Processo Enviado"]
+        cores_contratos = {
+            "Elaboração de Contrato": "🔴", 
+            "Aguardando Ass do Cliente": "🟠", 
+            "Aguardando Ass do Gerente": "🟡", 
+            "Processo Enviado": "🟢"
+        }
+        renderizar_painel_acompanhamento("contrato", status_contratos, cores_contratos)
+
+
+# =====================================================================
+# ABA 4: STATUS DE VENDAS
+# =====================================================================
+if aba_vendas is not None:
+    with aba_vendas:
+        cabecalho_pagina("Status de Vendas", "Acompanhamento de clientes em negociação e venda.")
+        status_vendas = ["Negociação Criada", "Aguardando Ass Cliente", "Processo despachado", "OC Venda de peça externo aberta", "Instalação / Serviço executado"]
+        cores_vendas = {
+            "Negociação Criada": "🔴", 
+            "Aguardando Ass Cliente": "🟠", 
+            "Processo despachado": "🟡", 
+            "OC Venda de peça externo aberta": "🔵", 
+            "Instalação / Serviço executado": "🟢"
+        }
+        renderizar_painel_acompanhamento("venda", status_vendas, cores_vendas)
+
+
+# =====================================================================
+# ABA 5: BLOCO DE NOTAS PESSOAL
+# =====================================================================
+if aba_notas is not None:
+    with aba_notas:
+        col_menu_notas, col_conteudo_notas = st.columns([1, 4])
+        usuario_atual = st.session_state.usuario_atual
+        notas_usuario = carregar_banco_notas(usuario_atual)
+
+        with col_menu_notas:
+            st.markdown("### 📓 Minhas Notas")
+            if st.button("➕ Nova Nota", type="primary", use_container_width=True):
+                st.session_state.nota_selecionada_id = None
+                st.rerun()
+                
+            st.divider()
+            if not notas_usuario:
+                st.caption("Nenhuma nota cadastrada.")
+            else:
+                for n_id, n_data in notas_usuario.items():
+                    if st.button(n_data.get("titulo", "Sem Título"), key=f"btn_n_{n_id}", use_container_width=True):
+                        st.session_state.nota_selecionada_id = n_id
+                        st.rerun()
+
+        with col_conteudo_notas:
+            cabecalho_pagina("Bloco de Notas Pessoal", "Anotações vinculadas à sua conta e salvas na nuvem.")
+            id_atual = st.session_state.nota_selecionada_id
+            
+            t_val = notas_usuario[id_atual]["titulo"] if id_atual in notas_usuario else ""
+            c_val = notas_usuario[id_atual]["cliente"] if id_atual in notas_usuario else ""
+            txt_val = notas_usuario[id_atual]["texto"] if id_atual in notas_usuario else ""
+
+            with st.form("form_nota"):
+                c1, c2 = st.columns(2)
+                with c1: tit = st.text_input("Título", value=t_val)
+                with c2: cli = st.text_input("Cliente", value=c_val)
+                txt = st.text_area("Anotação", value=txt_val, height=200)
+                
+                b1, b2, _ = st.columns([1.4, 1.2, 3.4])
+                with b1: btn_s = st.form_submit_button("💾 Salvar na Nuvem", type="primary")
+                with b2: btn_d = st.form_submit_button("🗑️ Apagar") if id_atual else False
+
+                if btn_s and tit:
+                    target_id = id_atual if id_atual else str(uuid.uuid4())
+                    if salvar_nota(target_id, usuario_atual, tit, cli, txt):
+                        st.session_state.nota_selecionada_id = target_id
+                        st.success("✅ Salvo com sucesso no banco de dados!")
+                        st.rerun()
+                if btn_d and id_atual:
+                    if apagar_nota(id_atual):
+                        st.session_state.nota_selecionada_id = None
+                        st.rerun()
+
+
+# =====================================================================
+# PAINEL ADMIN / SUPERVISOR
+# =====================================================================
+if aba_admin is not None:
+    with aba_admin:
+        cabecalho_pagina("Painel de Administração de Usuários", "Cadastro de colaboradores, níveis de permissão e redefinição de senhas gravadas na nuvem.")
+        
+        banco_usuarios = carregar_banco_usuarios()
+        col_adm1, col_adm2 = st.columns([1, 1])
+        
+        with col_adm1:
+            st.subheader("1. Cadastrar Novo Usuário")
+            st.caption("A senha inicial será sempre **123456** com troca obrigatória no primeiro acesso.")
+            
+            with st.form("form_novo_usuario"):
+                novo_user = st.text_input("Nome do Usuário", placeholder="ex: rodrigo.carvalho").strip().lower()
+                nivel_acesso = st.selectbox("Nível de Acesso", ["convencional", "supervisor", "admin"])
+                btn_cadastrar = st.form_submit_button("➕ Cadastrar Usuário", type="primary")
+                
+                if btn_cadastrar:
+                    if not novo_user:
+                        st.error("⚠️ Preencha o nome do usuário.")
+                    elif novo_user in banco_usuarios:
+                        st.warning(f"⚠️ O usuário '{novo_user}' já existe.")
+                    else:
+                        if salvar_usuario(novo_user, "123456", nivel_acesso=nivel_acesso, precisa_trocar=True):
+                            st.success(f"✅ Usuário **{novo_user}** criado com sucesso no banco de dados!")
+                            st.rerun()
+
+        with col_adm2:
+            st.subheader("2. Reset de Senha de Usuário")
+            lista_usuarios = [u for u in banco_usuarios.keys() if u != "admin"]
+            
+            if lista_usuarios:
+                user_sel_senha = st.selectbox("Selecione o Usuário para Reset:", lista_usuarios)
+                
+                if st.button("🔄 Resetar Senha para Inicial (123456)", type="primary"):
+                    curr_nivel = banco_usuarios[user_sel_senha]["nivel_acesso"]
+                    if salvar_usuario(user_sel_senha, "123456", nivel_acesso=curr_nivel, precisa_trocar=True):
+                        st.success(f"✅ Senha do usuário **{user_sel_senha}** resetada para **123456**!")
+                        st.rerun()
+
+        st.divider()
+        st.subheader("3. Usuários Cadastrados & Remoção")
+        
+        data_users = []
+        for k, v in banco_usuarios.items():
+            nivel_txt = "Convencional"
+            if v["nivel_acesso"] == "admin":
+                nivel_txt = "Administrador"
+            elif v["nivel_acesso"] == "supervisor":
+                nivel_txt = "Supervisor"
+
+            data_users.append({
+                "Usuário": k,
+                "Nível de Acesso": nivel_txt,
+                "Status Senha": "⚠️ Troca Pendente" if v["precisa_trocar_senha"] else "🟢 Definida"
+            })
+            
+        st.dataframe(pd.DataFrame(data_users), hide_index=True, use_container_width=True)
+
+        if lista_usuarios:
+            col_rem1, col_rem2 = st.columns([2, 1])
+            with col_rem1:
+                user_para_remover = st.selectbox("Selecione o usuário para remover:", lista_usuarios, key="sel_rem")
+            with col_rem2:
+                st.write(""); st.write("")
+                if st.button("🗑️ Remover Usuário do Banco", key="btn_rem_u"):
+                    if remover_usuario(user_para_remover):
+                        st.success(f"✅ Usuário **{user_para_remover}** excluído do banco de dados!")
+                        st.rerun()
+
+# --- BARRA LATERAL LOGOUT ---
+st.sidebar.divider()
+if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
+    st.session_state.autenticado = False
+    st.session_state.usuario_atual = ""
+    st.session_state.e_admin = False
+    st.session_state.e_supervisor = False
+    st.session_state.troca_obrigatoria = False
+    st.session_state.df_excel_agenda = None
+    st.rerun()
