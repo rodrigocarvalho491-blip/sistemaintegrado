@@ -16,6 +16,18 @@ from PIL import Image
 from fpdf import FPDF
 import tempfile
 
+# --- FORÇAR TEMA CLARO GLOBALMENTE NO STREAMLIT ---
+os.makedirs(".streamlit", exist_ok=True)
+with open(".streamlit/config.toml", "w", encoding="utf-8") as f:
+    f.write(
+        '[theme]\n'
+        'base="light"\n'
+        'primaryColor="#0055A5"\n'
+        'backgroundColor="#FFFFFF"\n'
+        'secondaryBackgroundColor="#F1F5FA"\n'
+        'textColor="#1B2A3A"\n'
+    )
+
 # --- CONFIGURAÇÃO GLOBAL DA PÁGINA ---
 st.set_page_config(
     page_title="Sistema Integrado Consigaz", 
@@ -40,7 +52,6 @@ def init_supabase() -> Client:
 supabase = init_supabase()
 
 # --- CAMADA DE PERSISTÊNCIA NA NUVEM (SUPABASE) ---
-@st.cache_data(ttl=60, show_spinner=False)
 def carregar_banco_usuarios():
     try:
         res = supabase.table("usuarios").select("*").execute()
@@ -74,7 +85,6 @@ def salvar_usuario(usuario, senha, nivel_acesso="convencional", precisa_trocar=F
             "precisa_trocar_senha": precisa_trocar
         }
         supabase.table("usuarios").upsert(payload).execute()
-        carregar_banco_usuarios.clear()
         return True
     except Exception as e:
         st.error(f"Erro ao salvar usuário: {e}")
@@ -85,7 +95,6 @@ def remover_usuario(usuario):
         supabase.table("usuarios").delete().eq("usuario", usuario).execute()
         supabase.table("notas").delete().eq("usuario", usuario).execute()
         supabase.table("acompanhamento").delete().eq("usuario", usuario).execute()
-        carregar_banco_usuarios.clear()
         return True
     except Exception as e:
         st.error(f"Erro ao remover usuário: {e}")
@@ -265,6 +274,7 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
         if "42501" in err_str or "row-level security" in err_str.lower():
             st.error("❌ Permissão bloqueada no Supabase (RLS ativo). Execute no SQL Editor do Supabase: `ALTER TABLE acompanhamento DISABLE ROW LEVEL SECURITY;`")
             return False
+        # Tenta salvar sem 'comissao' caso a coluna ainda não exista, persistindo comissão nas observações do Supabase
         try:
             payload_sem_com = {k: v for k, v in payload.items() if k != "comissao"}
             payload_sem_com["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean)
@@ -277,6 +287,7 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
             return True
         except Exception:
             pass
+        # Tenta salvar sem 'valor_proposta' e 'comissao' caso ainda não existam, persistindo ambos nas observações do Supabase
         try:
             payload_sem_val = {k: v for k, v in payload.items() if k not in ["valor_proposta", "comissao"]}
             payload_sem_val["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean, valor_proposta=val_clean)
@@ -288,6 +299,7 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
             return True
         except Exception:
             pass
+        # Tenta salvar sem 'vigencia', 'valor_proposta' e 'comissao'
         try:
             payload_sem_extras = {k: v for k, v in payload.items() if k not in ["vigencia", "valor_proposta", "comissao"]}
             payload_sem_extras["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean, valor_proposta=val_clean)
@@ -373,6 +385,7 @@ def ler_arquivo_excel_robusto(uploaded_file):
             html_text = bytes_data.decode('utf-8')
         except UnicodeDecodeError:
             html_text = bytes_data.decode('ISO-8859-1', errors='ignore')
+        import re
         table_match = re.search(r'<table[^>]*>(.*?)</table>', html_text, re.DOTALL | re.IGNORECASE)
         if not table_match:
             raise ValueError("Nenhuma tabela HTML encontrada.")
@@ -696,7 +709,7 @@ div.stButton > button[kind="secondary"]:hover {
   box-shadow: 0 4px 12px rgba(0, 85, 165, 0.14) !important;
 }
 
-/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS (MESMO LAYOUT DOS CARDS DE MÉTRICAS) --- */
+/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS --- */
 .element-container:has(.cg-kpi-marker) + .element-container [data-testid="stHorizontalBlock"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
   gap: 0.85rem !important;
@@ -706,45 +719,63 @@ div.stButton > button[kind="secondary"]:hover {
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button {
-  min-height: 92px !important;
-  padding: 0.8rem 1rem !important;
-  border-radius: 12px !important;
+  min-height: 94px !important;
+  padding: 0.85rem 0.65rem !important;
+  border-radius: 14px !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: flex-start !important;
+  align-items: center !important;
   justify-content: center !important;
-  text-align: left !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-/* Cartões Inativos com o mesmo layout limpo dos cards de métrica */
+/* Cartões Inativos com borda superior codificada por urgência */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"] {
-  background: #F8FAFC !important;
-  border: 1px solid #E2E8F0 !important;
-  border-top: 3px solid #0055A5 !important;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+  border: 1px solid #D8E2EE !important;
+  border-top: 4px solid #0055A5 !important;
   color: #0A2540 !important;
-  box-shadow: none !important;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(2) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(2) div.stButton > button[kind="secondary"] {
+  border-top-color: #DC2626 !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(3) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(3) div.stButton > button[kind="secondary"] {
+  border-top-color: #0284C7 !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(4) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(4) div.stButton > button[kind="secondary"] {
+  border-top-color: #EA580C !important;
+}
+
+.element-container:has(.cg-kpi-marker) + .element-container [data-testid="column"]:nth-child(5) div.stButton > button[kind="secondary"],
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stColumn"]:nth-child(5) div.stButton > button[kind="secondary"] {
+  border-top-color: #D97706 !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"]:hover,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"]:hover {
-  transform: translateY(-2px) !important;
+  transform: translateY(-3px) !important;
   background: #F0F7FF !important;
-  border-color: #BFDBFE !important;
-  border-top: 3px solid #0055A5 !important;
-  box-shadow: 0 4px 12px rgba(0, 85, 165, 0.12) !important;
+  border-color: #0055A5 !important;
+  box-shadow: 0 8px 20px rgba(0, 85, 165, 0.14) !important;
 }
 
 /* Cartão Ativo (Filtro Selecionado) */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] {
-  background: linear-gradient(135deg, #0055A5 0%, #003F7F 100%) !important;
-  border: 1px solid #003F7F !important;
-  border-top: 3px solid #F28C28 !important;
+  background: linear-gradient(135deg, #0055A5 0%, #00356B 100%) !important;
+  border: 1px solid #00356B !important;
+  border-bottom: 4px solid #F28C28 !important;
   color: #FFFFFF !important;
-  box-shadow: 0 6px 16px rgba(0, 85, 165, 0.24) !important;
-  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 22px rgba(0, 85, 165, 0.28) !important;
+  transform: translateY(-2px) !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p,
@@ -752,37 +783,26 @@ div.stButton > button[kind="secondary"]:hover {
   color: #FFFFFF !important;
 }
 
-/* Rótulo no topo (1ª linha) e Número em evidência embaixo (2ª linha), igual ao st.metric */
+/* Número em evidência (1ª linha) e Rótulo (2ª linha) */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:first-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:first-child {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.86rem !important;
-  font-weight: 600 !important;
-  color: #475569 !important;
-  line-height: 1.25 !important;
-  margin: 0 0 6px 0 !important;
-  letter-spacing: 0 !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:first-child,
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:first-child {
-  color: #DBEAFE !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 2rem !important;
+  font-weight: 800 !important;
+  line-height: 1.08 !important;
+  margin: 0 0 4px 0 !important;
+  letter-spacing: -0.02em !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:last-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:last-child {
-  font-family: 'Outfit', sans-serif !important;
-  font-size: 1.95rem !important;
-  font-weight: 800 !important;
-  color: #0A2540 !important;
-  line-height: 1.1 !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
   margin: 0 !important;
-  letter-spacing: -0.02em !important;
-}
-
-.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:last-child,
-[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:last-child {
-  color: #FFFFFF !important;
+  opacity: 0.92 !important;
 }
 
 /* --- CARDS DE MÉTRICAS, INPUTS E EXPANDERS (TEMA CLARO LIMPO) --- */
@@ -967,11 +987,11 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
                         perc = 0.20 if comissao == "20%" else 0.10
                         val_com_fmt = html_lib.escape(formatar_moeda_brl(val_num * perc))
                         partes_meta.append(
-                            f'<div class="kb-card-meta {classe_com}">💵 {val_com_fmt}</div>'
+                            f'<div class="kb-card-meta {classe_com}">💵 Comissão ({html_lib.escape(comissao)}): {val_com_fmt}</div>'
                         )
                     else:
                         partes_meta.append(
-                            f'<div class="kb-card-meta {classe_com}">💵 {html_lib.escape(comissao)}</div>'
+                            f'<div class="kb-card-meta {classe_com}">💵 Comissão: {html_lib.escape(comissao)}</div>'
                         )
                 if partes_meta:
                     meta_div = f'<div class="kb-card-meta-group">{"".join(partes_meta)}</div>'
@@ -1541,7 +1561,6 @@ def _ordenacao_vigencia_key(vig_label):
     return (1, 0, vig_label.lower())
 
 def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
-    meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     trimestres_cols = [
         "1º Tri (Jan, Fev, Mar)",
         "2º Tri (Abr, Mai, Jun)",
@@ -1550,12 +1569,11 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
     ]
     contagem_por_vigencia = {}
     totais_tri = {t: 0 for t in trimestres_cols}
-    totais_por_mes = {m: 0 for m in range(1, 13)}
 
     for d in dados.values():
         if not isinstance(d, dict):
             continue
-        if int(d.get("ano", 0)) != ano_selecionado:
+        if d.get("ano") != ano_selecionado:
             continue
         if str(d.get("status", "")).strip() != "Processo Enviado":
             continue
@@ -1581,45 +1599,18 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
 
         contagem_por_vigencia[vig_label][tri_nome] += 1
         totais_tri[tri_nome] += 1
-        totais_por_mes[mes_num] += 1
 
     st.divider()
     st.markdown(f"### 📊 Consolidado — Contratos \"Processo Enviado\" por Vigência ({ano_selecionado})")
-
-    col_sub_c, col_filtro_mes_c = st.columns([3.3, 1.2])
-    with col_sub_c:
-        st.caption(f"Ano de referência: **{ano_selecionado}** • Filtre por mês para atualizar os indicadores superiores mantendo a tabela completa abaixo.")
-    with col_filtro_mes_c:
-        mes_filtro_c = st.selectbox(
-            "📅 Filtrar por Mês",
-            ["Todos (Ano)"] + meses_cols,
-            key=f"filtro_mes_consolidado_contrato_{ano_selecionado}"
-        )
+    st.caption("Quantidade de contratos no status **Processo Enviado** agrupados por vigência e trimestre.")
 
     total_geral = sum(totais_tri.values())
-    if mes_filtro_c == "Todos (Ano)":
-        c_k1, c_k2, c_k3, c_k4, c_k5 = st.columns(5)
-        c_k1.metric(f"1º Tri ({ano_selecionado})", totais_tri[trimestres_cols[0]])
-        c_k2.metric(f"2º Tri ({ano_selecionado})", totais_tri[trimestres_cols[1]])
-        c_k3.metric(f"3º Tri ({ano_selecionado})", totais_tri[trimestres_cols[2]])
-        c_k4.metric(f"4º Tri ({ano_selecionado})", totais_tri[trimestres_cols[3]])
-        c_k5.metric(f"Total Enviado ({ano_selecionado})", total_geral)
-    else:
-        m_idx_c = meses_cols.index(mes_filtro_c) + 1
-        qtd_mes_c = totais_por_mes[m_idx_c]
-        if m_idx_c in (1, 2, 3):
-            tri_ref_lbl, tri_ref_val = "1º Tri (Jan-Mar)", totais_tri[trimestres_cols[0]]
-        elif m_idx_c in (4, 5, 6):
-            tri_ref_lbl, tri_ref_val = "2º Tri (Abr-Jun)", totais_tri[trimestres_cols[1]]
-        elif m_idx_c in (7, 8, 9):
-            tri_ref_lbl, tri_ref_val = "3º Tri (Jul-Set)", totais_tri[trimestres_cols[2]]
-        else:
-            tri_ref_lbl, tri_ref_val = "4º Tri (Out-Dez)", totais_tri[trimestres_cols[3]]
-
-        c_k1, c_k2, c_k3 = st.columns(3)
-        c_k1.metric(f"📄 Enviados em {mes_filtro_c}/{ano_selecionado}", qtd_mes_c)
-        c_k2.metric(f"📅 {tri_ref_lbl} ({ano_selecionado})", tri_ref_val)
-        c_k3.metric(f"📊 Total Enviado ({ano_selecionado})", total_geral)
+    c_k1, c_k2, c_k3, c_k4, c_k5 = st.columns(5)
+    c_k1.metric("1º Tri (Jan-Mar)", totais_tri[trimestres_cols[0]])
+    c_k2.metric("2º Tri (Abr-Jun)", totais_tri[trimestres_cols[1]])
+    c_k3.metric("3º Tri (Jul-Set)", totais_tri[trimestres_cols[2]])
+    c_k4.metric("4º Tri (Out-Dez)", totais_tri[trimestres_cols[3]])
+    c_k5.metric("Total Enviado", total_geral)
 
     if not contagem_por_vigencia:
         st.info(f"Nenhum contrato com status 'Processo Enviado' encontrado para o ano de {ano_selecionado}.")
@@ -1655,8 +1646,6 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
     meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     soma_20_por_mes = {m: 0.0 for m in range(1, 13)}
     soma_10_por_mes = {m: 0.0 for m in range(1, 13)}
-    soma_prop_por_mes = {m: 0.0 for m in range(1, 13)}
-    qtd_vendas_por_mes = {m: 0 for m in range(1, 13)}
     total_propostas_executadas = 0.0
     qtd_vendas_executadas = 0
 
@@ -1675,13 +1664,11 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
             continue
 
         qtd_vendas_executadas += 1
-        qtd_vendas_por_mes[mes_num] += 1
         val_num = parse_valor_moeda(d.get("valor_proposta", ""))
         if val_num is None:
             continue
 
         total_propostas_executadas += val_num
-        soma_prop_por_mes[mes_num] += val_num
         comissao_sel = str(d.get("comissao", "") or "").strip()
         if comissao_sel == "20%":
             soma_20_por_mes[mes_num] += val_num * 0.20
@@ -1693,39 +1680,14 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
     total_geral_comissoes = total_comissao_20 + total_comissao_10
 
     st.divider()
-    st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" ({ano_selecionado})")
-
-    col_sub_v, col_filtro_mes_v = st.columns([3.3, 1.2])
-    with col_sub_v:
-        st.caption(f"Ano de referência: **{ano_selecionado}** • Filtre por mês para visualizar os valores nos indicadores superiores, mantendo a tabela completa abaixo.")
-    with col_filtro_mes_v:
-        mes_filtro_v = st.selectbox(
-            "📅 Filtrar por Mês",
-            ["Todos (Ano)"] + meses_cols,
-            key=f"filtro_mes_consolidado_venda_{ano_selecionado}"
-        )
-
-    if mes_filtro_v == "Todos (Ano)":
-        periodo_lbl = f"Ano {ano_selecionado}"
-        val_20_top = total_comissao_20
-        val_10_top = total_comissao_10
-        val_tot_top = total_geral_comissoes
-        val_prop_top = total_propostas_executadas
-        qtd_top = qtd_vendas_executadas
-    else:
-        m_idx_v = meses_cols.index(mes_filtro_v) + 1
-        periodo_lbl = f"{mes_filtro_v}/{ano_selecionado}"
-        val_20_top = soma_20_por_mes[m_idx_v]
-        val_10_top = soma_10_por_mes[m_idx_v]
-        val_tot_top = val_20_top + val_10_top
-        val_prop_top = soma_prop_por_mes[m_idx_v]
-        qtd_top = qtd_vendas_por_mes[m_idx_v]
+    st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" por Mês ({ano_selecionado})")
+    st.caption("Somatória mensal dos valores de comissão (20% e 10%) considerando as vendas no status **Instalação / Serviço executado**.")
 
     c_k1, c_k2, c_k3, c_k4 = st.columns(4)
-    c_k1.metric(f"🟢 Comissão 20% ({periodo_lbl})", formatar_moeda_brl(val_20_top))
-    c_k2.metric(f"🟡 Comissão 10% ({periodo_lbl})", formatar_moeda_brl(val_10_top))
-    c_k3.metric(f"💵 Total Comissões ({periodo_lbl})", formatar_moeda_brl(val_tot_top))
-    c_k4.metric(f"📦 Propostas Executadas ({periodo_lbl})", f"{formatar_moeda_brl(val_prop_top)} ({qtd_top})")
+    c_k1.metric("🟢 Comissão 20% (Ano)", formatar_moeda_brl(total_comissao_20))
+    c_k2.metric("🟡 Comissão 10% (Ano)", formatar_moeda_brl(total_comissao_10))
+    c_k3.metric("💵 Total Comissões (Ano)", formatar_moeda_brl(total_geral_comissoes))
+    c_k4.metric("📦 Propostas Executadas", f"{formatar_moeda_brl(total_propostas_executadas)} ({qtd_vendas_executadas})")
 
     if qtd_vendas_executadas == 0:
         st.info(f"Nenhuma venda com status 'Instalação / Serviço executado' encontrada para o ano de {ano_selecionado}.")
@@ -3545,231 +3507,232 @@ if aba_agenda is not None:
 
                     if COL_OCORRENCIA not in df.columns:
                         st.error(f"❌ A coluna obrigatória '{COL_OCORRENCIA}' não foi encontrada no arquivo. Verifique se o relatório está correto.")
-                    else:
-                        df = df.dropna(subset=[COL_OCORRENCIA])
-                        
-                        if "Tratadas_Temp" not in st.session_state:
-                            st.session_state.Tratadas_Temp = set()
+                        st.stop()
 
-                        df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
-                        df_pendentes[COL_OCORRENCIA] = pd.to_numeric(df_pendentes[COL_OCORRENCIA], errors='coerce')
-                        df_pendentes = df_pendentes.dropna(subset=[COL_OCORRENCIA])
-                        df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
-                        
-                        df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.Tratadas_Temp)]
-                        
-                        df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
-                        abertura_parsed = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
-                        mask_na_abertura = abertura_parsed.isna() & df_pendentes[COL_ABERTURA].notna()
-                        if mask_na_abertura.any():
-                            abertura_parsed.loc[mask_na_abertura] = pd.to_datetime(
-                                df_pendentes.loc[mask_na_abertura, COL_ABERTURA], dayfirst=True, errors='coerce'
-                            )
-                        df_pendentes['Abertura_DT'] = abertura_parsed
-                        df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
-                        
-                        df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
-                        df_pendentes['Classificação Limpa'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_classificacao)
-                        
-                        if st.session_state.e_supervisor:
-                            if COL_PROPRIETARIO in df_pendentes.columns:
-                                df_pendentes['Consultor'] = df_pendentes[COL_PROPRIETARIO].fillna("Não Atribuído").astype(str)
-                            elif 'Vendedor/Consultor' in df_pendentes.columns:
-                                df_pendentes['Consultor'] = df_pendentes['Vendedor/Consultor'].fillna("Não Atribuído").astype(str)
-                            else:
-                                df_pendentes['Consultor'] = "Geral"
+                    df = df.dropna(subset=[COL_OCORRENCIA])
+                    
+                    if "Tratadas_Temp" not in st.session_state:
+                        st.session_state.Tratadas_Temp = set()
+
+                    df_pendentes = df[df[COL_FECHAMENTO].isna()].copy()
+                    df_pendentes[COL_OCORRENCIA] = pd.to_numeric(df_pendentes[COL_OCORRENCIA], errors='coerce')
+                    df_pendentes = df_pendentes.dropna(subset=[COL_OCORRENCIA])
+                    df_pendentes[COL_OCORRENCIA] = df_pendentes[COL_OCORRENCIA].astype(int)
+                    
+                    df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.Tratadas_Temp)]
+                    
+                    df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
+                    abertura_parsed = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+                    mask_na_abertura = abertura_parsed.isna() & df_pendentes[COL_ABERTURA].notna()
+                    if mask_na_abertura.any():
+                        abertura_parsed.loc[mask_na_abertura] = pd.to_datetime(
+                            df_pendentes.loc[mask_na_abertura, COL_ABERTURA], dayfirst=True, errors='coerce'
+                        )
+                    df_pendentes['Abertura_DT'] = abertura_parsed
+                    df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
+                    
+                    df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
+                    df_pendentes['Classificação Limpa'] = df_pendentes[COL_SUB_CLASSIF].apply(limpar_classificacao)
+                    
+                    if st.session_state.e_supervisor:
+                        if COL_PROPRIETARIO in df_pendentes.columns:
+                            df_pendentes['Consultor'] = df_pendentes[COL_PROPRIETARIO].fillna("Não Atribuído").astype(str)
+                        elif 'Vendedor/Consultor' in df_pendentes.columns:
+                            df_pendentes['Consultor'] = df_pendentes['Vendedor/Consultor'].fillna("Não Atribuído").astype(str)
                         else:
                             df_pendentes['Consultor'] = "Geral"
+                    else:
+                        df_pendentes['Consultor'] = "Geral"
 
-                        hoje = datetime.now()
-                        dias_para_sexta = (4 - hoje.weekday()) % 7
-                        sexta_semana = hoje + timedelta(days=dias_para_sexta)
-                        sexta_semana = sexta_semana.replace(hour=23, minute=59, second=59)
+                    hoje = datetime.now()
+                    dias_para_sexta = (4 - hoje.weekday()) % 7
+                    sexta_semana = hoje + timedelta(days=dias_para_sexta)
+                    sexta_semana = sexta_semana.replace(hour=23, minute=59, second=59)
 
-                        if tipo_visao_agenda == "Comodato Inativo":
-                            df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_abertura(r, hoje), axis=1)
+                    if tipo_visao_agenda == "Comodato Inativo":
+                        df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_abertura(r, hoje), axis=1)
+                    else:
+                        df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, hoje), axis=1)
+
+                    df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
+                    df_base_visao = df_pendentes.copy()
+
+                    if tipo_visao_agenda == "Comodato Inativo":
+                        df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
+                        st.subheader("⚠️ Relatório Específico: Comodato Inativo")
+                    elif tipo_visao_agenda == "Ocorrências por Cidade":
+                        st.subheader("🏙️ Ocorrências por Cidade")
+                        col_tabela_cidade, col_grafico_cidade = st.columns(2)
+                        with col_tabela_cidade:
+                            st.markdown("**Tabela Consolidada por Cidade**")
+                            df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
+                            st.dataframe(df_mapa_agrup.sort_values(by='Total Ocorrências', ascending=False), hide_index=True, use_container_width=True)
+                        with col_grafico_cidade:
+                            st.markdown("**Gráfico de OCs por Cidade**")
+                            chart = alt.Chart(df_mapa_agrup).mark_bar(color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+                                x=alt.X('Cidade:N', sort='-y', title='Cidade'),
+                                y=alt.Y('Total Ocorrências:Q', title='Qtd Ocorrências'),
+                                tooltip=['Cidade', 'Total Ocorrências']
+                            ).properties(height=280)
+                            st.altair_chart(chart, use_container_width=True)
+                        st.stop()
+                    else:
+                        st.subheader("Agenda Geral de Visitas Pendentes")
+
+                    st.markdown("#### 🎯 Filtros Rápidos por Status e Prazos")
+                    total_visitas = len(df_base_visao)
+                    filtro_atual_agenda = st.session_state.filtro_dashboard_ativo
+                    
+                    if tipo_visao_agenda == "Comodato Inativo":
+                        vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 3ª Semana'])
+                        hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 2ª Semana'])
+                        amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟢 1ª Semana'])
+                        
+                        st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
+                        c1, c2, c3, c4 = st.columns(4)
+                        with c1:
+                            if st.button(
+                                f"**{total_visitas}**\n\nTotal",
+                                type="primary" if filtro_atual_agenda == "Todas" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_total"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "Todas"
+                                st.rerun()
+                        with c2:
+                            if st.button(
+                                f"**{vencidas_qt}**\n\n3ª Semana",
+                                type="primary" if filtro_atual_agenda == "🔴 3ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_3sem"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🔴 3ª Semana"
+                                st.rerun()
+                        with c3:
+                            if st.button(
+                                f"**{hoje_qt}**\n\n2ª Semana",
+                                type="primary" if filtro_atual_agenda == "🟡 2ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_2sem"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟡 2ª Semana"
+                                st.rerun()
+                        with c4:
+                            if st.button(
+                                f"**{amanha_qt}**\n\n1ª Semana",
+                                type="primary" if filtro_atual_agenda == "🟢 1ª Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ci_1sem"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟢 1ª Semana"
+                                st.rerun()
+                    else:
+                        vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 Vencido'])
+                        hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔵 Vence Hoje'])
+                        amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟠 Vence Amanhã'])
+                        semana_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 Vence na Semana'])
+                        cinco_dias_qt = len(df_base_visao[df_base_visao['Prazo_DT'] <= sexta_semana])
+
+                        st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
+                        c1, c2, c3, c4, c5 = st.columns(5)
+                        with c1:
+                            if st.button(
+                                f"**{total_visitas}**\n\nTotal",
+                                type="primary" if filtro_atual_agenda == "Todas" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_total"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "Todas"
+                                st.rerun()
+                        with c2:
+                            if st.button(
+                                f"**{vencidas_qt}**\n\nVencidas",
+                                type="primary" if filtro_atual_agenda == "🔴 Vencido" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_vencidas"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🔴 Vencido"
+                                st.rerun()
+                        with c3:
+                            if st.button(
+                                f"**{hoje_qt}**\n\nVence Hoje",
+                                type="primary" if filtro_atual_agenda == "🔵 Vence Hoje" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_hoje"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🔵 Vence Hoje"
+                                st.rerun()
+                        with c4:
+                            if st.button(
+                                f"**{amanha_qt}**\n\nVence Amanhã",
+                                type="primary" if filtro_atual_agenda == "🟠 Vence Amanhã" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_amanha"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟠 Vence Amanhã"
+                                st.rerun()
+                        with c5:
+                            if st.button(
+                                f"**{semana_qt}**\n\nVence na Semana",
+                                type="primary" if filtro_atual_agenda == "🟡 Vence na Semana" else "secondary",
+                                use_container_width=True,
+                                key="btn_kpi_ag_semana"
+                            ):
+                                st.session_state.filtro_dashboard_ativo = "🟡 Vence na Semana"
+                                st.rerun()
+
+                    st.caption(f"🔎 Filtro ativo no painel: **{st.session_state.filtro_dashboard_ativo}**")
+                    st.divider()
+
+                    if st.session_state.e_supervisor:
+                        col_fc1, col_fc2, col_fc3 = st.columns(3)
+                        lista_consultores = ["Todos"] + sorted(list(df_base_visao['Consultor'].unique()))
+                        lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
+                        lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
+
+                        with col_fc1: consultor_sel = st.selectbox("Consultor:", lista_consultores)
+                        with col_fc2: cidade_filtro_sel = st.selectbox("Cidade:", lista_cidades_filtro)
+                        with col_fc3: class_filtro_sel = st.selectbox("Classificação:", lista_class_filtro)
+                    else:
+                        col_fc1, col_fc2 = st.columns(2)
+                        lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
+                        lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
+
+                        with col_fc1: cidade_filtro_sel = st.selectbox("Filtrar por Cidade:", lista_cidades_filtro)
+                        with col_fc2: class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
+
+                    df_filtrado = df_base_visao.copy()
+                    
+                    if st.session_state.filtro_dashboard_ativo != "Todas":
+                        df_filtrado = df_filtrado[df_filtrado['Status Geral'] == st.session_state.filtro_dashboard_ativo]
+
+                    if st.session_state.e_supervisor and consultor_sel != "Todos":
+                        df_filtrado = df_filtrado[df_filtrado['Consultor'] == consultor_sel]
+                    if cidade_filtro_sel != "Todas":
+                        df_filtrado = df_filtrado[df_filtrado['Cidade'] == cidade_filtro_sel]
+                    if class_filtro_sel != "Todas":
+                        df_filtrado = df_filtrado[df_filtrado['Classificação Limpa'] == class_filtro_sel]
+
+                    df_filtrado['Prazo'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
+
+                    if df_filtrado.empty:
+                        st.success("✅ Excelente! Não há nenhuma ocorrência pendente para os filtros selecionados.")
+                    else:
+                        if st.session_state.e_supervisor:
+                            df_exibicao = df_filtrado[[
+                                'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
+                                'Cidade', 'Classificação Limpa', 'Prazo', 'Consultor'
+                            ]].copy()
+                            df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo', 'Consultor']
                         else:
-                            df_pendentes['Status Geral'] = df_pendentes.apply(lambda r: classificar_status_geral(r, hoje), axis=1)
+                            df_exibicao = df_filtrado[[
+                                'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
+                                'Cidade', 'Classificação Limpa', 'Prazo'
+                            ]].copy()
+                            df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
 
-                        df_pendentes = df_pendentes.sort_values(by='Prazo_DT', ascending=True)
-                        df_base_visao = df_pendentes.copy()
-
-                        if tipo_visao_agenda == "Ocorrências por Cidade":
-                            st.subheader("🏙️ Ocorrências por Cidade")
-                            col_tabela_cidade, col_grafico_cidade = st.columns(2)
-                            with col_tabela_cidade:
-                                st.markdown("**Tabela Consolidada por Cidade**")
-                                df_mapa_agrup = df_base_visao.groupby('Cidade').size().reset_index(name='Total Ocorrências')
-                                st.dataframe(df_mapa_agrup.sort_values(by='Total Ocorrências', ascending=False), hide_index=True, use_container_width=True)
-                            with col_grafico_cidade:
-                                st.markdown("**Gráfico de OCs por Cidade**")
-                                chart = alt.Chart(df_mapa_agrup).mark_bar(color="#0055A5", cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
-                                    x=alt.X('Cidade:N', sort='-y', title='Cidade'),
-                                    y=alt.Y('Total Ocorrências:Q', title='Qtd Ocorrências'),
-                                    tooltip=['Cidade', 'Total Ocorrências']
-                                ).properties(height=280)
-                                st.altair_chart(chart, use_container_width=True)
-                        else:
-                            if tipo_visao_agenda == "Comodato Inativo":
-                                df_base_visao = df_base_visao[df_base_visao['Classificação Limpa'].str.contains("Comodato Inativo", case=False, na=False)]
-                                st.subheader("⚠️ Relatório Específico: Comodato Inativo")
-                            else:
-                                st.subheader("Agenda Geral de Visitas Pendentes")
-
-                            st.markdown("#### 🎯 Filtros Rápidos por Status e Prazos")
-                            total_visitas = len(df_base_visao)
-                            filtro_atual_agenda = st.session_state.filtro_dashboard_ativo
-                            
-                            if tipo_visao_agenda == "Comodato Inativo":
-                                vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 3ª Semana'])
-                                hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 2ª Semana'])
-                                amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟢 1ª Semana'])
-                                
-                                st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
-                                c1, c2, c3, c4 = st.columns(4)
-                                with c1:
-                                    if st.button(
-                                        f"📋 Total\n\n**{total_visitas}**",
-                                        type="primary" if filtro_atual_agenda == "Todas" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ci_total"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "Todas"
-                                        st.rerun()
-                                with c2:
-                                    if st.button(
-                                        f"🔴 3ª Semana\n\n**{vencidas_qt}**",
-                                        type="primary" if filtro_atual_agenda == "🔴 3ª Semana" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ci_3sem"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "🔴 3ª Semana"
-                                        st.rerun()
-                                with c3:
-                                    if st.button(
-                                        f"🟡 2ª Semana\n\n**{hoje_qt}**",
-                                        type="primary" if filtro_atual_agenda == "🟡 2ª Semana" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ci_2sem"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "🟡 2ª Semana"
-                                        st.rerun()
-                                with c4:
-                                    if st.button(
-                                        f"🟢 1ª Semana\n\n**{amanha_qt}**",
-                                        type="primary" if filtro_atual_agenda == "🟢 1ª Semana" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ci_1sem"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "🟢 1ª Semana"
-                                        st.rerun()
-                            else:
-                                vencidas_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔴 Vencido'])
-                                hoje_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🔵 Vence Hoje'])
-                                amanha_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟠 Vence Amanhã'])
-                                semana_qt = len(df_base_visao[df_base_visao['Status Geral'] == '🟡 Vence na Semana'])
-                                cinco_dias_qt = len(df_base_visao[df_base_visao['Prazo_DT'] <= sexta_semana])
-
-                                st.markdown('<div class="cg-kpi-marker"></div>', unsafe_allow_html=True)
-                                c1, c2, c3, c4, c5 = st.columns(5)
-                                with c1:
-                                    if st.button(
-                                        f"📋 Total\n\n**{total_visitas}**",
-                                        type="primary" if filtro_atual_agenda == "Todas" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ag_total"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "Todas"
-                                        st.rerun()
-                                with c2:
-                                    if st.button(
-                                        f"🔴 Vencidas\n\n**{vencidas_qt}**",
-                                        type="primary" if filtro_atual_agenda == "🔴 Vencido" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ag_vencidas"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "🔴 Vencido"
-                                        st.rerun()
-                                with c3:
-                                    if st.button(
-                                        f"🔵 Vence Hoje\n\n**{hoje_qt}**",
-                                        type="primary" if filtro_atual_agenda == "🔵 Vence Hoje" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ag_hoje"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "🔵 Vence Hoje"
-                                        st.rerun()
-                                with c4:
-                                    if st.button(
-                                        f"🟠 Vence Amanhã\n\n**{amanha_qt}**",
-                                        type="primary" if filtro_atual_agenda == "🟠 Vence Amanhã" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ag_amanha"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "🟠 Vence Amanhã"
-                                        st.rerun()
-                                with c5:
-                                    if st.button(
-                                        f"🟡 Vence na Semana\n\n**{semana_qt}**",
-                                        type="primary" if filtro_atual_agenda == "🟡 Vence na Semana" else "secondary",
-                                        use_container_width=True,
-                                        key="btn_kpi_ag_semana"
-                                    ):
-                                        st.session_state.filtro_dashboard_ativo = "🟡 Vence na Semana"
-                                        st.rerun()
-
-                            st.caption(f"🔎 Filtro ativo no painel: **{st.session_state.filtro_dashboard_ativo}**")
-                            st.divider()
-
-                            if st.session_state.e_supervisor:
-                                col_fc1, col_fc2, col_fc3 = st.columns(3)
-                                lista_consultores = ["Todos"] + sorted(list(df_base_visao['Consultor'].unique()))
-                                lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
-                                lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
-
-                                with col_fc1: consultor_sel = st.selectbox("Consultor:", lista_consultores)
-                                with col_fc2: cidade_filtro_sel = st.selectbox("Cidade:", lista_cidades_filtro)
-                                with col_fc3: class_filtro_sel = st.selectbox("Classificação:", lista_class_filtro)
-                            else:
-                                col_fc1, col_fc2 = st.columns(2)
-                                lista_cidades_filtro = ["Todas"] + sorted(list(df_base_visao['Cidade'].unique()))
-                                lista_class_filtro = ["Todas"] + sorted(list(df_base_visao['Classificação Limpa'].unique()))
-
-                                with col_fc1: cidade_filtro_sel = st.selectbox("Filtrar por Cidade:", lista_cidades_filtro)
-                                with col_fc2: class_filtro_sel = st.selectbox("Filtrar por Classificação:", lista_class_filtro)
-
-                            df_filtrado = df_base_visao.copy()
-                            
-                            if st.session_state.filtro_dashboard_ativo != "Todas":
-                                df_filtrado = df_filtrado[df_filtrado['Status Geral'] == st.session_state.filtro_dashboard_ativo]
-
-                            if st.session_state.e_supervisor and consultor_sel != "Todos":
-                                df_filtrado = df_filtrado[df_filtrado['Consultor'] == consultor_sel]
-                            if cidade_filtro_sel != "Todas":
-                                df_filtrado = df_filtrado[df_filtrado['Cidade'] == cidade_filtro_sel]
-                            if class_filtro_sel != "Todas":
-                                df_filtrado = df_filtrado[df_filtrado['Classificação Limpa'] == class_filtro_sel]
-
-                            df_filtrado['Prazo'] = df_filtrado['Prazo_DT'].dt.strftime('%d/%m/%Y')
-
-                            if df_filtrado.empty:
-                                st.success("✅ Excelente! Não há nenhuma ocorrência pendente para os filtros selecionados.")
-                            else:
-                                if st.session_state.e_supervisor:
-                                    df_exibicao = df_filtrado[[
-                                        'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
-                                        'Cidade', 'Classificação Limpa', 'Prazo', 'Consultor'
-                                    ]].copy()
-                                    df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo', 'Consultor']
-                                else:
-                                    df_exibicao = df_filtrado[[
-                                        'Status Geral', COL_OCORRENCIA, COL_CLIENTE, 
-                                        'Cidade', 'Classificação Limpa', 'Prazo'
-                                    ]].copy()
-                                    df_exibicao.columns = ['Status', 'Nº OC', 'Cliente', 'Cidade', 'Classificação', 'Prazo']
-
-                                df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str)
-                                st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
+                        df_exibicao['Nº OC'] = df_exibicao['Nº OC'].astype(str)
+                        st.dataframe(df_exibicao, hide_index=True, use_container_width=True)
 
                 except Exception as e:
                     st.error(f"⚠️ Ocorreu um erro ao processar o arquivo. Certifique-se de que é o relatório correto. Erro técnico: {e}")
