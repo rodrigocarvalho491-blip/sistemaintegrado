@@ -709,7 +709,7 @@ div.stButton > button[kind="secondary"]:hover {
   box-shadow: 0 4px 12px rgba(0, 85, 165, 0.14) !important;
 }
 
-/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS (LAYOUT CARD MÉTRICA) --- */
+/* --- PAINEL DE BOTÕES KPI DA AGENDA DE OCORRÊNCIAS (MESMO LAYOUT DOS CARDS DE MÉTRICAS) --- */
 .element-container:has(.cg-kpi-marker) + .element-container [data-testid="stHorizontalBlock"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
   gap: 0.85rem !important;
@@ -720,7 +720,7 @@ div.stButton > button[kind="secondary"]:hover {
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button {
   min-height: 92px !important;
-  padding: 0.85rem 1.05rem !important;
+  padding: 0.8rem 1rem !important;
   border-radius: 12px !important;
   display: flex !important;
   flex-direction: column !important;
@@ -730,14 +730,14 @@ div.stButton > button[kind="secondary"]:hover {
   transition: all 0.2s ease !important;
 }
 
-/* Cartão Inativo — Mesmo visual limpo dos cartões de Total de Comissão */
+/* Cartões Inativos com o mesmo layout limpo dos cards de métrica */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="secondary"] {
   background: #F8FAFC !important;
   border: 1px solid #E2E8F0 !important;
-  border-top: 3.5px solid #0055A5 !important;
+  border-top: 3px solid #0055A5 !important;
   color: #0A2540 !important;
-  box-shadow: 0 2px 6px rgba(10, 37, 64, 0.04) !important;
+  box-shadow: none !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="secondary"]:hover,
@@ -745,55 +745,57 @@ div.stButton > button[kind="secondary"]:hover {
   transform: translateY(-2px) !important;
   background: #F0F7FF !important;
   border-color: #BFDBFE !important;
-  border-top-color: #0055A5 !important;
-  box-shadow: 0 6px 16px rgba(0, 85, 165, 0.12) !important;
+  border-top: 3px solid #0055A5 !important;
+  box-shadow: 0 4px 12px rgba(0, 85, 165, 0.12) !important;
 }
 
 /* Cartão Ativo (Filtro Selecionado) */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"],
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] {
-  background: linear-gradient(180deg, #EFF6FF 0%, #E0EEFF 100%) !important;
-  border: 1.5px solid #0055A5 !important;
-  border-top: 4px solid #0055A5 !important;
-  color: #0A2540 !important;
-  box-shadow: 0 6px 18px rgba(0, 85, 165, 0.18) !important;
-  transform: translateY(-2px) !important;
+  background: linear-gradient(135deg, #0055A5 0%, #003F7F 100%) !important;
+  border: 1px solid #003F7F !important;
+  border-top: 3px solid #F28C28 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 6px 16px rgba(0, 85, 165, 0.24) !important;
+  transform: translateY(-1px) !important;
 }
 
-/* Rótulo Superior (1ª linha) igual ao título do st.metric */
+.element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p,
+[data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p {
+  color: #FFFFFF !important;
+}
+
+/* Rótulo no topo (1ª linha) e Número em evidência embaixo (2ª linha), igual ao st.metric */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:first-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:first-child {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.85rem !important;
+  font-size: 0.86rem !important;
   font-weight: 600 !important;
-  text-transform: none !important;
-  letter-spacing: 0 !important;
   color: #475569 !important;
+  line-height: 1.25 !important;
   margin: 0 0 6px 0 !important;
-  line-height: 1.2 !important;
+  letter-spacing: 0 !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:first-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:first-child {
-  color: #0055A5 !important;
-  font-weight: 700 !important;
+  color: #DBEAFE !important;
 }
 
-/* Valor/Quantidade em Evidência (2ª linha) igual ao valor do st.metric */
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button p:last-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button p:last-child {
   font-family: 'Outfit', sans-serif !important;
-  font-size: 2rem !important;
+  font-size: 1.95rem !important;
   font-weight: 800 !important;
-  line-height: 1.05 !important;
+  color: #0A2540 !important;
+  line-height: 1.1 !important;
   margin: 0 !important;
   letter-spacing: -0.02em !important;
-  color: #0A2540 !important;
 }
 
 .element-container:has(.cg-kpi-marker) + .element-container div.stButton > button[kind="primary"] p:last-child,
 [data-testid="stElementContainer"]:has(.cg-kpi-marker) + [data-testid="stElementContainer"] div.stButton > button[kind="primary"] p:last-child {
-  color: #003D7A !important;
+  color: #FFFFFF !important;
 }
 
 /* --- CARDS DE MÉTRICAS, INPUTS E EXPANDERS (TEMA CLARO LIMPO) --- */
@@ -1030,7 +1032,7 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
         if tem_val:
             alt += 5 + 23
         if tem_com:
-            alt += 4 + 24
+            alt += 4 + 26
         return alt
 
     alturas_meses = {}
@@ -1552,6 +1554,7 @@ def _ordenacao_vigencia_key(vig_label):
     return (1, 0, vig_label.lower())
 
 def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
+    meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     trimestres_cols = [
         "1º Tri (Jan, Fev, Mar)",
         "2º Tri (Abr, Mai, Jun)",
@@ -1560,11 +1563,12 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
     ]
     contagem_por_vigencia = {}
     totais_tri = {t: 0 for t in trimestres_cols}
+    totais_por_mes = {m: 0 for m in range(1, 13)}
 
     for d in dados.values():
         if not isinstance(d, dict):
             continue
-        if d.get("ano") != ano_selecionado:
+        if int(d.get("ano", 0)) != ano_selecionado:
             continue
         if str(d.get("status", "")).strip() != "Processo Enviado":
             continue
@@ -1590,18 +1594,45 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
 
         contagem_por_vigencia[vig_label][tri_nome] += 1
         totais_tri[tri_nome] += 1
+        totais_por_mes[mes_num] += 1
 
     st.divider()
     st.markdown(f"### 📊 Consolidado — Contratos \"Processo Enviado\" por Vigência ({ano_selecionado})")
-    st.caption("Quantidade de contratos no status **Processo Enviado** agrupados por vigência e trimestre.")
+
+    col_sub_c, col_filtro_mes_c = st.columns([3.3, 1.2])
+    with col_sub_c:
+        st.caption(f"Ano de referência: **{ano_selecionado}** • Filtre por mês para atualizar os indicadores superiores mantendo a tabela completa abaixo.")
+    with col_filtro_mes_c:
+        mes_filtro_c = st.selectbox(
+            "📅 Filtrar por Mês",
+            ["Todos (Ano)"] + meses_cols,
+            key=f"filtro_mes_consolidado_contrato_{ano_selecionado}"
+        )
 
     total_geral = sum(totais_tri.values())
-    c_k1, c_k2, c_k3, c_k4, c_k5 = st.columns(5)
-    c_k1.metric("1º Tri (Jan-Mar)", totais_tri[trimestres_cols[0]])
-    c_k2.metric("2º Tri (Abr-Jun)", totais_tri[trimestres_cols[1]])
-    c_k3.metric("3º Tri (Jul-Set)", totais_tri[trimestres_cols[2]])
-    c_k4.metric("4º Tri (Out-Dez)", totais_tri[trimestres_cols[3]])
-    c_k5.metric("Total Enviado", total_geral)
+    if mes_filtro_c == "Todos (Ano)":
+        c_k1, c_k2, c_k3, c_k4, c_k5 = st.columns(5)
+        c_k1.metric(f"1º Tri ({ano_selecionado})", totais_tri[trimestres_cols[0]])
+        c_k2.metric(f"2º Tri ({ano_selecionado})", totais_tri[trimestres_cols[1]])
+        c_k3.metric(f"3º Tri ({ano_selecionado})", totais_tri[trimestres_cols[2]])
+        c_k4.metric(f"4º Tri ({ano_selecionado})", totais_tri[trimestres_cols[3]])
+        c_k5.metric(f"Total Enviado ({ano_selecionado})", total_geral)
+    else:
+        m_idx_c = meses_cols.index(mes_filtro_c) + 1
+        qtd_mes_c = totais_por_mes[m_idx_c]
+        if m_idx_c in (1, 2, 3):
+            tri_ref_lbl, tri_ref_val = "1º Tri (Jan-Mar)", totais_tri[trimestres_cols[0]]
+        elif m_idx_c in (4, 5, 6):
+            tri_ref_lbl, tri_ref_val = "2º Tri (Abr-Jun)", totais_tri[trimestres_cols[1]]
+        elif m_idx_c in (7, 8, 9):
+            tri_ref_lbl, tri_ref_val = "3º Tri (Jul-Set)", totais_tri[trimestres_cols[2]]
+        else:
+            tri_ref_lbl, tri_ref_val = "4º Tri (Out-Dez)", totais_tri[trimestres_cols[3]]
+
+        c_k1, c_k2, c_k3 = st.columns(3)
+        c_k1.metric(f"📄 Enviados em {mes_filtro_c}/{ano_selecionado}", qtd_mes_c)
+        c_k2.metric(f"📅 {tri_ref_lbl} ({ano_selecionado})", tri_ref_val)
+        c_k3.metric(f"📊 Total Enviado ({ano_selecionado})", total_geral)
 
     if not contagem_por_vigencia:
         st.info(f"Nenhum contrato com status 'Processo Enviado' encontrado para o ano de {ano_selecionado}.")
@@ -1637,8 +1668,10 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
     meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     soma_20_por_mes = {m: 0.0 for m in range(1, 13)}
     soma_10_por_mes = {m: 0.0 for m in range(1, 13)}
-    soma_propostas_por_mes = {m: 0.0 for m in range(1, 13)}
+    soma_prop_por_mes = {m: 0.0 for m in range(1, 13)}
     qtd_vendas_por_mes = {m: 0 for m in range(1, 13)}
+    total_propostas_executadas = 0.0
+    qtd_vendas_executadas = 0
 
     for d in dados.values():
         if not isinstance(d, dict):
@@ -1654,12 +1687,14 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
         if not (1 <= mes_num <= 12):
             continue
 
+        qtd_vendas_executadas += 1
         qtd_vendas_por_mes[mes_num] += 1
         val_num = parse_valor_moeda(d.get("valor_proposta", ""))
         if val_num is None:
             continue
 
-        soma_propostas_por_mes[mes_num] += val_num
+        total_propostas_executadas += val_num
+        soma_prop_por_mes[mes_num] += val_num
         comissao_sel = str(d.get("comissao", "") or "").strip()
         if comissao_sel == "20%":
             soma_20_por_mes[mes_num] += val_num * 0.20
@@ -1669,44 +1704,41 @@ def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
     total_comissao_20 = sum(soma_20_por_mes.values())
     total_comissao_10 = sum(soma_10_por_mes.values())
     total_geral_comissoes = total_comissao_20 + total_comissao_10
-    total_propostas_executadas = sum(soma_propostas_por_mes.values())
-    qtd_vendas_executadas = sum(qtd_vendas_por_mes.values())
 
     st.divider()
-    col_tit_cons, col_filtro_mes_cons = st.columns([3.2, 1.3])
-    with col_tit_cons:
-        st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" ({ano_selecionado})")
-        st.caption("Somatória mensal dos valores de comissão (20% e 10%) considerando as vendas no status **Instalação / Serviço executado**.")
-    with col_filtro_mes_cons:
-        opcoes_periodo = [f"Ano ({ano_selecionado})"] + meses_cols
-        periodo_selecionado = st.selectbox(
-            "📅 Filtrar Indicadores por Mês",
-            opcoes_periodo,
-            index=0,
-            key=f"filtro_mes_consolidado_vendas_{ano_selecionado}"
+    st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" ({ano_selecionado})")
+
+    col_sub_v, col_filtro_mes_v = st.columns([3.3, 1.2])
+    with col_sub_v:
+        st.caption(f"Ano de referência: **{ano_selecionado}** • Filtre por mês para visualizar os valores nos indicadores superiores, mantendo a tabela completa abaixo.")
+    with col_filtro_mes_v:
+        mes_filtro_v = st.selectbox(
+            "📅 Filtrar por Mês",
+            ["Todos (Ano)"] + meses_cols,
+            key=f"filtro_mes_consolidado_venda_{ano_selecionado}"
         )
 
-    if periodo_selecionado in meses_cols:
-        mes_filtro_idx = meses_cols.index(periodo_selecionado) + 1
-        label_periodo = f"{periodo_selecionado}/{ano_selecionado}"
-        val_card_20 = soma_20_por_mes[mes_filtro_idx]
-        val_card_10 = soma_10_por_mes[mes_filtro_idx]
-        val_card_total = val_card_20 + val_card_10
-        val_card_propostas = soma_propostas_por_mes[mes_filtro_idx]
-        qtd_card_vendas = qtd_vendas_por_mes[mes_filtro_idx]
+    if mes_filtro_v == "Todos (Ano)":
+        periodo_lbl = f"Ano {ano_selecionado}"
+        val_20_top = total_comissao_20
+        val_10_top = total_comissao_10
+        val_tot_top = total_geral_comissoes
+        val_prop_top = total_propostas_executadas
+        qtd_top = qtd_vendas_executadas
     else:
-        label_periodo = f"Ano {ano_selecionado}"
-        val_card_20 = total_comissao_20
-        val_card_10 = total_comissao_10
-        val_card_total = total_geral_comissoes
-        val_card_propostas = total_propostas_executadas
-        qtd_card_vendas = qtd_vendas_executadas
+        m_idx_v = meses_cols.index(mes_filtro_v) + 1
+        periodo_lbl = f"{mes_filtro_v}/{ano_selecionado}"
+        val_20_top = soma_20_por_mes[m_idx_v]
+        val_10_top = soma_10_por_mes[m_idx_v]
+        val_tot_top = val_20_top + val_10_top
+        val_prop_top = soma_prop_por_mes[m_idx_v]
+        qtd_top = qtd_vendas_por_mes[m_idx_v]
 
     c_k1, c_k2, c_k3, c_k4 = st.columns(4)
-    c_k1.metric(f"🟢 Comissão 20% ({label_periodo})", formatar_moeda_brl(val_card_20))
-    c_k2.metric(f"🟡 Comissão 10% ({label_periodo})", formatar_moeda_brl(val_card_10))
-    c_k3.metric(f"💵 Total Comissões ({label_periodo})", formatar_moeda_brl(val_card_total))
-    c_k4.metric(f"📦 Propostas ({label_periodo} • {qtd_card_vendas})", formatar_moeda_brl(val_card_propostas))
+    c_k1.metric(f"🟢 Comissão 20% ({periodo_lbl})", formatar_moeda_brl(val_20_top))
+    c_k2.metric(f"🟡 Comissão 10% ({periodo_lbl})", formatar_moeda_brl(val_10_top))
+    c_k3.metric(f"💵 Total Comissões ({periodo_lbl})", formatar_moeda_brl(val_tot_top))
+    c_k4.metric(f"📦 Propostas Executadas ({periodo_lbl})", f"{formatar_moeda_brl(val_prop_top)} ({qtd_top})")
 
     if qtd_vendas_executadas == 0:
         st.info(f"Nenhuma venda com status 'Instalação / Serviço executado' encontrada para o ano de {ano_selecionado}.")
