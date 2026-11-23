@@ -3266,28 +3266,18 @@ if aba_agenda is not None:
             return texto_limpo if texto_limpo else str(texto)
 
         def classificar_status_abertura(row, hoje_ref):
-            prazo = row['Prazo_DT']
             abertura = row['Abertura_DT']
             
-            if pd.isna(prazo):
-                return "Normal"
-            
-            prazo_dia = pd.Timestamp(prazo).normalize()
-            hoje = pd.Timestamp(hoje_ref).normalize()
-            
-            if prazo_dia == hoje:
-                return "🔵 Vence Hoje"
-            elif prazo_dia < hoje:
-                return "🔴 Vencido"
-                
             if pd.isna(abertura):
                 return "🟢 1ª Semana"
                 
             abertura_dia = pd.Timestamp(abertura).normalize()
-            delta_dias = (prazo_dia - abertura_dia).days
-            if delta_dias <= 7:
+            hoje = pd.Timestamp(hoje_ref).normalize()
+            dias_abertura = (hoje - abertura_dia).days
+            
+            if dias_abertura <= 7:
                 return "🟢 1ª Semana"
-            elif delta_dias <= 14:
+            elif dias_abertura <= 14:
                 return "🟡 2ª Semana"
             else:
                 return "🔴 3ª Semana"
@@ -3338,6 +3328,12 @@ if aba_agenda is not None:
                 label_visibility="collapsed"
             )
 
+            if "ultima_visao_agenda" not in st.session_state:
+                st.session_state.ultima_visao_agenda = tipo_visao_agenda
+            elif st.session_state.ultima_visao_agenda != tipo_visao_agenda:
+                st.session_state.ultima_visao_agenda = tipo_visao_agenda
+                st.session_state.filtro_dashboard_ativo = "Todas"
+
             st.divider()
             st.markdown("### 🏷️ Legenda de Status")
             if tipo_visao_agenda == "Comodato Inativo":
@@ -3384,7 +3380,13 @@ if aba_agenda is not None:
                     df_pendentes = df_pendentes[~df_pendentes[COL_OCORRENCIA].isin(st.session_state.Tratadas_Temp)]
                     
                     df_pendentes['Prazo_DT'] = pd.to_datetime(df_pendentes[COL_PRAZO], format="%d/%m/%Y %H:%M", errors='coerce')
-                    df_pendentes['Abertura_DT'] = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+                    abertura_parsed = pd.to_datetime(df_pendentes[COL_ABERTURA], format="%d/%m/%Y %H:%M", errors='coerce')
+                    mask_na_abertura = abertura_parsed.isna() & df_pendentes[COL_ABERTURA].notna()
+                    if mask_na_abertura.any():
+                        abertura_parsed.loc[mask_na_abertura] = pd.to_datetime(
+                            df_pendentes.loc[mask_na_abertura, COL_ABERTURA], dayfirst=True, errors='coerce'
+                        )
+                    df_pendentes['Abertura_DT'] = abertura_parsed
                     df_pendentes = df_pendentes.dropna(subset=['Prazo_DT'])
                     
                     df_pendentes['Cidade'] = df_pendentes[COL_ENDERECO].apply(extrair_cidade)
