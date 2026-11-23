@@ -142,73 +142,32 @@ def apagar_nota(nota_id):
         return False
 
 # --- FUNÇÕES DE PERSISTÊNCIA: CONTRATOS & VENDAS ---
-def parse_valor_moeda(val_raw):
-    txt = " ".join(str(val_raw or "").split()).strip()
-    if not txt:
-        return None
-    sem_rs = re.sub(r'^r\$\s*', '', txt, flags=re.IGNORECASE).strip()
-    if not any(ch.isdigit() for ch in sem_rs):
-        return None
-    if re.match(r'^[\d.,]+$', sem_rs):
-        try:
-            if ',' in sem_rs and '.' in sem_rs:
-                return float(sem_rs.replace('.', '').replace(',', '.'))
-            elif ',' in sem_rs:
-                return float(sem_rs.replace(',', '.'))
-            elif '.' in sem_rs:
-                partes = sem_rs.split('.')
-                if len(partes[-1]) == 3 and len(partes) > 1:
-                    return float(sem_rs.replace('.', ''))
-                return float(sem_rs)
-            else:
-                return float(sem_rs)
-        except ValueError:
-            return None
-    return None
-
-def formatar_moeda_brl(valor_float):
-    formatado = f"{float(valor_float):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"R$ {formatado}"
-
 def formatar_valor_proposta(val_raw):
     txt = " ".join(str(val_raw or "").split()).strip()
     if not txt:
         return ""
-    num = parse_valor_moeda(txt)
-    if num is not None:
-        return formatar_moeda_brl(num)
     sem_rs = re.sub(r'^r\$\s*', '', txt, flags=re.IGNORECASE).strip()
+    if not any(ch.isdigit() for ch in sem_rs):
+        return txt
+    if re.match(r'^[\d.,]+$', sem_rs):
+        try:
+            if ',' in sem_rs and '.' in sem_rs:
+                num = float(sem_rs.replace('.', '').replace(',', '.'))
+            elif ',' in sem_rs:
+                num = float(sem_rs.replace(',', '.'))
+            elif '.' in sem_rs:
+                partes = sem_rs.split('.')
+                if len(partes[-1]) == 3 and len(partes) > 1:
+                    num = float(sem_rs.replace('.', ''))
+                else:
+                    num = float(sem_rs)
+            else:
+                num = float(sem_rs)
+            formatado = f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return f"R$ {formatado}"
+        except ValueError:
+            pass
     return f"R$ {sem_rs}"
-
-def _extrair_metadados_obs(obs_raw):
-    txt = str(obs_raw or "")
-    comissao_extraida = ""
-    val_prop_extraido = ""
-
-    m_com = re.search(r'\[\[COMISSAO:(20%|10%)\]\]', txt)
-    if m_com:
-        comissao_extraida = m_com.group(1)
-        txt = re.sub(r'\s*\[\[COMISSAO:(?:20%|10%)\]\]', '', txt)
-
-    m_val = re.search(r'\[\[VAL_PROP:(.*?)\]\]', txt)
-    if m_val:
-        val_prop_extraido = m_val.group(1).strip()
-        txt = re.sub(r'\s*\[\[VAL_PROP:.*?\]\]', '', txt)
-
-    return txt.strip(), comissao_extraida, val_prop_extraido
-
-def _anexar_metadados_obs(obs_limpa, comissao="", valor_proposta=""):
-    partes = []
-    base = str(obs_limpa or "").strip()
-    if base:
-        partes.append(base)
-    com_clean = str(comissao or "").strip()
-    if com_clean in ("20%", "10%"):
-        partes.append(f"[[COMISSAO:{com_clean}]]")
-    val_clean = str(valor_proposta or "").strip()
-    if val_clean:
-        partes.append(f"[[VAL_PROP:{val_clean}]]")
-    return "\n".join(partes).strip()
 
 def carregar_acompanhamento(usuario, tipo):
     try:
@@ -218,22 +177,12 @@ def carregar_acompanhamento(usuario, tipo):
         cache_val = st.session_state.get("valor_proposta_local_cache", {})
         cache_com = st.session_state.get("comissao_local_cache", {})
         for row in res.data:
-            obs_limpa, com_obs, val_obs = _extrair_metadados_obs(row.get("observacoes", ""))
-            row["observacoes"] = obs_limpa
-
             if row.get("vigencia") is None:
                 row["vigencia"] = cache_vig.get(row["id"], "")
-
-            val_db = str(row.get("valor_proposta") or "").strip()
-            if not val_db:
-                val_db = val_obs or cache_val.get(row["id"], "")
-            row["valor_proposta"] = val_db
-
-            com_db = str(row.get("comissao") or "").strip()
-            if not com_db:
-                com_db = com_obs or cache_com.get(row["id"], "")
-            row["comissao"] = com_db
-
+            if row.get("valor_proposta") is None:
+                row["valor_proposta"] = cache_val.get(row["id"], "")
+            if row.get("comissao") is None:
+                row["comissao"] = cache_com.get(row["id"], "")
             dados[row["id"]] = row
         return dados
     except Exception:
@@ -241,10 +190,6 @@ def carregar_acompanhamento(usuario, tipo):
 
 def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, status, ano, mes, observacoes="", vigencia="", valor_proposta="", comissao=""):
     data_mod = datetime.now().strftime("%d/%m/%Y %H:%M")
-    obs_limpa, _, _ = _extrair_metadados_obs(observacoes)
-    com_clean = str(comissao or "").strip()
-    val_clean = str(valor_proposta or "").strip()
-
     payload = {
         "id": id_reg,
         "usuario": usuario,
@@ -254,10 +199,10 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
         "status": status,
         "ano": int(ano),
         "mes": int(mes),
-        "observacoes": obs_limpa,
+        "observacoes": observacoes,
         "vigencia": vigencia,
-        "valor_proposta": val_clean,
-        "comissao": com_clean,
+        "valor_proposta": valor_proposta,
+        "comissao": comissao,
         "data_modificacao": data_mod
     }
     try:
@@ -274,49 +219,62 @@ def salvar_acompanhamento(id_reg, usuario, tipo, codigo_cliente, nome_cliente, s
         if "42501" in err_str or "row-level security" in err_str.lower():
             st.error("❌ Permissão bloqueada no Supabase (RLS ativo). Execute no SQL Editor do Supabase: `ALTER TABLE acompanhamento DISABLE ROW LEVEL SECURITY;`")
             return False
-        # Tenta salvar sem 'comissao' caso a coluna ainda não exista, persistindo comissão nas observações do Supabase
+        # Tenta salvar sem 'comissao' caso a coluna ainda não exista
         try:
             payload_sem_com = {k: v for k, v in payload.items() if k != "comissao"}
-            payload_sem_com["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean)
             supabase.table("acompanhamento").upsert(payload_sem_com).execute()
             if "vigencia_local_cache" in st.session_state:
                 st.session_state["vigencia_local_cache"].pop(id_reg, None)
             if "valor_proposta_local_cache" in st.session_state:
                 st.session_state["valor_proposta_local_cache"].pop(id_reg, None)
-            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
+            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
+            if str(comissao).strip():
+                st.warning("⚠️ Cliente salvo, mas a coluna 'comissao' ainda não existe no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento ADD COLUMN IF NOT EXISTS comissao TEXT;`")
             return True
         except Exception:
             pass
-        # Tenta salvar sem 'valor_proposta' e 'comissao' caso ainda não existam, persistindo ambos nas observações do Supabase
+        # Tenta salvar sem 'valor_proposta' e 'comissao' caso ainda não existam
         try:
             payload_sem_val = {k: v for k, v in payload.items() if k not in ["valor_proposta", "comissao"]}
-            payload_sem_val["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean, valor_proposta=val_clean)
             supabase.table("acompanhamento").upsert(payload_sem_val).execute()
             if "vigencia_local_cache" in st.session_state:
                 st.session_state["vigencia_local_cache"].pop(id_reg, None)
-            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = val_clean
-            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
+            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
+            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
+            colunas_faltando = []
+            if str(valor_proposta).strip():
+                colunas_faltando.append("ADD COLUMN IF NOT EXISTS valor_proposta TEXT")
+            if str(comissao).strip():
+                colunas_faltando.append("ADD COLUMN IF NOT EXISTS comissao TEXT")
+            if colunas_faltando:
+                st.warning(f"⚠️ Cliente salvo, mas faltam colunas no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento {', '.join(colunas_faltando)};`")
             return True
         except Exception:
             pass
         # Tenta salvar sem 'vigencia', 'valor_proposta' e 'comissao'
         try:
             payload_sem_extras = {k: v for k, v in payload.items() if k not in ["vigencia", "valor_proposta", "comissao"]}
-            payload_sem_extras["observacoes"] = _anexar_metadados_obs(obs_limpa, comissao=com_clean, valor_proposta=val_clean)
             supabase.table("acompanhamento").upsert(payload_sem_extras).execute()
             st.session_state.setdefault("vigencia_local_cache", {})[id_reg] = vigencia
-            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = val_clean
-            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
+            st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
+            st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
+            colunas_faltando = []
             if str(vigencia).strip():
-                st.warning("⚠️ Cliente salvo, mas falta a coluna 'vigencia' no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento ADD COLUMN IF NOT EXISTS vigencia TEXT;`")
+                colunas_faltando.append("ADD COLUMN IF NOT EXISTS vigencia TEXT")
+            if str(valor_proposta).strip():
+                colunas_faltando.append("ADD COLUMN IF NOT EXISTS valor_proposta TEXT")
+            if str(comissao).strip():
+                colunas_faltando.append("ADD COLUMN IF NOT EXISTS comissao TEXT")
+            if colunas_faltando:
+                st.warning(f"⚠️ Cliente salvo, mas faltam colunas no Supabase. Execute no SQL Editor: `ALTER TABLE acompanhamento {', '.join(colunas_faltando)};`")
             return True
         except Exception:
             try:
                 payload_fallback = {k: v for k, v in payload.items() if k not in ["observacoes", "nome_cliente", "vigencia", "valor_proposta", "comissao"]}
                 supabase.table("acompanhamento").upsert(payload_fallback).execute()
                 st.session_state.setdefault("vigencia_local_cache", {})[id_reg] = vigencia
-                st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = val_clean
-                st.session_state.setdefault("comissao_local_cache", {})[id_reg] = com_clean
+                st.session_state.setdefault("valor_proposta_local_cache", {})[id_reg] = valor_proposta
+                st.session_state.setdefault("comissao_local_cache", {})[id_reg] = comissao
                 st.warning("⚠️ Cliente salvo parcialmente. Adicione as colunas 'observacoes', 'nome_cliente', 'vigencia', 'valor_proposta' e 'comissao' no Supabase executando um ALTER TABLE.")
                 return True
             except Exception as e2:
@@ -967,34 +925,22 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             cod = html_lib.escape(str(item["codigo"]))
             nome = html_lib.escape(str(item["nome"]))
             vig = html_lib.escape(str(item.get("vigencia", "") or "").strip())
-            val_prop_raw = str(item.get("valor_proposta", "") or "").strip()
-            val_prop = html_lib.escape(val_prop_raw)
+            val_prop = html_lib.escape(str(item.get("valor_proposta", "") or "").strip())
             comissao = str(item.get("comissao", "") or "").strip()
             is_selected = "selected-card" if str(item["id"]) == str(id_editando) else ""
             nome_div = f'<div class="kb-card-name">{nome}</div>' if nome else ""
 
             meta_div = ""
             if is_contrato and vig:
-                meta_div = f'<div class="kb-card-meta-group"><div class="kb-card-meta kb-card-vig">📅 {vig}</div></div>'
-            elif not is_contrato:
-                partes_meta = []
-                if val_prop:
-                    partes_meta.append(f'<div class="kb-card-meta kb-card-val-neutro">💰 {val_prop}</div>')
-                if comissao in ("20%", "10%"):
-                    classe_com = "kb-card-val-verde" if comissao == "20%" else "kb-card-val-amarelo"
-                    val_num = parse_valor_moeda(val_prop_raw)
-                    if val_num is not None:
-                        perc = 0.20 if comissao == "20%" else 0.10
-                        val_com_fmt = html_lib.escape(formatar_moeda_brl(val_num * perc))
-                        partes_meta.append(
-                            f'<div class="kb-card-meta {classe_com}">💵 Comissão ({html_lib.escape(comissao)}): {val_com_fmt}</div>'
-                        )
-                    else:
-                        partes_meta.append(
-                            f'<div class="kb-card-meta {classe_com}">💵 Comissão: {html_lib.escape(comissao)}</div>'
-                        )
-                if partes_meta:
-                    meta_div = f'<div class="kb-card-meta-group">{"".join(partes_meta)}</div>'
+                meta_div = f'<div class="kb-card-meta kb-card-vig">📅 {vig}</div>'
+            elif (not is_contrato) and val_prop:
+                if comissao == "20%":
+                    classe_val = "kb-card-val-verde"
+                elif comissao == "10%":
+                    classe_val = "kb-card-val-amarelo"
+                else:
+                    classe_val = "kb-card-val-neutro"
+                meta_div = f'<div class="kb-card-meta {classe_val}">💰 {val_prop}</div>'
 
             cards_html += f"""
             <div class="kb-card {is_selected}" draggable="true" data-id="{cid}" data-status="{st_atual}"
@@ -1025,21 +971,16 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
 
     def _estimar_altura_card(item):
         nome_txt = str(item.get("nome", "") or "").strip()
-        val_txt = str(item.get("valor_proposta", "") or "").strip()
-        com_txt = str(item.get("comissao", "") or "").strip()
-        tem_vig = is_contrato and bool(str(item.get("vigencia", "") or "").strip())
-        tem_val = (not is_contrato) and bool(val_txt)
-        tem_com = (not is_contrato) and (com_txt in ("20%", "10%"))
+        tem_meta = bool(
+            (is_contrato and str(item.get("vigencia", "") or "").strip())
+            or ((not is_contrato) and str(item.get("valor_proposta", "") or "").strip())
+        )
         alt = 42
         if nome_txt:
             linhas_nome = max(1, (len(nome_txt) + 15) // 16)
             alt += 3 + (linhas_nome * 16)
-        if tem_vig:
+        if tem_meta:
             alt += 5 + 23
-        if tem_val:
-            alt += 5 + 23
-        if tem_com:
-            alt += 4 + 26
         return alt
 
     alturas_meses = {}
@@ -1179,15 +1120,8 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             margin-top: 3px;
             line-height: 1.25;
         }}
-        .kb-card-meta-group {{
-            margin-top: 5px;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 4px;
-            width: 100%;
-        }}
         .kb-card-meta {{
+            margin-top: 5px;
             padding: 2px 6px;
             border-radius: 5px;
             font-size: 10.5px;
@@ -1195,9 +1129,6 @@ def renderizar_kanban_interativo_html(tipo_acompanhamento, cards_por_mes, meses_
             line-height: 1.25;
             display: inline-block;
             max-width: 100%;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            white-space: normal;
         }}
         .kb-card-vig {{
             background: #EFF6FF;
@@ -1641,77 +1572,6 @@ def renderizar_consolidado_contratos_vigencia(dados, ano_selecionado):
     df_consolidado = pd.DataFrame(linhas_tabela)
     st.dataframe(df_consolidado, hide_index=True, use_container_width=True)
 
-# --- CONSOLIDAÇÃO MENSAL DE COMISSÕES EM VENDAS EXECUTADAS ---
-def renderizar_consolidado_vendas_comissao(dados, ano_selecionado):
-    meses_cols = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-    soma_20_por_mes = {m: 0.0 for m in range(1, 13)}
-    soma_10_por_mes = {m: 0.0 for m in range(1, 13)}
-    total_propostas_executadas = 0.0
-    qtd_vendas_executadas = 0
-
-    for d in dados.values():
-        if not isinstance(d, dict):
-            continue
-        if int(d.get("ano", 0)) != ano_selecionado:
-            continue
-        if str(d.get("status", "")).strip().lower() != "instalação / serviço executado":
-            continue
-        try:
-            mes_num = int(d.get("mes", 0))
-        except (TypeError, ValueError):
-            continue
-        if not (1 <= mes_num <= 12):
-            continue
-
-        qtd_vendas_executadas += 1
-        val_num = parse_valor_moeda(d.get("valor_proposta", ""))
-        if val_num is None:
-            continue
-
-        total_propostas_executadas += val_num
-        comissao_sel = str(d.get("comissao", "") or "").strip()
-        if comissao_sel == "20%":
-            soma_20_por_mes[mes_num] += val_num * 0.20
-        elif comissao_sel == "10%":
-            soma_10_por_mes[mes_num] += val_num * 0.10
-
-    total_comissao_20 = sum(soma_20_por_mes.values())
-    total_comissao_10 = sum(soma_10_por_mes.values())
-    total_geral_comissoes = total_comissao_20 + total_comissao_10
-
-    st.divider()
-    st.markdown(f"### 💰 Consolidado — Comissões \"Instalação / Serviço Executado\" por Mês ({ano_selecionado})")
-    st.caption("Somatória mensal dos valores de comissão (20% e 10%) considerando as vendas no status **Instalação / Serviço executado**.")
-
-    c_k1, c_k2, c_k3, c_k4 = st.columns(4)
-    c_k1.metric("🟢 Comissão 20% (Ano)", formatar_moeda_brl(total_comissao_20))
-    c_k2.metric("🟡 Comissão 10% (Ano)", formatar_moeda_brl(total_comissao_10))
-    c_k3.metric("💵 Total Comissões (Ano)", formatar_moeda_brl(total_geral_comissoes))
-    c_k4.metric("📦 Propostas Executadas", f"{formatar_moeda_brl(total_propostas_executadas)} ({qtd_vendas_executadas})")
-
-    if qtd_vendas_executadas == 0:
-        st.info(f"Nenhuma venda com status 'Instalação / Serviço executado' encontrada para o ano de {ano_selecionado}.")
-        return
-
-    linha_20 = {"Tipo de Comissão": "🟢 Comissão 20%"}
-    linha_10 = {"Tipo de Comissão": "🟡 Comissão 10%"}
-    linha_total = {"Tipo de Comissão": "Total Geral"}
-
-    for idx_m, mes_nome in enumerate(meses_cols):
-        mes_num = idx_m + 1
-        v20 = soma_20_por_mes[mes_num]
-        v10 = soma_10_por_mes[mes_num]
-        linha_20[mes_nome] = formatar_moeda_brl(v20)
-        linha_10[mes_nome] = formatar_moeda_brl(v10)
-        linha_total[mes_nome] = formatar_moeda_brl(v20 + v10)
-
-    linha_20["Total"] = formatar_moeda_brl(total_comissao_20)
-    linha_10["Total"] = formatar_moeda_brl(total_comissao_10)
-    linha_total["Total"] = formatar_moeda_brl(total_geral_comissoes)
-
-    df_comissoes = pd.DataFrame([linha_20, linha_10, linha_total])
-    st.dataframe(df_comissoes, hide_index=True, use_container_width=True)
-
 # --- GERENCIADOR DO PAINEL KANBAN (CONTRATOS E VENDAS) COM ESTILO VISUAL ---
 def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cores):
     usuario = st.session_state.usuario_atual
@@ -2087,8 +1947,6 @@ def renderizar_painel_acompanhamento(tipo_acompanhamento, lista_status, dict_cor
 
         if is_contrato:
             renderizar_consolidado_contratos_vigencia(dados, ano_selecionado)
-        else:
-            renderizar_consolidado_vendas_comissao(dados, ano_selecionado)
 
 # --- GERENCIAMENTO DE ESTADO DE AUTENTICAÇÃO E SESSÃO ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
